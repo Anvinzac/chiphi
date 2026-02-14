@@ -5,9 +5,11 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { Check, ChevronRight, ChevronDown, Plus } from "lucide-react";
 import DayScroller from "./DayScroller";
-import EntryRow from "./EntryRow";
+import PaymentGroup, { type PaymentGroupData, type PaymentEntry } from "./PaymentGroup";
+import QuickVerifyPopup from "./QuickVerifyPopup";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import type { VerifyData } from "@/types/expense";
 
 interface DbItem {
   id: string;
@@ -18,13 +20,6 @@ interface DbItem {
   default_supplier_id: string | null;
   default_unit_price: number | null;
   unit: string | null;
-}
-
-interface SavedEntry {
-  item_name: string;
-  amount: number;
-  category_id: string | null;
-  supplier_id: string | null;
 }
 
 interface MatchInfo {
@@ -40,7 +35,7 @@ interface MatchInfo {
   supplierId: string | null;
 }
 
-type InputPhase = "name" | "amount" | "done";
+type InputPhase = "name" | "verify" | "amount" | "done";
 
 export default function DailyExpenseTable() {
   const { user } = useAuth();
@@ -52,16 +47,17 @@ export default function DailyExpenseTable() {
   const [subCategories, setSubCategories] = useState<{ id: string; name: string }[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
 
-  // Day data
-  const [savedEntries, setSavedEntries] = useState<SavedEntry[]>([]);
+  // Day data - grouped by payment
+  const [paymentGroups, setPaymentGroups] = useState<PaymentGroupData[]>([]);
   const [dayTotal, setDayTotal] = useState(0);
-  const [paymentId, setPaymentId] = useState<string | null>(null);
+  const [activePaymentId, setActivePaymentId] = useState<string | null>(null);
 
   // Input state
   const [phase, setPhase] = useState<InputPhase>("name");
   const [nameValue, setNameValue] = useState("");
   const [amountValue, setAmountValue] = useState("");
   const [match, setMatch] = useState<MatchInfo | null>(null);
+  const [verifyData, setVerifyData] = useState<VerifyData | null>(null);
   const [justSaved, setJustSaved] = useState(false);
 
   // UI state
@@ -93,37 +89,54 @@ export default function DailyExpenseTable() {
     load();
   }, [user]);
 
-  // Load data for selected date
+  // Load data for selected date - grouped by payment
   useEffect(() => {
     if (!user) return;
-    setSavedEntries([]);
+    setPaymentGroups([]);
     setDayTotal(0);
-    setPaymentId(null);
+    setActivePaymentId(null);
 
     const loadDay = async () => {
-      const { data: existing } = await supabase
+      const { data: payments } = await supabase
         .from("payments")
-        .select("id, total_amount, sub_payments(id, item_name, amount, category_id, supplier_id)")
+        .select("id, total_amount, supplier_id, sub_payments(id, item_name, amount, category_id, supplier_id)")
         .eq("user_id", user.id)
         .eq("date", selectedDate)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
+        .order("created_at", { ascending: true });
 
-      if (existing) {
-        setPaymentId(existing.id);
-        setDayTotal(Number(existing.total_amount) || 0);
-        const subs = (existing.sub_payments as any[]) || [];
-        setSavedEntries(subs.map((s: any) => ({
-          item_name: s.item_name,
-          amount: Number(s.amount),
-          category_id: s.category_id,
-          supplier_id: s.supplier_id,
-        })));
+      if (payments && payments.length > 0) {
+        let total = 0;
+        const groups: PaymentGroupData[] = payments.map((p: any) => {
+          const subs = (p.sub_payments as any[]) || [];
+          const paymentTotal = subs.reduce((sum: number, s: any) => sum + Number(s.amount), 0);
+          total += paymentTotal;
+
+          // Determine supplier name from payment-level or first sub_payment
+          const supplierId = p.supplier_id || (subs.length > 0 ? subs[0].supplier_id : null);
+          const supplierName = supplierId
+            ? suppliers.find(s => s.id === supplierId)?.name || null
+            : null;
+
+          return {
+            paymentId: p.id,
+            supplierName,
+            total: paymentTotal,
+            entries: subs.map((s: any) => ({
+              item_name: s.item_name,
+              amount: Number(s.amount),
+              category_id: s.category_id,
+              supplier_id: s.supplier_id,
+            })),
+          };
+        });
+
+        setPaymentGroups(groups);
+        setDayTotal(total);
+        setActivePaymentId(payments[payments.length - 1].id);
       }
     };
     loadDay();
-  }, [user, selectedDate]);
+  }, [user, selectedDate, suppliers]);
 
   useEffect(() => {
     if (phase === "name" && cardExpanded) nameRef.current?.focus();
@@ -164,7 +177,7 @@ export default function DailyExpenseTable() {
       const cat = categories.find(c => c.id === matched.category_id);
       const sub = subCategories.find(s => s.id === matched.sub_category_id);
       const sup = suppliers.find(s => s.id === matched.default_supplier_id);
-      setMatch({
+      const matchInfo: MatchInfo = {
         itemId: matched.id,
         categoryName: cat?.name ?? "",
         subCategoryName: sub?.name ?? "",
@@ -175,29 +188,69 @@ export default function DailyExpenseTable() {
         subCategoryId: matched.sub_category_id,
         subSubCategoryId: matched.sub_sub_category_id,
         supplierId: matched.default_supplier_id,
+      };
+      setMatch(matchInfo);
+
+      // Show verify popup
+      setVerifyData({
+        itemName: nameValue.trim(),
+        categoryName: cat?.name ?? "",
+        subCategoryName: sub?.name ?? "",
+        supplierName: sup?.name ?? "",
+        unitPrice: matched.default_unit_price ?? 0,
+        unit: matched.unit ?? "unit",
+        itemId: matched.id,
+        categoryId: matched.category_id ?? undefined,
+        subCategoryId: matched.sub_category_id ?? undefined,
+        supplierId: matched.default_supplier_id ?? undefined,
       });
+      setPhase("verify");
     } else {
       setMatch(null);
+      setVerifyData(null);
+      setPhase("amount");
+      setTimeout(() => amountRef.current?.focus(), 50);
     }
+  }, [nameValue, findItem, categories, subCategories, suppliers]);
+
+  const handleVerifyDismiss = useCallback(() => {
+    // Auto-confirmed by countdown, proceed to amount
     setPhase("amount");
     setTimeout(() => amountRef.current?.focus(), 50);
-  }, [nameValue, findItem, categories, subCategories, suppliers]);
+  }, []);
+
+  const handleVerifySave = useCallback((updated: VerifyData) => {
+    // User edited and saved verify data, update match
+    setMatch(prev => prev ? {
+      ...prev,
+      categoryName: updated.categoryName,
+      subCategoryName: updated.subCategoryName,
+      supplierName: updated.supplierName,
+      unitPrice: updated.unitPrice,
+      supplierId: updated.supplierId ?? prev.supplierId,
+      categoryId: updated.categoryId ?? prev.categoryId,
+      subCategoryId: updated.subCategoryId ?? prev.subCategoryId,
+    } : null);
+    setVerifyData(null);
+    setPhase("amount");
+    setTimeout(() => amountRef.current?.focus(), 50);
+  }, []);
 
   const handleSave = useCallback(async () => {
     if (!amountValue.trim() || !user) return;
     const amount = Number(amountValue) || 0;
     if (amount === 0) return;
 
-    let pid = paymentId;
+    let pid = activePaymentId;
     if (!pid) {
       const { data: newPayment } = await supabase
         .from("payments")
-        .insert({ date: selectedDate, user_id: user.id, total_amount: 0 })
+        .insert({ date: selectedDate, user_id: user.id, total_amount: 0, supplier_id: match?.supplierId || null })
         .select("id")
         .single();
       if (newPayment) {
         pid = newPayment.id;
-        setPaymentId(pid);
+        setActivePaymentId(pid);
       }
     }
     if (!pid) return;
@@ -221,12 +274,32 @@ export default function DailyExpenseTable() {
       return;
     }
 
-    setSavedEntries(prev => [...prev, {
+    const newEntry: PaymentEntry = {
       item_name: nameValue.trim(),
       amount,
       category_id: match?.categoryId || null,
       supplier_id: match?.supplierId || null,
-    }]);
+    };
+
+    // Update or create group
+    setPaymentGroups(prev => {
+      const existing = prev.find(g => g.paymentId === pid);
+      if (existing) {
+        return prev.map(g => g.paymentId === pid ? {
+          ...g,
+          entries: [...g.entries, newEntry],
+          total: g.total + amount,
+          supplierName: g.supplierName || (match?.supplierName || null),
+        } : g);
+      } else {
+        return [...prev, {
+          paymentId: pid!,
+          supplierName: match?.supplierName || null,
+          total: amount,
+          entries: [newEntry],
+        }];
+      }
+    });
     setDayTotal(prev => prev + amount);
 
     setPhase("done");
@@ -235,10 +308,11 @@ export default function DailyExpenseTable() {
       setNameValue("");
       setAmountValue("");
       setMatch(null);
+      setVerifyData(null);
       setJustSaved(false);
       setPhase("name");
     }, 600);
-  }, [amountValue, nameValue, match, paymentId, user, selectedDate]);
+  }, [amountValue, nameValue, match, activePaymentId, user, selectedDate]);
 
   const handleNameKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === "Tab") {
@@ -276,6 +350,17 @@ export default function DailyExpenseTable() {
     setTimeout(() => nameRef.current?.focus(), 100);
   };
 
+  const startNewPurchase = () => {
+    setActivePaymentId(null);
+    setNameValue("");
+    setAmountValue("");
+    setMatch(null);
+    setVerifyData(null);
+    setPhase("name");
+    setCardExpanded(true);
+    setTimeout(() => nameRef.current?.focus(), 100);
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Top bar */}
@@ -295,7 +380,7 @@ export default function DailyExpenseTable() {
         </div>
       </div>
 
-      {/* Day scroller (hidden by default) */}
+      {/* Day scroller */}
       {showDayScroller && (
         <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
           <PopoverTrigger asChild>
@@ -319,26 +404,36 @@ export default function DailyExpenseTable() {
         </Popover>
       )}
 
-      {/* Saved entries */}
-      <div className={`flex-1 overflow-auto px-4 ${cardExpanded ? "pb-[45vh]" : "pb-24"}`}>
-        {savedEntries.length === 0 && (
+      {/* Grouped entries */}
+      <div className={`flex-1 overflow-auto px-4 ${cardExpanded ? "pb-[50vh]" : "pb-24"}`}>
+        {paymentGroups.length === 0 && (
           <div className="text-center pt-12 text-muted-foreground text-sm">
             <p>No expenses recorded</p>
           </div>
         )}
-        {savedEntries.map((entry, i) => (
-          <EntryRow
-            key={i}
-            item_name={entry.item_name}
-            amount={entry.amount}
-            categoryName={getCategoryName(entry.category_id)}
-            supplierName={getSupplierName(entry.supplier_id)}
-            isHighValue={entry.amount >= HIGH_VALUE_THRESHOLD}
+        {paymentGroups.map((group) => (
+          <PaymentGroup
+            key={group.paymentId}
+            group={group}
+            getCategoryName={getCategoryName}
+            getSupplierName={getSupplierName}
+            highValueThreshold={HIGH_VALUE_THRESHOLD}
           />
         ))}
+
+        {/* New purchase button */}
+        {paymentGroups.length > 0 && (
+          <button
+            onClick={startNewPurchase}
+            className="w-full mt-2 py-2.5 text-xs text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:border-primary/40 transition-colors flex items-center justify-center gap-1.5"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            New purchase
+          </button>
+        )}
       </div>
 
-      {/* ============ COMPACT FAB (when card is collapsed) ============ */}
+      {/* FAB when collapsed */}
       {!cardExpanded && (
         <button
           onClick={expandCard}
@@ -349,16 +444,16 @@ export default function DailyExpenseTable() {
         </button>
       )}
 
-      {/* ============ THE FLOATING INPUT CARD (expandable) ============ */}
+      {/* Floating input card */}
       {cardExpanded && (
-        <div ref={cardRef} className="fixed bottom-0 left-0 right-0 z-50 animate-in slide-in-from-bottom-4 fade-in duration-250" style={{ height: "42vh" }}>
+        <div ref={cardRef} className="fixed bottom-0 left-0 right-0 z-50 animate-in slide-in-from-bottom-4 fade-in duration-250" style={{ height: "45vh" }}>
           <div
             className="absolute -top-8 left-0 right-0 h-8 pointer-events-none"
             style={{ background: "linear-gradient(to bottom, transparent, hsl(var(--background)))" }}
           />
 
           <div
-            className={`h-full rounded-t-2xl border-t border-border/60 flex flex-col transition-colors duration-300 ${
+            className={`h-full rounded-t-2xl border-t border-border/60 flex flex-col transition-colors duration-300 overflow-auto ${
               justSaved ? "bg-secondary/30" : "bg-card"
             }`}
             style={{ boxShadow: "0 -8px 40px -4px hsl(25 30% 20% / 0.10)" }}
@@ -367,6 +462,9 @@ export default function DailyExpenseTable() {
             <div className="flex items-center gap-2 px-5 pt-4 pb-1">
               <div className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
                 phase === "name" ? "bg-primary" : "bg-primary/30"
+              }`} />
+              <div className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
+                phase === "verify" ? "bg-primary" : phase === "amount" || phase === "done" ? "bg-primary/30" : "bg-muted"
               }`} />
               <div className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
                 phase === "amount" || phase === "done" ? "bg-primary" : "bg-muted"
@@ -427,6 +525,17 @@ export default function DailyExpenseTable() {
                 >
                   Next <ChevronRight className="h-4 w-4" />
                 </button>
+              </div>
+            )}
+
+            {/* Verify phase */}
+            {phase === "verify" && verifyData && !justSaved && (
+              <div className="flex-1 px-5 py-2 overflow-auto">
+                <QuickVerifyPopup
+                  data={verifyData}
+                  onSave={handleVerifySave}
+                  onDismiss={handleVerifyDismiss}
+                />
               </div>
             )}
 

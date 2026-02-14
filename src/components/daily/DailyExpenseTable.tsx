@@ -3,9 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { Check, ChevronRight } from "lucide-react";
+import { Check, ChevronRight, ChevronDown, Plus } from "lucide-react";
 import DayScroller from "./DayScroller";
 import EntryRow from "./EntryRow";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface DbItem {
   id: string;
@@ -62,10 +64,15 @@ export default function DailyExpenseTable() {
   const [match, setMatch] = useState<MatchInfo | null>(null);
   const [justSaved, setJustSaved] = useState(false);
 
+  // UI state
+  const [showDayScroller, setShowDayScroller] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [cardExpanded, setCardExpanded] = useState(true);
+
   const nameRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
 
-  // HIGH_VALUE threshold (top 20% of typical daily items)
   const HIGH_VALUE_THRESHOLD = 200000;
 
   // Load reference data once
@@ -119,8 +126,20 @@ export default function DailyExpenseTable() {
   }, [user, selectedDate]);
 
   useEffect(() => {
-    if (phase === "name") nameRef.current?.focus();
-  }, [phase]);
+    if (phase === "name" && cardExpanded) nameRef.current?.focus();
+  }, [phase, cardExpanded]);
+
+  // Click outside card to collapse
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (!cardExpanded) return;
+      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
+        setCardExpanded(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [cardExpanded]);
 
   const findItem = useCallback((name: string): DbItem | undefined => {
     const lower = name.toLowerCase().trim();
@@ -240,24 +259,68 @@ export default function DailyExpenseTable() {
     }
   };
 
+  const handleDateLabelClick = () => {
+    setShowDayScroller(prev => !prev);
+  };
+
+  const handleCalendarSelect = (date: Date | undefined) => {
+    if (date) {
+      setSelectedDate(format(date, "yyyy-MM-dd"));
+      setCalendarOpen(false);
+      setShowDayScroller(false);
+    }
+  };
+
+  const expandCard = () => {
+    setCardExpanded(true);
+    setTimeout(() => nameRef.current?.focus(), 100);
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Top bar */}
       <div className="px-4 py-3 flex items-center justify-between">
         <span className="font-display text-xl text-primary">Mìsè</span>
         <div className="text-right">
-          <span className="text-[10px] text-muted-foreground uppercase tracking-widest block">
-            {format(new Date(selectedDate + "T00:00:00"), "EEE, MMM d")}
-          </span>
-          <span className="text-lg font-display">{dayTotal.toLocaleString()}</span>
+          <button
+            onClick={handleDateLabelClick}
+            className="flex items-center gap-1.5 group"
+          >
+            <span className="text-[10px] text-muted-foreground uppercase tracking-widest group-hover:text-foreground transition-colors">
+              {format(new Date(selectedDate + "T00:00:00"), "EEE, MMM d")}
+            </span>
+            <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform duration-200 ${showDayScroller ? "rotate-180" : ""}`} />
+          </button>
+          <span className="text-lg font-display block">{dayTotal.toLocaleString()}</span>
         </div>
       </div>
 
-      {/* Day scroller */}
-      <DayScroller selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+      {/* Day scroller (hidden by default) */}
+      {showDayScroller && (
+        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+          <PopoverTrigger asChild>
+            <div>
+              <DayScroller
+                selectedDate={selectedDate}
+                onSelectDate={(d) => { setSelectedDate(d); setShowDayScroller(false); }}
+                onRequestCalendar={() => setCalendarOpen(true)}
+              />
+            </div>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end">
+            <Calendar
+              mode="single"
+              selected={new Date(selectedDate + "T00:00:00")}
+              onSelect={handleCalendarSelect}
+              disabled={(date) => date > new Date()}
+              className="p-3 pointer-events-auto"
+            />
+          </PopoverContent>
+        </Popover>
+      )}
 
       {/* Saved entries */}
-      <div className="flex-1 overflow-auto px-4 pb-[45vh]">
+      <div className={`flex-1 overflow-auto px-4 ${cardExpanded ? "pb-[45vh]" : "pb-24"}`}>
         {savedEntries.length === 0 && (
           <div className="text-center pt-12 text-muted-foreground text-sm">
             <p>No expenses recorded</p>
@@ -275,136 +338,149 @@ export default function DailyExpenseTable() {
         ))}
       </div>
 
-      {/* ==================== THE FLOATING INPUT CARD ==================== */}
-      <div className="fixed bottom-0 left-0 right-0 z-50" style={{ height: "42vh" }}>
-        <div
-          className="absolute -top-8 left-0 right-0 h-8 pointer-events-none"
-          style={{ background: "linear-gradient(to bottom, transparent, hsl(var(--background)))" }}
-        />
-
-        <div
-          className={`h-full rounded-t-2xl border-t border-border/60 flex flex-col transition-colors duration-300 ${
-            justSaved ? "bg-secondary/30" : "bg-card"
-          }`}
-          style={{ boxShadow: "0 -8px 40px -4px hsl(25 30% 20% / 0.10)" }}
+      {/* ============ COMPACT FAB (when card is collapsed) ============ */}
+      {!cardExpanded && (
+        <button
+          onClick={expandCard}
+          className="fixed bottom-6 right-5 z-50 w-14 h-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg active:scale-95 transition-transform animate-in fade-in zoom-in-90 duration-200"
+          aria-label="Add expense"
         >
-          {/* Phase indicator */}
-          <div className="flex items-center gap-2 px-5 pt-4 pb-1">
-            <div className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
-              phase === "name" ? "bg-primary" : "bg-primary/30"
-            }`} />
-            <div className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
-              phase === "amount" || phase === "done" ? "bg-primary" : "bg-muted"
-            }`} />
-          </div>
+          <Plus className="h-6 w-6" />
+        </button>
+      )}
 
-          {/* Success flash */}
-          {justSaved && (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="flex items-center gap-3 animate-in fade-in zoom-in-95 duration-300">
-                <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center">
-                  <Check className="h-6 w-6 text-secondary-foreground" />
-                </div>
-                <div>
-                  <p className="text-lg font-display">{nameValue}</p>
-                  <p className="text-2xl font-display">{Number(amountValue).toLocaleString()}</p>
+      {/* ============ THE FLOATING INPUT CARD (expandable) ============ */}
+      {cardExpanded && (
+        <div ref={cardRef} className="fixed bottom-0 left-0 right-0 z-50 animate-in slide-in-from-bottom-4 fade-in duration-250" style={{ height: "42vh" }}>
+          <div
+            className="absolute -top-8 left-0 right-0 h-8 pointer-events-none"
+            style={{ background: "linear-gradient(to bottom, transparent, hsl(var(--background)))" }}
+          />
+
+          <div
+            className={`h-full rounded-t-2xl border-t border-border/60 flex flex-col transition-colors duration-300 ${
+              justSaved ? "bg-secondary/30" : "bg-card"
+            }`}
+            style={{ boxShadow: "0 -8px 40px -4px hsl(25 30% 20% / 0.10)" }}
+          >
+            {/* Phase indicator */}
+            <div className="flex items-center gap-2 px-5 pt-4 pb-1">
+              <div className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
+                phase === "name" ? "bg-primary" : "bg-primary/30"
+              }`} />
+              <div className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
+                phase === "amount" || phase === "done" ? "bg-primary" : "bg-muted"
+              }`} />
+            </div>
+
+            {/* Success flash */}
+            {justSaved && (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="flex items-center gap-3 animate-in fade-in zoom-in-95 duration-300">
+                  <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center">
+                    <Check className="h-6 w-6 text-secondary-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-lg font-display">{nameValue}</p>
+                    <p className="text-2xl font-display">{Number(amountValue).toLocaleString()}</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Name phase */}
-          {phase === "name" && !justSaved && (
-            <div className="flex-1 flex flex-col justify-center px-5">
-              <label className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-2">
-                Item name
-              </label>
-              <input
-                ref={nameRef}
-                type="text"
-                value={nameValue}
-                onChange={(e) => setNameValue(e.target.value)}
-                onKeyDown={handleNameKeyDown}
-                placeholder="What did you buy?"
-                className="bg-transparent text-3xl font-display text-foreground placeholder:text-muted-foreground/40 outline-none w-full caret-primary"
-                autoComplete="off"
-                aria-label="Item name"
-              />
-              {nameValue.length > 1 && (() => {
-                const hint = findItem(nameValue);
-                return hint ? (
-                  <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1.5">
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-secondary" />
-                    {hint.name}
-                    {categories.find(c => c.id === hint.category_id)?.name && (
-                      <span className="text-muted-foreground/60">
-                        · {categories.find(c => c.id === hint.category_id)?.name}
-                      </span>
-                    )}
-                  </p>
-                ) : null;
-              })()}
-              <button
-                onClick={handleNameConfirm}
-                disabled={!nameValue.trim()}
-                className="self-end mt-4 flex items-center gap-1 text-sm font-medium text-primary disabled:text-muted-foreground/30 transition-colors"
-                aria-label="Next"
-              >
-                Next <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          )}
-
-          {/* Amount phase */}
-          {phase === "amount" && !justSaved && (
-            <div className="flex-1 flex flex-col justify-center px-5">
-              <div className="flex items-center justify-between mb-1">
+            {/* Name phase */}
+            {phase === "name" && !justSaved && (
+              <div className="flex-1 flex flex-col justify-center px-5">
+                <label className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-2">
+                  Item name
+                </label>
+                <input
+                  ref={nameRef}
+                  type="text"
+                  value={nameValue}
+                  onChange={(e) => setNameValue(e.target.value)}
+                  onKeyDown={handleNameKeyDown}
+                  placeholder="What did you buy?"
+                  className="bg-transparent text-3xl font-display text-foreground placeholder:text-muted-foreground/40 outline-none w-full caret-primary"
+                  autoComplete="off"
+                  aria-label="Item name"
+                />
+                {nameValue.length > 1 && (() => {
+                  const hint = findItem(nameValue);
+                  return hint ? (
+                    <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1.5">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-secondary" />
+                      {hint.name}
+                      {categories.find(c => c.id === hint.category_id)?.name && (
+                        <span className="text-muted-foreground/60">
+                          · {categories.find(c => c.id === hint.category_id)?.name}
+                        </span>
+                      )}
+                    </p>
+                  ) : null;
+                })()}
                 <button
-                  onClick={() => { setPhase("name"); setTimeout(() => nameRef.current?.focus(), 50); }}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={handleNameConfirm}
+                  disabled={!nameValue.trim()}
+                  className="self-end mt-4 flex items-center gap-1 text-sm font-medium text-primary disabled:text-muted-foreground/30 transition-colors"
+                  aria-label="Next"
                 >
-                  ← {nameValue}
+                  Next <ChevronRight className="h-4 w-4" />
                 </button>
-                {match && (
-                  <span className="text-[10px] text-muted-foreground">
-                    Last: {match.unitPrice.toLocaleString()}/{match.unit}
-                  </span>
-                )}
               </div>
-              <label className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-2">
-                Amount
-              </label>
-              <input
-                ref={amountRef}
-                type="number"
-                inputMode="numeric"
-                value={amountValue}
-                onChange={(e) => setAmountValue(e.target.value)}
-                onKeyDown={handleAmountKeyDown}
-                placeholder="0"
-                className="bg-transparent text-5xl font-display text-foreground placeholder:text-muted-foreground/20 outline-none w-full caret-primary tabular-nums"
-                aria-label="Amount"
-              />
-              {match && (
-                <div className="flex items-center gap-3 mt-3 text-[11px] text-muted-foreground">
-                  {match.supplierName && <span className="px-2 py-0.5 rounded-full bg-muted">{match.supplierName}</span>}
-                  {match.categoryName && <span className="px-2 py-0.5 rounded-full bg-muted">{match.categoryName}</span>}
-                  {match.subCategoryName && <span className="px-2 py-0.5 rounded-full bg-muted">{match.subCategoryName}</span>}
+            )}
+
+            {/* Amount phase */}
+            {phase === "amount" && !justSaved && (
+              <div className="flex-1 flex flex-col justify-center px-5">
+                <div className="flex items-center justify-between mb-1">
+                  <button
+                    onClick={() => { setPhase("name"); setTimeout(() => nameRef.current?.focus(), 50); }}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    ← {nameValue}
+                  </button>
+                  {match && (
+                    <span className="text-[10px] text-muted-foreground">
+                      Last: {match.unitPrice.toLocaleString()}/{match.unit}
+                    </span>
+                  )}
                 </div>
-              )}
-              <button
-                onClick={handleSave}
-                disabled={!amountValue.trim() || Number(amountValue) === 0}
-                className="self-end mt-4 flex items-center gap-1.5 text-sm font-medium bg-primary text-primary-foreground px-5 py-2.5 rounded-lg disabled:opacity-30 transition-opacity active:scale-95"
-                aria-label="Save"
-              >
-                <Check className="h-4 w-4" />
-                Save
-              </button>
-            </div>
-          )}
+                <label className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-2">
+                  Amount
+                </label>
+                <input
+                  ref={amountRef}
+                  type="number"
+                  inputMode="numeric"
+                  value={amountValue}
+                  onChange={(e) => setAmountValue(e.target.value)}
+                  onKeyDown={handleAmountKeyDown}
+                  placeholder="0"
+                  className="bg-transparent text-5xl font-display text-foreground placeholder:text-muted-foreground/20 outline-none w-full caret-primary tabular-nums"
+                  aria-label="Amount"
+                />
+                {match && (
+                  <div className="flex items-center gap-3 mt-3 text-[11px] text-muted-foreground">
+                    {match.supplierName && <span className="px-2 py-0.5 rounded-full bg-muted">{match.supplierName}</span>}
+                    {match.categoryName && <span className="px-2 py-0.5 rounded-full bg-muted">{match.categoryName}</span>}
+                    {match.subCategoryName && <span className="px-2 py-0.5 rounded-full bg-muted">{match.subCategoryName}</span>}
+                  </div>
+                )}
+                <button
+                  onClick={handleSave}
+                  disabled={!amountValue.trim() || Number(amountValue) === 0}
+                  className="self-end mt-4 flex items-center gap-1.5 text-sm font-medium bg-primary text-primary-foreground px-5 py-2.5 rounded-lg disabled:opacity-30 transition-opacity active:scale-95"
+                  aria-label="Save"
+                >
+                  <Check className="h-4 w-4" />
+                  Save
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

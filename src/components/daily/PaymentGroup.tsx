@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
-import EntryRow from "./EntryRow";
+import SwipeableEntryRow from "./SwipeableEntryRow";
 
 export interface PaymentEntry {
   item_name: string;
   amount: number;
   category_id: string | null;
   supplier_id: string | null;
+  sub_payment_id?: string;
 }
 
 export interface PaymentGroupData {
@@ -21,9 +22,11 @@ interface PaymentGroupProps {
   getCategoryName: (id: string | null) => string | undefined;
   getSupplierName: (id: string | null) => string | undefined;
   highValueThreshold: number;
+  onEntryClick: (entry: PaymentEntry) => void;
+  onEntryDelete: (paymentId: string, entry: PaymentEntry, index: number) => void;
 }
 
-export default function PaymentGroup({ group, getCategoryName, getSupplierName, highValueThreshold }: PaymentGroupProps) {
+export default function PaymentGroup({ group, getCategoryName, getSupplierName, highValueThreshold, onEntryClick, onEntryDelete }: PaymentGroupProps) {
   const [expanded, setExpanded] = useState(true);
 
   return (
@@ -57,13 +60,15 @@ export default function PaymentGroup({ group, getCategoryName, getSupplierName, 
       {expanded && (
         <div className="ml-5 pl-3 border-l border-border/50 animate-in fade-in slide-in-from-top-1 duration-150">
           {group.entries.map((entry, i) => (
-            <EntryRow
-              key={i}
+            <SwipeableEntryRow
+              key={entry.sub_payment_id || i}
               item_name={entry.item_name}
               amount={entry.amount}
               categoryName={getCategoryName(entry.category_id)}
               supplierName={getSupplierName(entry.supplier_id)}
               isHighValue={entry.amount >= highValueThreshold}
+              onClick={() => onEntryClick(entry)}
+              onDelete={() => onEntryDelete(group.paymentId, entry, i)}
             />
           ))}
         </div>

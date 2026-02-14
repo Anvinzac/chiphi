@@ -7,6 +7,7 @@ import { Check, ChevronRight, ChevronDown, Plus } from "lucide-react";
 import DayScroller from "./DayScroller";
 import PaymentGroup, { type PaymentGroupData, type PaymentEntry } from "./PaymentGroup";
 import QuickVerifyPopup from "./QuickVerifyPopup";
+import PurchaseDetailDialog from "./PurchaseDetailDialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { VerifyData } from "@/types/expense";
@@ -64,6 +65,8 @@ export default function DailyExpenseTable() {
   const [showDayScroller, setShowDayScroller] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [cardExpanded, setCardExpanded] = useState(true);
+  const [detailEntry, setDetailEntry] = useState<PaymentEntry | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const nameRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
@@ -126,6 +129,7 @@ export default function DailyExpenseTable() {
               amount: Number(s.amount),
               category_id: s.category_id,
               supplier_id: s.supplier_id,
+              sub_payment_id: s.id,
             })),
           };
         });
@@ -279,6 +283,7 @@ export default function DailyExpenseTable() {
       amount,
       category_id: match?.categoryId || null,
       supplier_id: match?.supplierId || null,
+      sub_payment_id: undefined, // will get real id on reload
     };
 
     // Update or create group
@@ -418,6 +423,19 @@ export default function DailyExpenseTable() {
             getCategoryName={getCategoryName}
             getSupplierName={getSupplierName}
             highValueThreshold={HIGH_VALUE_THRESHOLD}
+            onEntryClick={(entry) => { setDetailEntry(entry); setDetailOpen(true); }}
+            onEntryDelete={async (paymentId, entry, index) => {
+              if (entry.sub_payment_id) {
+                await supabase.from("sub_payments").delete().eq("id", entry.sub_payment_id);
+              }
+              setPaymentGroups(prev => prev.map(g => {
+                if (g.paymentId !== paymentId) return g;
+                const newEntries = g.entries.filter((_, i) => i !== index);
+                return { ...g, entries: newEntries, total: newEntries.reduce((s, e) => s + e.amount, 0) };
+              }).filter(g => g.entries.length > 0));
+              setDayTotal(prev => prev - entry.amount);
+              toast.success("Deleted");
+            }}
           />
         ))}
 
@@ -437,7 +455,7 @@ export default function DailyExpenseTable() {
       {!cardExpanded && (
         <button
           onClick={expandCard}
-          className="fixed bottom-6 right-5 z-50 w-14 h-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg active:scale-95 transition-transform animate-in fade-in zoom-in-90 duration-200"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-14 h-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg active:scale-95 transition-transform animate-in fade-in zoom-in-90 duration-200"
           aria-label="Add expense"
         >
           <Plus className="h-6 w-6" />
@@ -590,6 +608,29 @@ export default function DailyExpenseTable() {
           </div>
         </div>
       )}
+
+      {/* Purchase detail dialog */}
+      <PurchaseDetailDialog
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        entry={detailEntry}
+        getCategoryName={getCategoryName}
+        getSupplierName={getSupplierName}
+        onSave={async (id, updates) => {
+          await supabase.from("sub_payments").update(updates).eq("id", id);
+          setPaymentGroups(prev => prev.map(g => ({
+            ...g,
+            entries: g.entries.map(e =>
+              e.sub_payment_id === id ? { ...e, ...updates } : e
+            ),
+            total: g.entries.reduce((s, e) => e.sub_payment_id === id ? s + updates.amount : s + e.amount, 0),
+          })));
+          const diff = updates.amount - (detailEntry?.amount || 0);
+          setDayTotal(prev => prev + diff);
+          setDetailOpen(false);
+          toast.success("Updated");
+        }}
+      />
     </div>
   );
 }

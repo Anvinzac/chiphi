@@ -4,6 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Check, ChevronRight } from "lucide-react";
+import DayScroller from "./DayScroller";
+import EntryRow from "./EntryRow";
 
 interface DbItem {
   id: string;
@@ -19,6 +21,8 @@ interface DbItem {
 interface SavedEntry {
   item_name: string;
   amount: number;
+  category_id: string | null;
+  supplier_id: string | null;
 }
 
 interface MatchInfo {
@@ -38,15 +42,17 @@ type InputPhase = "name" | "amount" | "done";
 
 export default function DailyExpenseTable() {
   const { user } = useAuth();
-  const today = format(new Date(), "yyyy-MM-dd");
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
 
-  // Data
+  // Reference data
   const [items, setItems] = useState<DbItem[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [subCategories, setSubCategories] = useState<{ id: string; name: string }[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+
+  // Day data
   const [savedEntries, setSavedEntries] = useState<SavedEntry[]>([]);
-  const [todayTotal, setTodayTotal] = useState(0);
+  const [dayTotal, setDayTotal] = useState(0);
   const [paymentId, setPaymentId] = useState<string | null>(null);
 
   // Input state
@@ -59,7 +65,10 @@ export default function DailyExpenseTable() {
   const nameRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
 
-  // Load reference data
+  // HIGH_VALUE threshold (top 20% of typical daily items)
+  const HIGH_VALUE_THRESHOLD = 200000;
+
+  // Load reference data once
   useEffect(() => {
     if (!user) return;
     const load = async () => {
@@ -77,30 +86,38 @@ export default function DailyExpenseTable() {
     load();
   }, [user]);
 
-  // Load today's data
+  // Load data for selected date
   useEffect(() => {
     if (!user) return;
-    const loadToday = async () => {
+    setSavedEntries([]);
+    setDayTotal(0);
+    setPaymentId(null);
+
+    const loadDay = async () => {
       const { data: existing } = await supabase
         .from("payments")
-        .select("id, total_amount, sub_payments(id, item_name, amount)")
+        .select("id, total_amount, sub_payments(id, item_name, amount, category_id, supplier_id)")
         .eq("user_id", user.id)
-        .eq("date", today)
+        .eq("date", selectedDate)
         .order("created_at", { ascending: false })
         .limit(1)
         .single();
 
       if (existing) {
         setPaymentId(existing.id);
-        setTodayTotal(Number(existing.total_amount) || 0);
+        setDayTotal(Number(existing.total_amount) || 0);
         const subs = (existing.sub_payments as any[]) || [];
-        setSavedEntries(subs.map((s: any) => ({ item_name: s.item_name, amount: Number(s.amount) })));
+        setSavedEntries(subs.map((s: any) => ({
+          item_name: s.item_name,
+          amount: Number(s.amount),
+          category_id: s.category_id,
+          supplier_id: s.supplier_id,
+        })));
       }
     };
-    loadToday();
-  }, [user, today]);
+    loadDay();
+  }, [user, selectedDate]);
 
-  // Auto-focus name input on mount
   useEffect(() => {
     if (phase === "name") nameRef.current?.focus();
   }, [phase]);
@@ -110,6 +127,16 @@ export default function DailyExpenseTable() {
     return items.find(i => i.name.toLowerCase() === lower) ||
       items.find(i => i.name.toLowerCase().includes(lower));
   }, [items]);
+
+  const getCategoryName = useCallback((catId: string | null) => {
+    if (!catId) return undefined;
+    return categories.find(c => c.id === catId)?.name;
+  }, [categories]);
+
+  const getSupplierName = useCallback((supId: string | null) => {
+    if (!supId) return undefined;
+    return suppliers.find(s => s.id === supId)?.name;
+  }, [suppliers]);
 
   const handleNameConfirm = useCallback(() => {
     if (!nameValue.trim()) return;
@@ -142,12 +169,11 @@ export default function DailyExpenseTable() {
     const amount = Number(amountValue) || 0;
     if (amount === 0) return;
 
-    // Ensure payment exists
     let pid = paymentId;
     if (!pid) {
       const { data: newPayment } = await supabase
         .from("payments")
-        .insert({ date: today, user_id: user.id, total_amount: 0 })
+        .insert({ date: selectedDate, user_id: user.id, total_amount: 0 })
         .select("id")
         .single();
       if (newPayment) {
@@ -176,10 +202,14 @@ export default function DailyExpenseTable() {
       return;
     }
 
-    setSavedEntries(prev => [...prev, { item_name: nameValue.trim(), amount }]);
-    setTodayTotal(prev => prev + amount);
+    setSavedEntries(prev => [...prev, {
+      item_name: nameValue.trim(),
+      amount,
+      category_id: match?.categoryId || null,
+      supplier_id: match?.supplierId || null,
+    }]);
+    setDayTotal(prev => prev + amount);
 
-    // Flash success
     setPhase("done");
     setJustSaved(true);
     setTimeout(() => {
@@ -189,7 +219,7 @@ export default function DailyExpenseTable() {
       setJustSaved(false);
       setPhase("name");
     }, 600);
-  }, [amountValue, nameValue, match, paymentId, user, today]);
+  }, [amountValue, nameValue, match, paymentId, user, selectedDate]);
 
   const handleNameKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === "Tab") {
@@ -216,32 +246,37 @@ export default function DailyExpenseTable() {
       <div className="px-4 py-3 flex items-center justify-between">
         <span className="font-display text-xl text-primary">Mìsè</span>
         <div className="text-right">
-          <span className="text-[10px] text-muted-foreground uppercase tracking-widest block">{format(new Date(), "EEE, MMM d")}</span>
-          <span className="text-lg font-display">{todayTotal.toLocaleString()}</span>
+          <span className="text-[10px] text-muted-foreground uppercase tracking-widest block">
+            {format(new Date(selectedDate + "T00:00:00"), "EEE, MMM d")}
+          </span>
+          <span className="text-lg font-display">{dayTotal.toLocaleString()}</span>
         </div>
       </div>
 
-      {/* Saved entries - scrollable list behind the card */}
+      {/* Day scroller */}
+      <DayScroller selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+
+      {/* Saved entries */}
       <div className="flex-1 overflow-auto px-4 pb-[45vh]">
         {savedEntries.length === 0 && (
           <div className="text-center pt-12 text-muted-foreground text-sm">
-            <p>No expenses today yet</p>
+            <p>No expenses recorded</p>
           </div>
         )}
         {savedEntries.map((entry, i) => (
-          <div
+          <EntryRow
             key={i}
-            className="flex items-center justify-between py-3 border-b border-border/40"
-          >
-            <span className="text-sm">{entry.item_name}</span>
-            <span className="text-sm font-medium tabular-nums">{entry.amount.toLocaleString()}</span>
-          </div>
+            item_name={entry.item_name}
+            amount={entry.amount}
+            categoryName={getCategoryName(entry.category_id)}
+            supplierName={getSupplierName(entry.supplier_id)}
+            isHighValue={entry.amount >= HIGH_VALUE_THRESHOLD}
+          />
         ))}
       </div>
 
       {/* ==================== THE FLOATING INPUT CARD ==================== */}
       <div className="fixed bottom-0 left-0 right-0 z-50" style={{ height: "42vh" }}>
-        {/* Soft gradient fade above the card */}
         <div
           className="absolute -top-8 left-0 right-0 h-8 pointer-events-none"
           style={{ background: "linear-gradient(to bottom, transparent, hsl(var(--background)))" }}
@@ -249,9 +284,7 @@ export default function DailyExpenseTable() {
 
         <div
           className={`h-full rounded-t-2xl border-t border-border/60 flex flex-col transition-colors duration-300 ${
-            justSaved
-              ? "bg-secondary/30"
-              : "bg-card"
+            justSaved ? "bg-secondary/30" : "bg-card"
           }`}
           style={{ boxShadow: "0 -8px 40px -4px hsl(25 30% 20% / 0.10)" }}
         >
@@ -297,7 +330,6 @@ export default function DailyExpenseTable() {
                 autoComplete="off"
                 aria-label="Item name"
               />
-              {/* Live match hint */}
               {nameValue.length > 1 && (() => {
                 const hint = findItem(nameValue);
                 return hint ? (
@@ -353,7 +385,6 @@ export default function DailyExpenseTable() {
                 className="bg-transparent text-5xl font-display text-foreground placeholder:text-muted-foreground/20 outline-none w-full caret-primary tabular-nums"
                 aria-label="Amount"
               />
-              {/* Match metadata */}
               {match && (
                 <div className="flex items-center gap-3 mt-3 text-[11px] text-muted-foreground">
                   {match.supplierName && <span className="px-2 py-0.5 rounded-full bg-muted">{match.supplierName}</span>}

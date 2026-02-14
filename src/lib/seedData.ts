@@ -66,7 +66,7 @@ export async function seedDataForUser(userId: string) {
   const supMap = Object.fromEntries(suppliers.map(s => [s.name, s.id]));
 
   // Items
-  await supabase.from("items").insert([
+  const { data: itemsData } = await supabase.from("items").insert([
     { name: "Morning Glory", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Vegetables"], sub_sub_category_id: subSubMap["Leafy Greens"], default_supplier_id: supMap["Farm Fresh Co."], default_unit_price: 15000, unit: "kg", user_id: userId },
     { name: "Bok Choy", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Vegetables"], sub_sub_category_id: subSubMap["Leafy Greens"], default_supplier_id: supMap["Green Valley Market"], default_unit_price: 12000, unit: "kg", user_id: userId },
     { name: "Carrots", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Vegetables"], sub_sub_category_id: subSubMap["Root Vegetables"], default_supplier_id: supMap["Farm Fresh Co."], default_unit_price: 18000, unit: "kg", user_id: userId },
@@ -77,5 +77,65 @@ export async function seedDataForUser(userId: string) {
     { name: "Eggs", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Dairy & Eggs"], default_supplier_id: supMap["Metro Wholesale"], default_unit_price: 3500, unit: "piece", user_id: userId },
     { name: "Cooking Oil", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Dry Goods & Spices"], default_supplier_id: supMap["Metro Wholesale"], default_unit_price: 45000, unit: "liter", user_id: userId },
     { name: "Dish Soap", category_id: catMap["Kitchen Supplies"], sub_category_id: subMap["Cleaning"], default_supplier_id: supMap["Metro Wholesale"], default_unit_price: 35000, unit: "bottle", user_id: userId },
-  ]);
+  ]).select("id, name, category_id, sub_category_id, default_supplier_id, default_unit_price");
+
+  if (!itemsData) return;
+  const itemMap = Object.fromEntries(itemsData.map(i => [i.name, i]));
+
+  // Seed sample purchases for past 3 days
+  const today = new Date();
+  const pastDays = [
+    { offset: 1, purchases: [
+      { item: "Morning Glory", qty: 3, amount: 45000 },
+      { item: "Chicken Breast", qty: 2, amount: 170000 },
+      { item: "Eggs", qty: 30, amount: 105000 },
+      { item: "Cooking Oil", qty: 1, amount: 45000 },
+      { item: "Thai Basil", qty: 0.5, amount: 12500 },
+    ]},
+    { offset: 2, purchases: [
+      { item: "Tiger Prawns", qty: 1.5, amount: 420000 },
+      { item: "Pork Belly", qty: 2, amount: 240000 },
+      { item: "Bok Choy", qty: 2, amount: 24000 },
+      { item: "Dish Soap", qty: 2, amount: 70000 },
+    ]},
+    { offset: 3, purchases: [
+      { item: "Carrots", qty: 5, amount: 90000 },
+      { item: "Chicken Breast", qty: 3, amount: 255000 },
+      { item: "Morning Glory", qty: 2, amount: 30000 },
+    ]},
+  ];
+
+  for (const day of pastDays) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - day.offset);
+    const dateStr = d.toISOString().split("T")[0];
+    const totalAmount = day.purchases.reduce((s, p) => s + p.amount, 0);
+
+    const { data: payment } = await supabase.from("payments").insert({
+      date: dateStr,
+      user_id: userId,
+      total_amount: totalAmount,
+      supplier_id: supMap["Metro Wholesale"],
+    }).select("id").single();
+
+    if (!payment) continue;
+
+    await supabase.from("sub_payments").insert(
+      day.purchases.map(p => {
+        const it = itemMap[p.item];
+        return {
+          payment_id: payment.id,
+          item_name: p.item,
+          item_id: it?.id || null,
+          quantity: p.qty,
+          unit_price: it?.default_unit_price || p.amount,
+          amount: p.amount,
+          category_id: it?.category_id || null,
+          sub_category_id: it?.sub_category_id || null,
+          supplier_id: it?.default_supplier_id || null,
+          user_id: userId,
+        };
+      })
+    );
+  }
 }

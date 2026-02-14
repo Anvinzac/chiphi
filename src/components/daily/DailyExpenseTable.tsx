@@ -387,26 +387,27 @@ export default function DailyExpenseTable() {
 
       {/* Day scroller */}
       {showDayScroller && (
-        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-          <PopoverTrigger asChild>
-            <div>
-              <DayScroller
-                selectedDate={selectedDate}
-                onSelectDate={(d) => { setSelectedDate(d); setShowDayScroller(false); }}
-                onRequestCalendar={() => setCalendarOpen(true)}
+        <div>
+          <DayScroller
+            selectedDate={selectedDate}
+            onSelectDate={(d) => { setSelectedDate(d); setShowDayScroller(false); }}
+            onRequestCalendar={() => setCalendarOpen(true)}
+          />
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <span className="sr-only">Open calendar</span>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={new Date(selectedDate + "T00:00:00")}
+                onSelect={handleCalendarSelect}
+                disabled={(date) => date > new Date()}
+                className="p-3 pointer-events-auto"
               />
-            </div>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
-            <Calendar
-              mode="single"
-              selected={new Date(selectedDate + "T00:00:00")}
-              onSelect={handleCalendarSelect}
-              disabled={(date) => date > new Date()}
-              className="p-3 pointer-events-auto"
-            />
-          </PopoverContent>
-        </Popover>
+            </PopoverContent>
+          </Popover>
+        </div>
       )}
 
       {/* Grouped entries */}

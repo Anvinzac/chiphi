@@ -69,7 +69,9 @@ export default function Auth() {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
-            autoComplete="username"
+            autoComplete="off"
+            inputMode="text"
+            name="mise_username"
             aria-label="Username"
           />
           <Input

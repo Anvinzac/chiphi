@@ -522,18 +522,62 @@ export default function DailyExpenseTable() {
                   autoComplete="off"
                   aria-label="Item name"
                 />
-                {nameValue.length > 1 && (() => {
-                  const hint = findItem(nameValue);
-                  return hint ? (
-                    <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1.5">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-secondary" />
-                      {hint.name}
-                      {categories.find(c => c.id === hint.category_id)?.name && (
-                        <span className="text-muted-foreground/60">
-                          · {categories.find(c => c.id === hint.category_id)?.name}
-                        </span>
-                      )}
-                    </p>
+                {/* Recommendation cloud */}
+                {(() => {
+                  const query = nameValue.toLowerCase().trim();
+                  const filtered = query.length > 0
+                    ? items.filter(i => i.name.toLowerCase().includes(query))
+                    : items;
+                  const display = filtered.slice(0, 20);
+                  return display.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 mt-3 max-h-[18vh] overflow-auto">
+                      {display.map(item => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            setNameValue(item.name);
+                            const cat = categories.find(c => c.id === item.category_id);
+                            const sub = subCategories.find(s => s.id === item.sub_category_id);
+                            const sup = suppliers.find(s => s.id === item.default_supplier_id);
+                            setMatch({
+                              itemId: item.id,
+                              categoryName: cat?.name ?? "",
+                              subCategoryName: sub?.name ?? "",
+                              supplierName: sup?.name ?? "",
+                              unitPrice: item.default_unit_price ?? 0,
+                              unit: item.unit ?? "unit",
+                              categoryId: item.category_id,
+                              subCategoryId: item.sub_category_id,
+                              subSubCategoryId: item.sub_sub_category_id,
+                              supplierId: item.default_supplier_id,
+                            });
+                            setVerifyData({
+                              itemName: item.name,
+                              categoryName: cat?.name ?? "",
+                              subCategoryName: sub?.name ?? "",
+                              supplierName: sup?.name ?? "",
+                              unitPrice: item.default_unit_price ?? 0,
+                              unit: item.unit ?? "unit",
+                              itemId: item.id,
+                              categoryId: item.category_id ?? undefined,
+                              subCategoryId: item.sub_category_id ?? undefined,
+                              supplierId: item.default_supplier_id ?? undefined,
+                            });
+                            setPhase("verify");
+                          }}
+                          className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                            query && item.name.toLowerCase() === query
+                              ? "bg-primary/15 border-primary/40 text-primary font-medium"
+                              : "bg-muted/60 border-border/40 text-foreground hover:bg-muted hover:border-border"
+                          }`}
+                        >
+                          {item.name}
+                        </button>
+                      ))}
+                    </div>
+                  ) : query.length > 0 ? (
+                    <p className="text-xs text-muted-foreground/60 mt-3">No matching items</p>
                   ) : null;
                 })()}
                 <button

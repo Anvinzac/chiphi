@@ -1,17 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { useEffect } from "react";
 
 export default function Auth() {
   const { session, loading } = useAuth();
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -24,9 +23,14 @@ export default function Auth() {
   if (loading) return null;
   if (session) return null;
 
+  // Convert username to a synthetic email for Supabase auth
+  const toEmail = (u: string) => `${u.toLowerCase().trim()}@mise.local`;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!username.trim()) return;
     setSubmitting(true);
+    const email = toEmail(username);
     try {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -36,7 +40,10 @@ export default function Auth() {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: window.location.origin },
+          options: {
+            emailRedirectTo: window.location.origin,
+            data: { username: username.trim() },
+          },
         });
         if (error) throw error;
         toast.success("Account created!");
@@ -56,8 +63,25 @@ export default function Auth() {
           <p className="text-sm text-muted-foreground mt-1">Restaurant expense tracker</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" aria-label="Email" />
-          <Input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete={isLogin ? "current-password" : "new-password"} aria-label="Password" />
+          <Input
+            type="text"
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+            autoComplete="username"
+            aria-label="Username"
+          />
+          <Input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={6}
+            autoComplete={isLogin ? "current-password" : "new-password"}
+            aria-label="Password"
+          />
           <Button type="submit" className="w-full" disabled={submitting}>
             {submitting ? "..." : isLogin ? "Sign In" : "Sign Up"}
           </Button>

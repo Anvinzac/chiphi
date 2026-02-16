@@ -366,8 +366,38 @@ export default function DailyExpenseTable() {
     setTimeout(() => nameRef.current?.focus(), 100);
   };
 
+  // Swipe between days
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    touchStartX.current = null;
+    touchStartY.current = null;
+    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.7) return; // too short or vertical
+    const current = new Date(selectedDate + "T00:00:00");
+    if (dx > 0) {
+      // swipe right = previous day
+      current.setDate(current.getDate() - 1);
+    } else {
+      // swipe left = next day (don't go past today)
+      const tomorrow = new Date(current);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      if (tomorrow > new Date()) return;
+      current.setDate(current.getDate() + 1);
+    }
+    setSelectedDate(format(current, "yyyy-MM-dd"));
+  }, [selectedDate]);
+
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {/* Top bar */}
       <div className="px-4 py-3 flex items-center justify-between">
         <span className="font-display text-xl text-primary">Mìsè</span>

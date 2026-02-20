@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Check, ChevronRight, ChevronDown, Plus } from "lucide-react";
 import DayScroller from "./DayScroller";
 import PaymentGroup, { type PaymentGroupData, type PaymentEntry } from "./PaymentGroup";
-import QuickVerifyPopup from "./QuickVerifyPopup";
+import AmountPhase from "./AmountPhase";
 import PurchaseDetailDialog from "./PurchaseDetailDialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -36,7 +36,7 @@ interface MatchInfo {
   supplierId: string | null;
 }
 
-type InputPhase = "name" | "verify" | "amount" | "done";
+type InputPhase = "name" | "amount" | "done";
 
 export default function DailyExpenseTable() {
   const { user } = useAuth();
@@ -208,7 +208,8 @@ export default function DailyExpenseTable() {
         subCategoryId: matched.sub_category_id ?? undefined,
         supplierId: matched.default_supplier_id ?? undefined,
       });
-      setPhase("verify");
+      setPhase("amount");
+      setTimeout(() => amountRef.current?.focus(), 50);
     } else {
       setMatch(null);
       setVerifyData(null);
@@ -217,28 +218,7 @@ export default function DailyExpenseTable() {
     }
   }, [nameValue, findItem, categories, subCategories, suppliers]);
 
-  const handleVerifyDismiss = useCallback(() => {
-    // Auto-confirmed by countdown, proceed to amount
-    setPhase("amount");
-    setTimeout(() => amountRef.current?.focus(), 50);
-  }, []);
 
-  const handleVerifySave = useCallback((updated: VerifyData) => {
-    // User edited and saved verify data, update match
-    setMatch(prev => prev ? {
-      ...prev,
-      categoryName: updated.categoryName,
-      subCategoryName: updated.subCategoryName,
-      supplierName: updated.supplierName,
-      unitPrice: updated.unitPrice,
-      supplierId: updated.supplierId ?? prev.supplierId,
-      categoryId: updated.categoryId ?? prev.categoryId,
-      subCategoryId: updated.subCategoryId ?? prev.subCategoryId,
-    } : null);
-    setVerifyData(null);
-    setPhase("amount");
-    setTimeout(() => amountRef.current?.focus(), 50);
-  }, []);
 
   const handleSave = useCallback(async () => {
     if (!amountValue.trim() || !user) return;
@@ -513,172 +493,25 @@ export default function DailyExpenseTable() {
                 phase === "name" ? "bg-primary" : "bg-primary/30"
               }`} />
               <div className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
-                phase === "verify" ? "bg-primary" : phase === "amount" || phase === "done" ? "bg-primary/30" : "bg-muted"
-              }`} />
-              <div className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
                 phase === "amount" || phase === "done" ? "bg-primary" : "bg-muted"
               }`} />
             </div>
 
-            {/* Success flash */}
-            {justSaved && (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="flex items-center gap-3 animate-in fade-in zoom-in-95 duration-300">
-                  <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center">
-                    <Check className="h-6 w-6 text-secondary-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-lg font-display">{nameValue}</p>
-                    <p className="text-2xl font-display">{Number(amountValue).toLocaleString()}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Name phase */}
-            {phase === "name" && !justSaved && (
-              <div className="flex-1 flex flex-col justify-center px-5">
-                <label className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-2">
-                  Item name
-                </label>
-                <input
-                  ref={nameRef}
-                  type="text"
-                  value={nameValue}
-                  onChange={(e) => setNameValue(e.target.value)}
-                  onKeyDown={handleNameKeyDown}
-                  placeholder="What did you buy?"
-                  className="bg-transparent text-3xl font-display text-foreground placeholder:text-muted-foreground/40 outline-none w-full caret-primary"
-                  autoComplete="off"
-                  aria-label="Item name"
-                />
-                {/* Recommendation cloud */}
-                {(() => {
-                  const query = nameValue.toLowerCase().trim();
-                  const filtered = query.length > 0
-                    ? items.filter(i => i.name.toLowerCase().includes(query))
-                    : items;
-                  const display = filtered.slice(0, 20);
-                  return display.length > 0 ? (
-                    <div className="flex flex-wrap gap-2 mt-3 max-h-[18vh] overflow-auto">
-                      {display.map(item => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => {
-                            setNameValue(item.name);
-                            const cat = categories.find(c => c.id === item.category_id);
-                            const sub = subCategories.find(s => s.id === item.sub_category_id);
-                            const sup = suppliers.find(s => s.id === item.default_supplier_id);
-                            setMatch({
-                              itemId: item.id,
-                              categoryName: cat?.name ?? "",
-                              subCategoryName: sub?.name ?? "",
-                              supplierName: sup?.name ?? "",
-                              unitPrice: item.default_unit_price ?? 0,
-                              unit: item.unit ?? "unit",
-                              categoryId: item.category_id,
-                              subCategoryId: item.sub_category_id,
-                              subSubCategoryId: item.sub_sub_category_id,
-                              supplierId: item.default_supplier_id,
-                            });
-                            setVerifyData({
-                              itemName: item.name,
-                              categoryName: cat?.name ?? "",
-                              subCategoryName: sub?.name ?? "",
-                              supplierName: sup?.name ?? "",
-                              unitPrice: item.default_unit_price ?? 0,
-                              unit: item.unit ?? "unit",
-                              itemId: item.id,
-                              categoryId: item.category_id ?? undefined,
-                              subCategoryId: item.sub_category_id ?? undefined,
-                              supplierId: item.default_supplier_id ?? undefined,
-                            });
-                            setPhase("verify");
-                          }}
-                          className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                            query && item.name.toLowerCase() === query
-                              ? "bg-primary/15 border-primary/40 text-primary font-medium"
-                              : "bg-muted/60 border-border/40 text-foreground hover:bg-muted hover:border-border"
-                          }`}
-                        >
-                          {item.name}
-                        </button>
-                      ))}
-                    </div>
-                  ) : query.length > 0 ? (
-                    <p className="text-xs text-muted-foreground/60 mt-3">No matching items</p>
-                  ) : null;
-                })()}
-                <button
-                  onClick={handleNameConfirm}
-                  disabled={!nameValue.trim()}
-                  className="self-end mt-4 flex items-center gap-1 text-sm font-medium text-primary disabled:text-muted-foreground/30 transition-colors"
-                  aria-label="Next"
-                >
-                  Next <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-            )}
-
-            {/* Verify phase */}
-            {phase === "verify" && verifyData && !justSaved && (
-              <div className="flex-1 px-5 py-2 overflow-auto">
-                <QuickVerifyPopup
-                  data={verifyData}
-                  onSave={handleVerifySave}
-                  onDismiss={handleVerifyDismiss}
-                />
-              </div>
-            )}
-
-            {/* Amount phase */}
+            {/* Amount + inline verify phase */}
             {phase === "amount" && !justSaved && (
-              <div className="flex-1 flex flex-col justify-center px-5">
-                <div className="flex items-center justify-between mb-1">
-                  <button
-                    onClick={() => { setPhase("name"); setTimeout(() => nameRef.current?.focus(), 50); }}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    ← {nameValue}
-                  </button>
-                  {match && (
-                    <span className="text-[10px] text-muted-foreground">
-                      Last: {match.unitPrice.toLocaleString()}/{match.unit}
-                    </span>
-                  )}
-                </div>
-                <label className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-2">
-                  Amount
-                </label>
-                <input
-                  ref={amountRef}
-                  type="number"
-                  inputMode="numeric"
-                  value={amountValue}
-                  onChange={(e) => setAmountValue(e.target.value)}
-                  onKeyDown={handleAmountKeyDown}
-                  placeholder="0"
-                  className="bg-transparent text-5xl font-display text-foreground placeholder:text-muted-foreground/20 outline-none w-full caret-primary tabular-nums"
-                  aria-label="Amount"
-                />
-                {match && (
-                  <div className="flex items-center gap-3 mt-3 text-[11px] text-muted-foreground">
-                    {match.supplierName && <span className="px-2 py-0.5 rounded-full bg-muted">{match.supplierName}</span>}
-                    {match.categoryName && <span className="px-2 py-0.5 rounded-full bg-muted">{match.categoryName}</span>}
-                    {match.subCategoryName && <span className="px-2 py-0.5 rounded-full bg-muted">{match.subCategoryName}</span>}
-                  </div>
-                )}
-                <button
-                  onClick={handleSave}
-                  disabled={!amountValue.trim() || Number(amountValue) === 0}
-                  className="self-end mt-4 flex items-center gap-1.5 text-sm font-medium bg-primary text-primary-foreground px-5 py-2.5 rounded-lg disabled:opacity-30 transition-opacity active:scale-95"
-                  aria-label="Save"
-                >
-                  <Check className="h-4 w-4" />
-                  Save
-                </button>
-              </div>
+              <AmountPhase
+                nameValue={nameValue}
+                amountValue={amountValue}
+                setAmountValue={setAmountValue}
+                amountRef={amountRef}
+                match={match}
+                verifyData={verifyData}
+                setMatch={setMatch}
+                setVerifyData={setVerifyData}
+                onBack={() => { setPhase("name"); setTimeout(() => nameRef.current?.focus(), 50); }}
+                onKeyDown={handleAmountKeyDown}
+                onSave={handleSave}
+              />
             )}
           </div>
         </div>

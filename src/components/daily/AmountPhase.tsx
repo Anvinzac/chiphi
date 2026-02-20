@@ -48,6 +48,9 @@ export default function AmountPhase({
   const [editValue, setEditValue] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
 
+  // The real VND amount (×1000)
+  const realAmount = amountValue ? Number(amountValue) * 1000 : 0;
+
   const openEdit = (field: EditableField) => {
     if (!field) return;
     const current = match
@@ -86,10 +89,10 @@ export default function AmountPhase({
   const hasMeta = supplier || category || subCategory || unitPrice > 0;
 
   const allFields: { key: EditableField; label: string; value: string }[] = [
-    { key: "supplierName", label: "Supplier", value: supplier },
-    { key: "categoryName", label: "Category", value: category },
-    { key: "subCategoryName", label: "Sub-cat", value: subCategory },
-    { key: "unitPrice", label: `/${unit}`, value: unitPrice > 0 ? unitPrice.toLocaleString() : "" },
+    { key: "supplierName", label: "Nhà cung cấp", value: supplier },
+    { key: "categoryName", label: "Danh mục", value: category },
+    { key: "subCategoryName", label: "Phân loại", value: subCategory },
+    { key: "unitPrice", label: `/${unit}`, value: unitPrice > 0 ? unitPrice.toLocaleString("vi-VN") : "" },
   ];
   const fields = allFields.filter(f => f.value !== "");
 
@@ -99,26 +102,36 @@ export default function AmountPhase({
       <button
         onClick={onBack}
         className="text-xs text-muted-foreground hover:text-foreground transition-colors self-start mb-3"
-        aria-label="Back to name"
+        aria-label="Quay lại"
       >
         ← {nameValue}
       </button>
 
       {/* Amount input */}
       <label className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-1">
-        Amount
+        Số tiền (nghìn đồng)
       </label>
-      <input
-        ref={amountRef}
-        type="number"
-        inputMode="numeric"
-        value={amountValue}
-        onChange={(e) => setAmountValue(e.target.value)}
-        onKeyDown={onKeyDown}
-        placeholder="0"
-        className="bg-transparent text-5xl font-display text-foreground placeholder:text-muted-foreground/20 outline-none w-full caret-primary tabular-nums mb-3"
-        aria-label="Amount"
-      />
+      <div className="flex items-baseline gap-1.5 mb-1">
+        <input
+          ref={amountRef}
+          type="number"
+          inputMode="numeric"
+          value={amountValue}
+          onChange={(e) => setAmountValue(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="0"
+          className="bg-transparent text-5xl font-display text-foreground placeholder:text-muted-foreground/20 outline-none caret-primary tabular-nums w-auto max-w-[60vw]"
+          aria-label="Số tiền"
+          style={{ width: amountValue ? `${Math.max(amountValue.length, 1)}ch` : "2ch" }}
+        />
+        <span className="text-2xl font-display text-muted-foreground/60">nghìn</span>
+      </div>
+      {/* Real VND preview */}
+      {realAmount > 0 && (
+        <p className="text-sm text-muted-foreground mb-2 tabular-nums">
+          = {realAmount.toLocaleString("vi-VN")} ₫
+        </p>
+      )}
 
       {/* Inline editable meta pills */}
       {hasMeta && (
@@ -170,10 +183,10 @@ export default function AmountPhase({
         onClick={onSave}
         disabled={!amountValue.trim() || Number(amountValue) === 0}
         className="self-end mt-auto flex items-center gap-1.5 text-sm font-medium bg-primary text-primary-foreground px-5 py-2.5 rounded-lg disabled:opacity-30 transition-opacity active:scale-95"
-        aria-label="Save"
+        aria-label="Lưu"
       >
         <Check className="h-4 w-4" />
-        Save
+        Lưu
       </button>
     </div>
   );

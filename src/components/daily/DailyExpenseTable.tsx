@@ -231,7 +231,8 @@ export default function DailyExpenseTable() {
 
   const handleSave = useCallback(async () => {
     if (!amountValue.trim() || !user) return;
-    const amount = Number(amountValue) || 0;
+    // User types in thousands — multiply by 1000 to get real VND amount
+    const amount = (Number(amountValue) || 0) * 1000;
     if (amount === 0) return;
 
     let pid = activePaymentId;
@@ -263,7 +264,7 @@ export default function DailyExpenseTable() {
     });
 
     if (error) {
-      toast.error("Failed to save");
+      toast.error("Lưu thất bại");
       return;
     }
 
@@ -272,7 +273,7 @@ export default function DailyExpenseTable() {
       amount,
       category_id: match?.categoryId || null,
       supplier_id: match?.supplierId || null,
-      sub_payment_id: undefined, // will get real id on reload
+      sub_payment_id: undefined,
     };
 
     // Update or create group
@@ -400,7 +401,7 @@ export default function DailyExpenseTable() {
             </span>
             <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform duration-200 ${showDayScroller ? "rotate-180" : ""}`} />
           </button>
-          <span className="text-lg font-display block">{dayTotal.toLocaleString()}</span>
+          <span className="text-lg font-display block">{dayTotal.toLocaleString("vi-VN")} ₫</span>
         </div>
       </div>
 
@@ -433,7 +434,7 @@ export default function DailyExpenseTable() {
       <div className={`flex-1 overflow-auto px-4 ${cardExpanded ? "pb-[50vh]" : "pb-24"}`}>
         {paymentGroups.length === 0 && (
           <div className="text-center pt-12 text-muted-foreground text-sm">
-            <p>No expenses recorded</p>
+            <p>Chưa có chi tiêu nào</p>
           </div>
         )}
         {paymentGroups.map((group) => (
@@ -466,7 +467,7 @@ export default function DailyExpenseTable() {
             className="w-full mt-2 py-2.5 text-xs text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:border-primary/40 transition-colors flex items-center justify-center gap-1.5"
           >
             <Plus className="h-3.5 w-3.5" />
-            New purchase
+            Lần mua mới
           </button>
         )}
       </div>
@@ -515,7 +516,7 @@ export default function DailyExpenseTable() {
                   </div>
                   <div>
                     <p className="text-lg font-display">{nameValue}</p>
-                    <p className="text-2xl font-display">{Number(amountValue).toLocaleString()}</p>
+                    <p className="text-2xl font-display">{(Number(amountValue) * 1000).toLocaleString("vi-VN")} ₫</p>
                   </div>
                 </div>
               </div>
@@ -525,7 +526,7 @@ export default function DailyExpenseTable() {
             {phase === "name" && !justSaved && (
               <div className="flex-1 flex flex-col justify-center px-5">
                 <label className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-2">
-                  Item name
+                  Tên mặt hàng
                 </label>
                 <input
                   ref={nameRef}
@@ -533,10 +534,10 @@ export default function DailyExpenseTable() {
                   value={nameValue}
                   onChange={(e) => setNameValue(e.target.value)}
                   onKeyDown={handleNameKeyDown}
-                  placeholder="What did you buy?"
+                  placeholder="Bạn mua gì?"
                   className="bg-transparent text-3xl font-display text-foreground placeholder:text-muted-foreground/40 outline-none w-full caret-primary"
                   autoComplete="off"
-                  aria-label="Item name"
+                  aria-label="Tên mặt hàng"
                 />
                 {/* Recommendation cloud */}
                 {(() => {
@@ -597,16 +598,16 @@ export default function DailyExpenseTable() {
                       ))}
                     </div>
                   ) : query.length > 0 ? (
-                    <p className="text-xs text-muted-foreground/60 mt-3">No matching items</p>
+                    <p className="text-xs text-muted-foreground/60 mt-3">Không tìm thấy mặt hàng</p>
                   ) : null;
                 })()}
                 <button
                   onClick={handleNameConfirm}
                   disabled={!nameValue.trim()}
                   className="self-end mt-4 flex items-center gap-1 text-sm font-medium text-primary disabled:text-muted-foreground/30 transition-colors"
-                  aria-label="Next"
+                  aria-label="Tiếp theo"
                 >
-                  Next <ChevronRight className="h-4 w-4" />
+                  Tiếp theo <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
             )}

@@ -47,6 +47,7 @@ export default function DailyExpenseTable() {
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [subCategories, setSubCategories] = useState<{ id: string; name: string }[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+  const [itemFrequency, setItemFrequency] = useState<Record<string, number>>({});
 
   // Day data - grouped by payment
   const [paymentGroups, setPaymentGroups] = useState<PaymentGroupData[]>([]);
@@ -78,16 +79,24 @@ export default function DailyExpenseTable() {
   useEffect(() => {
     if (!user) return;
     const load = async () => {
-      const [itemsRes, catsRes, subsRes, supsRes] = await Promise.all([
+      const [itemsRes, catsRes, subsRes, supsRes, freqRes] = await Promise.all([
         supabase.from("items").select("*").eq("user_id", user.id),
         supabase.from("categories").select("id, name").eq("user_id", user.id),
         supabase.from("sub_categories").select("id, name").eq("user_id", user.id),
         supabase.from("suppliers").select("id, name").eq("user_id", user.id),
+        supabase.from("sub_payments").select("item_id").eq("user_id", user.id).not("item_id", "is", null),
       ]);
       if (itemsRes.data) setItems(itemsRes.data);
       if (catsRes.data) setCategories(catsRes.data);
       if (subsRes.data) setSubCategories(subsRes.data);
       if (supsRes.data) setSuppliers(supsRes.data);
+      if (freqRes.data) {
+        const freq: Record<string, number> = {};
+        freqRes.data.forEach((r: { item_id: string | null }) => {
+          if (r.item_id) freq[r.item_id] = (freq[r.item_id] || 0) + 1;
+        });
+        setItemFrequency(freq);
+      }
     };
     load();
   }, [user]);
@@ -535,7 +544,10 @@ export default function DailyExpenseTable() {
                   const filtered = query.length > 0
                     ? items.filter(i => i.name.toLowerCase().includes(query))
                     : items;
-                  const display = filtered.slice(0, 20);
+                  const sorted = [...filtered].sort((a, b) =>
+                    (itemFrequency[b.id] || 0) - (itemFrequency[a.id] || 0)
+                  );
+                  const display = sorted.slice(0, 20);
                   return display.length > 0 ? (
                     <div className="flex flex-wrap gap-2 mt-3 max-h-[18vh] overflow-auto">
                       {display.map(item => (

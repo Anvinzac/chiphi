@@ -492,7 +492,7 @@ export default function DailyExpenseTable() {
           />
 
           <div
-            className={`h-full rounded-t-2xl border-t border-border/60 flex flex-col transition-colors duration-300 overflow-auto ${
+            className={`h-full rounded-t-2xl border-t border-border/60 flex flex-col transition-colors duration-300 overflow-hidden ${
               justSaved ? "bg-secondary/30" : "bg-card"
             }`}
             style={{ boxShadow: "0 -8px 40px -4px hsl(25 30% 20% / 0.10)" }}

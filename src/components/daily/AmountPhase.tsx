@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Check, Pencil, X } from "lucide-react";
+import { Check, Pencil } from "lucide-react";
 import type { VerifyData } from "@/types/expense";
 
 interface MatchInfo {
@@ -48,9 +48,6 @@ export default function AmountPhase({
   const [editValue, setEditValue] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
 
-  // The real VND amount (×1000)
-  const realAmount = amountValue ? Number(amountValue) * 1000 : 0;
-
   const openEdit = (field: EditableField) => {
     if (!field) return;
     const current = match
@@ -77,8 +74,6 @@ export default function AmountPhase({
     setEditingField(null);
   };
 
-  const cancelEdit = () => setEditingField(null);
-
   // Build pill rows from match or verifyData
   const supplier = match?.supplierName || verifyData?.supplierName || "";
   const category = match?.categoryName || verifyData?.categoryName || "";
@@ -97,50 +92,40 @@ export default function AmountPhase({
   const fields = allFields.filter(f => f.value !== "");
 
   return (
-    <div className="flex-1 flex flex-col px-5 pt-2 pb-4 overflow-hidden">
+    <div className="flex-1 flex flex-col px-5 pt-2 pb-4 min-h-0">
       {/* Back link + item name */}
       <button
         onClick={onBack}
-        className="text-xs text-muted-foreground hover:text-foreground transition-colors self-start mb-3"
+        className="text-xs text-muted-foreground hover:text-foreground transition-colors self-start mb-3 shrink-0"
         aria-label="Quay lại"
       >
         ← {nameValue}
       </button>
 
       {/* Amount input */}
-      <label className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-1">
-        Số tiền (nghìn đồng)
+      <label className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-1 shrink-0">
+        Số tiền
       </label>
-      <div className="flex items-baseline gap-1.5 mb-1">
-        <input
-          ref={amountRef}
-          type="number"
-          inputMode="numeric"
-          value={amountValue}
-          onChange={(e) => setAmountValue(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="0"
-          className="bg-transparent text-5xl font-display text-foreground placeholder:text-muted-foreground/20 outline-none caret-primary tabular-nums w-auto max-w-[60vw]"
-          aria-label="Số tiền"
-          style={{ width: amountValue ? `${Math.max(amountValue.length, 1)}ch` : "2ch" }}
-        />
-        <span className="text-2xl font-display text-muted-foreground/60">nghìn</span>
-      </div>
-      {/* Real VND preview */}
-      {realAmount > 0 && (
-        <p className="text-sm text-muted-foreground mb-2 tabular-nums">
-          = {realAmount.toLocaleString("vi-VN")} ₫
-        </p>
-      )}
+      <input
+        ref={amountRef}
+        type="number"
+        inputMode="numeric"
+        value={amountValue}
+        onChange={(e) => setAmountValue(e.target.value)}
+        onKeyDown={onKeyDown}
+        placeholder="0"
+        className="bg-transparent text-5xl font-display text-foreground placeholder:text-muted-foreground/20 outline-none w-full caret-primary tabular-nums mb-3 shrink-0"
+        aria-label="Số tiền"
+      />
 
       {/* Inline editable meta pills */}
       {hasMeta && (
-        <div className="flex flex-wrap gap-2 mb-3">
+        <div className="flex flex-wrap gap-2 mb-3 shrink-0">
           {fields.map(({ key, label, value }) =>
             editingField === key ? (
               <div
                 key={key}
-                className="flex items-center gap-1 bg-primary/10 border border-primary/30 rounded-full pl-2.5 pr-1 py-1 text-xs"
+                className="flex items-center gap-1 bg-primary/10 border border-primary/30 rounded-full pl-2.5 pr-2.5 py-1 text-xs"
               >
                 <span className="text-[10px] text-muted-foreground">{label}:</span>
                 <input
@@ -149,17 +134,12 @@ export default function AmountPhase({
                   value={editValue}
                   onChange={(e) => setEditValue(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") commitEdit();
-                    if (e.key === "Escape") cancelEdit();
+                    if (e.key === "Enter") { commitEdit(); amountRef.current?.focus(); }
+                    if (e.key === "Escape") { setEditingField(null); amountRef.current?.focus(); }
                   }}
-                  aria-label={`Edit ${label}`}
+                  onBlur={commitEdit}
+                  aria-label={`Sửa ${label}`}
                 />
-                <button onClick={commitEdit} className="ml-0.5 p-0.5 text-primary hover:text-primary/70 transition-colors" aria-label="Confirm">
-                  <Check className="h-3 w-3" />
-                </button>
-                <button onClick={cancelEdit} className="p-0.5 text-muted-foreground hover:text-foreground transition-colors" aria-label="Cancel">
-                  <X className="h-3 w-3" />
-                </button>
               </div>
             ) : (
               <button
@@ -167,7 +147,7 @@ export default function AmountPhase({
                 type="button"
                 onClick={() => openEdit(key)}
                 className="group flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted border border-border/60 text-xs text-foreground hover:bg-muted/80 hover:border-primary/30 active:scale-95 transition-all"
-                aria-label={`Edit ${label}`}
+                aria-label={`Sửa ${label}`}
               >
                 <span className="text-[10px] text-muted-foreground">{label}</span>
                 <span className="font-medium">{value}</span>
@@ -178,16 +158,18 @@ export default function AmountPhase({
         </div>
       )}
 
-      {/* Save button */}
-      <button
-        onClick={onSave}
-        disabled={!amountValue.trim() || Number(amountValue) === 0}
-        className="self-end mt-auto flex items-center gap-1.5 text-sm font-medium bg-primary text-primary-foreground px-5 py-2.5 rounded-lg disabled:opacity-30 transition-opacity active:scale-95"
-        aria-label="Lưu"
-      >
-        <Check className="h-4 w-4" />
-        Lưu
-      </button>
+      {/* Save button — always visible at bottom */}
+      <div className="mt-auto pt-2 shrink-0 flex justify-end">
+        <button
+          onClick={onSave}
+          disabled={!amountValue.trim() || Number(amountValue) === 0}
+          className="flex items-center gap-1.5 text-sm font-medium bg-primary text-primary-foreground px-5 py-2.5 rounded-lg disabled:opacity-30 transition-opacity active:scale-95"
+          aria-label="Lưu"
+        >
+          <Check className="h-4 w-4" />
+          Lưu
+        </button>
+      </div>
     </div>
   );
 }

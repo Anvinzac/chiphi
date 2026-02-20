@@ -497,6 +497,108 @@ export default function DailyExpenseTable() {
               }`} />
             </div>
 
+            {/* Success flash */}
+            {justSaved && (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="flex items-center gap-3 animate-in fade-in zoom-in-95 duration-300">
+                  <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center">
+                    <Check className="h-6 w-6 text-secondary-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-lg font-display">{nameValue}</p>
+                    <p className="text-2xl font-display">{Number(amountValue).toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Name phase */}
+            {phase === "name" && !justSaved && (
+              <div className="flex-1 flex flex-col justify-center px-5">
+                <label className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-2">
+                  Item name
+                </label>
+                <input
+                  ref={nameRef}
+                  type="text"
+                  value={nameValue}
+                  onChange={(e) => setNameValue(e.target.value)}
+                  onKeyDown={handleNameKeyDown}
+                  placeholder="What did you buy?"
+                  className="bg-transparent text-3xl font-display text-foreground placeholder:text-muted-foreground/40 outline-none w-full caret-primary"
+                  autoComplete="off"
+                  aria-label="Item name"
+                />
+                {/* Recommendation cloud */}
+                {(() => {
+                  const query = nameValue.toLowerCase().trim();
+                  const filtered = query.length > 0
+                    ? items.filter(i => i.name.toLowerCase().includes(query))
+                    : items;
+                  const display = filtered.slice(0, 20);
+                  return display.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 mt-3 max-h-[18vh] overflow-auto">
+                      {display.map(item => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            setNameValue(item.name);
+                            const cat = categories.find(c => c.id === item.category_id);
+                            const sub = subCategories.find(s => s.id === item.sub_category_id);
+                            const sup = suppliers.find(s => s.id === item.default_supplier_id);
+                            setMatch({
+                              itemId: item.id,
+                              categoryName: cat?.name ?? "",
+                              subCategoryName: sub?.name ?? "",
+                              supplierName: sup?.name ?? "",
+                              unitPrice: item.default_unit_price ?? 0,
+                              unit: item.unit ?? "unit",
+                              categoryId: item.category_id,
+                              subCategoryId: item.sub_category_id,
+                              subSubCategoryId: item.sub_sub_category_id,
+                              supplierId: item.default_supplier_id,
+                            });
+                            setVerifyData({
+                              itemName: item.name,
+                              categoryName: cat?.name ?? "",
+                              subCategoryName: sub?.name ?? "",
+                              supplierName: sup?.name ?? "",
+                              unitPrice: item.default_unit_price ?? 0,
+                              unit: item.unit ?? "unit",
+                              itemId: item.id,
+                              categoryId: item.category_id ?? undefined,
+                              subCategoryId: item.sub_category_id ?? undefined,
+                              supplierId: item.default_supplier_id ?? undefined,
+                            });
+                            setPhase("amount");
+                            setTimeout(() => amountRef.current?.focus(), 50);
+                          }}
+                          className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                            query && item.name.toLowerCase() === query
+                              ? "bg-primary/15 border-primary/40 text-primary font-medium"
+                              : "bg-muted/60 border-border/40 text-foreground hover:bg-muted hover:border-border"
+                          }`}
+                        >
+                          {item.name}
+                        </button>
+                      ))}
+                    </div>
+                  ) : query.length > 0 ? (
+                    <p className="text-xs text-muted-foreground/60 mt-3">No matching items</p>
+                  ) : null;
+                })()}
+                <button
+                  onClick={handleNameConfirm}
+                  disabled={!nameValue.trim()}
+                  className="self-end mt-4 flex items-center gap-1 text-sm font-medium text-primary disabled:text-muted-foreground/30 transition-colors"
+                  aria-label="Next"
+                >
+                  Next <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
             {/* Amount + inline verify phase */}
             {phase === "amount" && !justSaved && (
               <AmountPhase

@@ -102,26 +102,51 @@ export default function AmountPhase({
         ← {nameValue}
       </button>
 
-      {/* Amount input */}
+      {/* Amount input + Save inline */}
       <label className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-1 shrink-0">
         Số tiền
       </label>
-      <div className="flex items-baseline mb-3 shrink-0">
-        <input
-          ref={amountRef}
-          type="number"
-          inputMode="numeric"
-          value={amountValue}
-          onChange={(e) => setAmountValue(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="0"
-          className="bg-transparent text-5xl font-display text-foreground placeholder:text-muted-foreground/20 outline-none caret-primary tabular-nums min-w-0"
-          style={{ width: amountValue ? `${amountValue.length}ch` : "2ch" }}
-          aria-label="Số tiền"
-        />
-        {amountValue && (
-          <span className="text-5xl font-display tabular-nums text-muted-foreground/30 leading-none select-none pointer-events-none">.000</span>
-        )}
+      <div className="flex items-center gap-3 mb-3 shrink-0">
+        {/* Number display: formatted with dot thousands separator */}
+        <div className="flex items-baseline flex-1 min-w-0">
+          {/* Hidden real input for capture */}
+          <input
+            ref={amountRef}
+            type="number"
+            inputMode="numeric"
+            value={amountValue}
+            onChange={(e) => setAmountValue(e.target.value)}
+            onKeyDown={onKeyDown}
+            className="sr-only"
+            aria-label="Số tiền"
+          />
+          {/* Visual display, tappable to focus real input */}
+          <div
+            className="flex items-baseline cursor-text flex-1 min-w-0"
+            onClick={() => amountRef.current?.focus()}
+          >
+            <span className="text-5xl font-display tabular-nums text-foreground leading-none break-all">
+              {amountValue
+                ? Number(amountValue).toLocaleString("vi-VN")
+                : <span className="text-muted-foreground/20">0</span>
+              }
+            </span>
+            {amountValue && (
+              <span className="text-5xl font-display tabular-nums text-muted-foreground/30 leading-none select-none pointer-events-none">.000</span>
+            )}
+          </div>
+        </div>
+
+        {/* Save button inline */}
+        <button
+          onClick={onSave}
+          disabled={!amountValue.trim() || Number(amountValue) === 0}
+          className="shrink-0 flex items-center gap-1.5 text-sm font-medium bg-primary text-primary-foreground px-5 py-2.5 rounded-lg disabled:opacity-30 transition-opacity active:scale-95"
+          aria-label="Lưu"
+        >
+          <Check className="h-4 w-4" />
+          Lưu
+        </button>
       </div>
 
       {/* Inline editable meta pills */}
@@ -163,19 +188,6 @@ export default function AmountPhase({
           )}
         </div>
       )}
-
-      {/* Save button — always visible at bottom */}
-      <div className="mt-auto pt-2 shrink-0 flex justify-end">
-        <button
-          onClick={onSave}
-          disabled={!amountValue.trim() || Number(amountValue) === 0}
-          className="flex items-center gap-1.5 text-sm font-medium bg-primary text-primary-foreground px-5 py-2.5 rounded-lg disabled:opacity-30 transition-opacity active:scale-95"
-          aria-label="Lưu"
-        >
-          <Check className="h-4 w-4" />
-          Lưu
-        </button>
-      </div>
     </div>
   );
 }

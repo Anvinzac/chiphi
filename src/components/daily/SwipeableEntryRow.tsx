@@ -101,13 +101,13 @@ export default function SwipeableEntryRow({
               )}
               {isHighValue && (
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-destructive/15 text-destructive font-medium">
-                  High value
+                  Giá trị cao
                 </span>
               )}
             </div>
           </div>
           <span className="text-sm font-display tabular-nums whitespace-nowrap pt-0.5">
-            {amount.toLocaleString()}
+            {amount.toLocaleString("vi-VN")} ₫
           </span>
         </div>
       </div>

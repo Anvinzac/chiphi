@@ -44,14 +44,14 @@ export default function PaymentGroup({ group, getCategoryName, getSupplierName, 
         <div className="flex-1 min-w-0 flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-sm font-medium truncate">
-              {group.supplierName || "Uncategorized"}
+              {group.supplierName || "Chưa phân loại"}
             </span>
             <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded-full bg-muted tabular-nums">
-              {group.entries.length} {group.entries.length === 1 ? "item" : "items"}
+              {group.entries.length} {group.entries.length === 1 ? "mặt hàng" : "mặt hàng"}
             </span>
           </div>
           <span className="text-sm font-display tabular-nums whitespace-nowrap">
-            {group.total.toLocaleString()}
+            {group.total.toLocaleString("vi-VN")} ₫
           </span>
         </div>
       </button>

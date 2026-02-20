@@ -116,7 +116,7 @@ export default function AmountPhase({
           onKeyDown={onKeyDown}
           placeholder="0"
           className="bg-transparent text-5xl font-display text-foreground placeholder:text-muted-foreground/20 outline-none caret-primary tabular-nums min-w-0"
-          style={{ width: amountValue ? `${amountValue.length + 1}ch` : "2ch" }}
+          style={{ width: amountValue ? `${amountValue.length}ch` : "2ch" }}
           aria-label="Số tiền"
         />
         {amountValue && (

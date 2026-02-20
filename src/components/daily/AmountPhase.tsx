@@ -106,17 +106,23 @@ export default function AmountPhase({
       <label className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-1 shrink-0">
         Số tiền
       </label>
-      <input
-        ref={amountRef}
-        type="number"
-        inputMode="numeric"
-        value={amountValue}
-        onChange={(e) => setAmountValue(e.target.value)}
-        onKeyDown={onKeyDown}
-        placeholder="0"
-        className="bg-transparent text-5xl font-display text-foreground placeholder:text-muted-foreground/20 outline-none w-full caret-primary tabular-nums mb-3 shrink-0"
-        aria-label="Số tiền"
-      />
+      <div className="flex items-baseline mb-3 shrink-0">
+        <input
+          ref={amountRef}
+          type="number"
+          inputMode="numeric"
+          value={amountValue}
+          onChange={(e) => setAmountValue(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="0"
+          className="bg-transparent text-5xl font-display text-foreground placeholder:text-muted-foreground/20 outline-none caret-primary tabular-nums min-w-0"
+          style={{ width: amountValue ? `${amountValue.length + 1}ch` : "2ch" }}
+          aria-label="Số tiền"
+        />
+        {amountValue && (
+          <span className="text-5xl font-display tabular-nums text-muted-foreground/30 leading-none select-none pointer-events-none">.000</span>
+        )}
+      </div>
 
       {/* Inline editable meta pills */}
       {hasMeta && (

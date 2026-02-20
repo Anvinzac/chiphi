@@ -86,7 +86,7 @@ export default function SwipeableEntryRow({
         onClick={() => { if (offsetX === 0) onClick(); }}
       >
         <div className="flex items-start justify-between py-3 gap-3 cursor-pointer active:bg-muted/30 transition-colors">
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 pl-2">
             <span className="text-sm font-medium block truncate">{item_name}</span>
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
               {categoryName && (
@@ -106,7 +106,7 @@ export default function SwipeableEntryRow({
               )}
             </div>
           </div>
-          <span className="text-sm font-display tabular-nums whitespace-nowrap pt-0.5">
+          <span className="text-sm font-display tabular-nums whitespace-nowrap pt-0.5 pr-2">
             {amount.toLocaleString("vi-VN")} ₫
           </span>
         </div>

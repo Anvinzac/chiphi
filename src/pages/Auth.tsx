@@ -14,14 +14,21 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const isDemoSession = session?.user?.email === "demo@mise.local";
+
   useEffect(() => {
-    if (!loading && session) {
+    // If arriving as demo user, sign out so they can create a real account
+    if (!loading && session && isDemoSession) {
+      supabase.auth.signOut();
+      return;
+    }
+    if (!loading && session && !isDemoSession) {
       navigate("/", { replace: true });
     }
-  }, [session, loading, navigate]);
+  }, [session, loading, navigate, isDemoSession]);
 
   if (loading) return null;
-  if (session) return null;
+  if (session && !isDemoSession) return null;
 
   // Convert username to a synthetic email for Supabase auth
   const toEmail = (u: string) => `${u.toLowerCase().trim()}@mise.local`;

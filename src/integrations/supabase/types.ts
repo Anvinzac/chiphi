@@ -17,21 +17,21 @@ export type Database = {
       categories: {
         Row: {
           created_at: string
-          frequency: "daily" | "weekly" | "monthly"
+          frequency: string
           id: string
           name: string
           user_id: string
         }
         Insert: {
           created_at?: string
-          frequency?: "daily" | "weekly" | "monthly"
+          frequency?: string
           id?: string
           name: string
           user_id: string
         }
         Update: {
           created_at?: string
-          frequency?: "daily" | "weekly" | "monthly"
+          frequency?: string
           id?: string
           name?: string
           user_id?: string

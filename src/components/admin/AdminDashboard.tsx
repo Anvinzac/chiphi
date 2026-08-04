@@ -59,7 +59,7 @@ export default function AdminDashboard() {
         supabase.from("items").select("id, name, category_id, default_supplier_id, default_unit_price, unit").eq("user_id", user.id),
         supabase.from("payments").select("id, date, total_amount, sub_payments(item_name, amount, category_id)").eq("user_id", user.id),
       ]);
-      if (c.data) setCategories(c.data);
+      if (c.data) setCategories(c.data as DbCategory[]);
       if (sc.data) setSubCategories(sc.data);
       if (s.data) setSuppliers(s.data);
       if (i.data) setItems(i.data);
@@ -123,7 +123,7 @@ export default function AdminDashboard() {
     if (!newCatName.trim() || !user) return;
     const { data, error } = await supabase.from("categories").insert({ name: newCatName.trim(), user_id: user.id, frequency: "daily" }).select("id, name, frequency").single();
     if (error) { toast.error(error.message); return; }
-    if (data) setCategories(prev => [...prev, data]);
+    if (data) setCategories(prev => [...prev, data as DbCategory]);
     setNewCatName("");
   };
 

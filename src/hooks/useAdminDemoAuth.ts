@@ -60,7 +60,7 @@ async function ensureAdminRole() {
   if (!existing) {
     await supabase.from("user_roles").insert({
       user_id: user.id,
-      app_role: "admin",
+      role: "admin" as const,
     });
   }
 }

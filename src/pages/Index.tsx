@@ -15,9 +15,13 @@ const Index = () => {
       <DailyExpenseTable />
       {/* Bottom nav */}
       <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-card px-4 py-2 flex items-center justify-between safe-area-bottom">
-        <Link to="/admin" className="flex items-center gap-1.5 text-xs text-muted-foreground px-3 py-2 rounded-lg hover:bg-muted">
+        <Link
+          to="/admin"
+          className="flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+          aria-label="Open Admin Dashboard"
+        >
           <LayoutDashboard className="h-4 w-4" />
-          Dashboard
+          Admin Dashboard
         </Link>
         {!isDemo ? (
           <button onClick={signOut} className="flex items-center gap-1.5 text-xs text-muted-foreground px-3 py-2 rounded-lg hover:bg-muted">

@@ -44,8 +44,8 @@
     --sidebar-ring: 20 50% 53%;
 
     /* Custom tokens */
-    --font-display: 'DM Serif Display', Georgia, serif;
-    --font-body: 'DM Sans', system-ui, sans-serif;
+    --font-display: 'Noto Sans', system-ui, sans-serif;
+    --font-body: 'Noto Sans', system-ui, sans-serif;
 
     --shadow-warm: 0 2px 12px -2px hsl(25 30% 30% / 0.08);
     --shadow-warm-lg: 0 8px 30px -4px hsl(25 30% 30% / 0.12);
@@ -116,6 +116,124 @@
 
   .quick-verify-exit {
     animation: slideDown 0.2s ease-in forwards;
+  }
+
+  .amount-phase-enter {
+    animation: amountPhaseEnter 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .category-cell {
+    animation: categoryCellEnter 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .category-rail {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary) / 0.35) transparent;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .category-rail::-webkit-scrollbar {
+    height: 5px;
+  }
+
+  .category-rail::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .category-rail::-webkit-scrollbar-thumb {
+    background: hsl(var(--primary) / 0.35);
+    border-radius: 999px;
+  }
+
+  .keypad-key {
+    min-height: 3.25rem;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 120ms ease, background-color 160ms ease, box-shadow 160ms ease;
+  }
+
+  .keypad-key:active {
+    transform: scale(0.94);
+  }
+
+  .expense-card-enter {
+    animation: expenseCardEnter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .expense-card-exit {
+    animation: expenseCardExit 0.32s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .amount-phase-enter,
+    .expense-card-enter,
+    .expense-card-exit {
+      animation: none;
+    }
+
+    .keypad-key {
+      transition: none;
+    }
+  }
+}
+
+@keyframes amountPhaseEnter {
+  0% {
+    opacity: 0;
+    transform: translate3d(48px, 18px, 0) scale(0.98);
+  }
+  60% {
+    opacity: 1;
+    transform: translate3d(-4px, -2px, 0) scale(1.005);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes categoryCellEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes expenseCardEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(40px) scaleY(0.85);
+    transform-origin: bottom center;
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-3px) scaleY(1.01);
+    transform-origin: bottom center;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+    transform-origin: bottom center;
+  }
+}
+
+@keyframes expenseCardExit {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+    transform-origin: bottom center;
+  }
+  40% {
+    opacity: 0.7;
+    transform: translateY(8px) scaleY(0.95);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(48px) scaleY(0.8);
+    transform-origin: bottom center;
   }
 }
 

@@ -3,12 +3,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, ChevronDown, ChevronRight, Users, Tag, BarChart3 } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Plus, Trash2, ChevronDown, ChevronRight, Users, Tag, BarChart3, CalendarIcon, X } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO, isWithinInterval } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from "recharts";
 import { toast } from "sonner";
+import type { DateRange } from "react-day-picker";
 
 type AdminTab = "summary" | "categories" | "suppliers" | "items";
+type CategoryFrequency = "daily" | "weekly" | "monthly";
 
 const CHART_COLORS = [
   "hsl(20, 50%, 53%)",
@@ -18,7 +22,7 @@ const CHART_COLORS = [
   "hsl(200, 25%, 60%)",
 ];
 
-interface DbCategory { id: string; name: string }
+interface DbCategory { id: string; name: string; frequency: CategoryFrequency }
 interface DbSubCategory { id: string; name: string; category_id: string; parent_sub_category_id: string | null }
 interface DbSupplier { id: string; name: string; contact: string | null }
 interface DbItem { id: string; name: string; category_id: string | null; default_supplier_id: string | null; default_unit_price: number | null; unit: string | null }
@@ -43,12 +47,13 @@ export default function AdminDashboard() {
   const [newItemSupplier, setNewItemSupplier] = useState("");
   const [newItemPrice, setNewItemPrice] = useState("");
   const [newItemUnit, setNewItemUnit] = useState("kg");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   useEffect(() => {
     if (!user) return;
     const load = async () => {
       const [c, sc, s, i, p] = await Promise.all([
-        supabase.from("categories").select("id, name").eq("user_id", user.id),
+        supabase.from("categories").select("id, name, frequency").eq("user_id", user.id),
         supabase.from("sub_categories").select("id, name, category_id, parent_sub_category_id").eq("user_id", user.id),
         supabase.from("suppliers").select("id, name, contact").eq("user_id", user.id),
         supabase.from("items").select("id, name, category_id, default_supplier_id, default_unit_price, unit").eq("user_id", user.id),
@@ -75,13 +80,24 @@ export default function AdminDashboard() {
   const monthInterval = { start: startOfMonth(today), end: endOfMonth(today) };
   const yearInterval = { start: startOfYear(today), end: endOfYear(today) };
 
-  const dailyTotal = useMemo(() => payments.filter(p => p.date === todayStr).reduce((s, p) => s + Number(p.total_amount), 0), [payments, todayStr]);
-  const monthlyTotal = useMemo(() => payments.filter(p => { try { return isWithinInterval(parseISO(p.date), monthInterval); } catch { return false; } }).reduce((s, p) => s + Number(p.total_amount), 0), [payments]);
-  const yearlyTotal = useMemo(() => payments.filter(p => { try { return isWithinInterval(parseISO(p.date), yearInterval); } catch { return false; } }).reduce((s, p) => s + Number(p.total_amount), 0), [payments]);
+  const filteredPayments = useMemo(() => {
+    if (!dateRange?.from && !dateRange?.to) return payments;
+    const from = dateRange.from;
+    const to = dateRange.to || dateRange.from;
+    return payments.filter(p => {
+      try { return isWithinInterval(parseISO(p.date), { start: from!, end: to! }); } catch { return false; }
+    });
+  }, [payments, dateRange]);
+
+  const rangeTotal = useMemo(() => filteredPayments.reduce((s, p) => s + Number(p.total_amount), 0), [filteredPayments]);
+
+  const dailyTotal = useMemo(() => filteredPayments.filter(p => p.date === todayStr).reduce((s, p) => s + Number(p.total_amount), 0), [filteredPayments, todayStr]);
+  const monthlyTotal = useMemo(() => filteredPayments.filter(p => { try { return isWithinInterval(parseISO(p.date), monthInterval); } catch { return false; } }).reduce((s, p) => s + Number(p.total_amount), 0), [filteredPayments]);
+  const yearlyTotal = useMemo(() => filteredPayments.filter(p => { try { return isWithinInterval(parseISO(p.date), yearInterval); } catch { return false; } }).reduce((s, p) => s + Number(p.total_amount), 0), [filteredPayments]);
 
   const categoryBreakdown = useMemo(() => {
     const map = new Map<string, number>();
-    payments.forEach(p => {
+    filteredPayments.forEach(p => {
       (p.sub_payments || []).forEach((sp: any) => {
         const cat = categories.find(c => c.id === sp.category_id);
         const name = cat?.name ?? "Uncategorized";
@@ -89,26 +105,35 @@ export default function AdminDashboard() {
       });
     });
     return Array.from(map, ([name, value]) => ({ name, value }));
-  }, [payments, categories]);
+  }, [filteredPayments, categories]);
 
   const monthlyTrend = useMemo(() => {
     const months: { month: string; total: number }[] = [];
     for (let m = 0; m < 12; m++) {
       const mStart = new Date(today.getFullYear(), m, 1);
       const mEnd = endOfMonth(mStart);
-      const total = payments.filter(p => { try { return isWithinInterval(parseISO(p.date), { start: mStart, end: mEnd }); } catch { return false; } }).reduce((s, p) => s + Number(p.total_amount), 0);
+      const total = filteredPayments.filter(p => { try { return isWithinInterval(parseISO(p.date), { start: mStart, end: mEnd }); } catch { return false; } }).reduce((s, p) => s + Number(p.total_amount), 0);
       months.push({ month: format(mStart, "MMM"), total });
     }
     return months;
-  }, [payments, today]);
+  }, [filteredPayments, today]);
 
   // CRUD helpers
   const addCategory = async () => {
     if (!newCatName.trim() || !user) return;
-    const { data, error } = await supabase.from("categories").insert({ name: newCatName.trim(), user_id: user.id }).select("id, name").single();
+    const { data, error } = await supabase.from("categories").insert({ name: newCatName.trim(), user_id: user.id, frequency: "daily" }).select("id, name, frequency").single();
     if (error) { toast.error(error.message); return; }
     if (data) setCategories(prev => [...prev, data]);
     setNewCatName("");
+  };
+
+  const updateCategoryFrequency = async (id: string, frequency: CategoryFrequency) => {
+    const { error } = await supabase.from("categories").update({ frequency }).eq("id", id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setCategories(prev => prev.map(category => category.id === id ? { ...category, frequency } : category));
   };
 
   const deleteCategory = async (id: string) => {
@@ -180,6 +205,51 @@ export default function AdminDashboard() {
 
       {activeTab === "summary" && (
         <div className="space-y-4">
+          {/* Date Range Picker */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+                  <CalendarIcon className="h-3.5 w-3.5" />
+                  {dateRange?.from ? (
+                    dateRange.to ? (
+                      <>{format(dateRange.from, "MMM d, y")} – {format(dateRange.to, "MMM d, y")}</>
+                    ) : (
+                      format(dateRange.from, "MMM d, y")
+                    )
+                  ) : (
+                    "Pick a date range"
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="range"
+                  selected={dateRange}
+                  onSelect={setDateRange}
+                  numberOfMonths={2}
+                />
+              </PopoverContent>
+            </Popover>
+            {dateRange && (
+              <Button variant="ghost" size="sm" className="text-xs h-7 px-2" onClick={() => setDateRange(undefined)}>
+                <X className="h-3 w-3 mr-1" />Clear
+              </Button>
+            )}
+          </div>
+
+          {/* Range Total (only shown when filter is active) */}
+          {dateRange && (
+            <div className="card-editorial p-4 border-primary/30 bg-primary/5">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                {dateRange.to
+                  ? `${format(dateRange.from!, "MMM d")} – ${format(dateRange.to, "MMM d, y")}`
+                  : format(dateRange.from!, "MMM d, y")}
+              </p>
+              <p className="text-2xl font-display mt-1">{rangeTotal.toLocaleString()}</p>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[{ label: "Today", value: dailyTotal }, { label: "This Month", value: monthlyTotal }, { label: "This Year", value: yearlyTotal }].map(({ label, value }) => (
               <div key={label} className="card-editorial p-4">
@@ -224,10 +294,30 @@ export default function AdminDashboard() {
             const subs = getLevel1Subs(cat.id);
             return (
               <div key={cat.id} className="card-editorial overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-2.5">
+                <div className="flex items-center gap-2 px-4 py-2.5">
                   <button onClick={() => setExpandedCats(prev => { const n = new Set(prev); n.has(cat.id) ? n.delete(cat.id) : n.add(cat.id); return n; })} className="flex items-center gap-2 text-sm font-medium flex-1 text-left">
                     {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}{cat.name}
                   </button>
+                  <div className="flex items-center gap-1 text-xs">
+                    {(["daily", "weekly", "monthly"] as CategoryFrequency[]).map(freq => {
+                      const labels: Record<CategoryFrequency, string> = { daily: "D", weekly: "W", monthly: "M" };
+                      return (
+                        <button
+                          key={freq}
+                          type="button"
+                          onClick={() => cat.frequency !== freq && updateCategoryFrequency(cat.id, freq)}
+                          aria-pressed={cat.frequency === freq}
+                          className={`h-7 px-2 rounded-md border text-xs font-medium transition-all ${
+                            cat.frequency === freq
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border/60 bg-muted/50 text-muted-foreground hover:bg-muted"
+                          }`}
+                        >
+                          {labels[freq]}
+                        </button>
+                      );
+                    })}
+                  </div>
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteCategory(cat.id)}><Trash2 className="h-3 w-3" /></Button>
                 </div>
                 {expanded && (

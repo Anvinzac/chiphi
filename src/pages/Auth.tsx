@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { signInAsAdmin } from "@/hooks/useAdminDemoAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -93,6 +94,23 @@ export default function Auth() {
           />
           <Button type="submit" className="w-full" disabled={submitting}>
             {submitting ? "..." : isLogin ? "Sign In" : "Sign Up"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full text-xs"
+            onClick={async () => {
+              setSubmitting(true);
+              try {
+                await signInAsAdmin();
+              } catch (err: any) {
+                toast.error(err.message);
+              } finally {
+                setSubmitting(false);
+              }
+            }}
+          >
+            Quick Admin Login
           </Button>
         </form>
         <p className="text-center text-sm text-muted-foreground">

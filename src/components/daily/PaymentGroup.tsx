@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { format, parseISO } from "date-fns";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import SwipeableEntryRow from "./SwipeableEntryRow";
 
@@ -15,6 +16,7 @@ export interface PaymentGroupData {
   supplierName: string | null;
   total: number;
   entries: PaymentEntry[];
+  date?: string;
 }
 
 interface PaymentGroupProps {
@@ -46,6 +48,11 @@ export default function PaymentGroup({ group, getCategoryName, getSupplierName, 
             <span className="text-sm font-medium truncate">
               {group.supplierName || "Chưa phân loại"}
             </span>
+            {group.date && (
+              <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
+                {format(parseISO(group.date), "MMM d")}
+              </span>
+            )}
             <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded-full bg-muted tabular-nums">
               {group.entries.length} {group.entries.length === 1 ? "mặt hàng" : "mặt hàng"}
             </span>

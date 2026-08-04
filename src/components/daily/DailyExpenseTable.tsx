@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { addDays, differenceInCalendarDays, format } from "date-fns";
+import { addDays, differenceInCalendarDays, format, isToday, isYesterday, parseISO } from "date-fns";
+import { vi } from "date-fns/locale";
 import { toast } from "sonner";
 import { Check, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import PaymentGroup, { type PaymentGroupData, type PaymentEntry } from "./PaymentGroup";
@@ -10,21 +11,41 @@ import PurchaseDetailDialog from "./PurchaseDetailDialog";
 import RangeDayPicker from "./RangeDayPicker";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { VerifyData } from "@/types/expense";
+import { getMockGroupsForRange, isMockPaymentId } from "@/lib/mockRangeData";
 
 type ViewMode = "range" | "daily";
 
-/** First accounting period: Aug 5 – Sep 3 (30 days). Later periods shift by 30 days. */
-const PERIOD_ANCHOR = new Date(2026, 7, 5); // Aug 5, 2026 local
+/** Accounting periods: … → Jul 3–Aug 4 → Aug 5–Sep 3 → … */
+const PERIOD_ZERO_START = new Date(2026, 7, 5); // Aug 5, 2026
+const PERIOD_ZERO_END = new Date(2026, 8, 3); // Sep 3, 2026
+const PERIOD_PREV_START = new Date(2026, 6, 3); // Jul 3, 2026
+const PERIOD_PREV_END = new Date(2026, 7, 4); // Aug 4, 2026
 const PERIOD_LENGTH_DAYS = 30;
 
 function getPeriodBounds(offset: number) {
-  const start = addDays(PERIOD_ANCHOR, offset * PERIOD_LENGTH_DAYS);
-  const end = addDays(start, PERIOD_LENGTH_DAYS - 1);
-  return { start, end };
+  if (offset === 0) return { start: PERIOD_ZERO_START, end: PERIOD_ZERO_END };
+  if (offset === -1) return { start: PERIOD_PREV_START, end: PERIOD_PREV_END };
+  if (offset > 0) {
+    const start = addDays(PERIOD_ZERO_END, 1 + (offset - 1) * PERIOD_LENGTH_DAYS);
+    return { start, end: addDays(start, PERIOD_LENGTH_DAYS - 1) };
+  }
+  // offset < -1: step backward from Jul 3 in 30-day chunks
+  const start = addDays(PERIOD_PREV_START, (offset + 1) * PERIOD_LENGTH_DAYS);
+  return { start, end: addDays(start, PERIOD_LENGTH_DAYS - 1) };
 }
 
 function getPeriodOffsetForDate(date: Date) {
-  return Math.floor(differenceInCalendarDays(date, PERIOD_ANCHOR) / PERIOD_LENGTH_DAYS);
+  const key = format(date, "yyyy-MM-dd");
+  if (key >= format(PERIOD_ZERO_START, "yyyy-MM-dd") && key <= format(PERIOD_ZERO_END, "yyyy-MM-dd")) {
+    return 0;
+  }
+  if (key >= format(PERIOD_PREV_START, "yyyy-MM-dd") && key <= format(PERIOD_PREV_END, "yyyy-MM-dd")) {
+    return -1;
+  }
+  if (key > format(PERIOD_ZERO_END, "yyyy-MM-dd")) {
+    return 1 + Math.floor(differenceInCalendarDays(date, addDays(PERIOD_ZERO_END, 1)) / PERIOD_LENGTH_DAYS);
+  }
+  return -1 + Math.floor(differenceInCalendarDays(date, PERIOD_PREV_START) / PERIOD_LENGTH_DAYS);
 }
 
 interface DbItem {
@@ -105,25 +126,29 @@ export default function DailyExpenseTable() {
   const lastTapRef = useRef(0);
 
   const HIGH_VALUE_THRESHOLD = 200000;
+  // Soft dusty pastels — same visual weight across the set
   const QUICK_CATEGORY_DETAILS: { name: string; emoji: string; gradient: string }[] = [
-    { name: "Điện", emoji: "⚡", gradient: "linear-gradient(135deg, #c9ad86, #b99578)" },
-    { name: "Thuê nhà", emoji: "🏠", gradient: "linear-gradient(135deg, #b99a9b, #a98289)" },
-    { name: "Gas", emoji: "🔥", gradient: "linear-gradient(135deg, #c69a83, #b77f72)" },
-    { name: "Đi chợ", emoji: "🛒", gradient: "linear-gradient(135deg, #9caf9b, #849f91)" },
-    { name: "Bánh mì", emoji: "🥖", gradient: "linear-gradient(135deg, #c8b487, #b49a73)" },
-    { name: "Nguyên vật liệu", emoji: "🥬", gradient: "linear-gradient(135deg, #a7b298, #879d88)" },
-    { name: "Nước dừa", emoji: "🥥", gradient: "linear-gradient(135deg, #9db5b4, #829fa3)" },
-    { name: "Muối", emoji: "🧂", gradient: "linear-gradient(135deg, #a8afb2, #8e989f)" },
-    { name: "Shopee", emoji: "🛍️", gradient: "linear-gradient(135deg, #c39b8d, #b27d79)" },
-    { name: "Internet", emoji: "🌐", gradient: "linear-gradient(135deg, #9caabd, #818fa9)" },
-    { name: "Sửa chữa", emoji: "🛠️", gradient: "linear-gradient(135deg, #b29e8e, #9a8179)" },
-    { name: "Vệ sinh", emoji: "🧼", gradient: "linear-gradient(135deg, #9db7b5, #7f9e9f)" },
-    { name: "Lương NV", emoji: "👥", gradient: "linear-gradient(135deg, #aa9cad, #907e9e)" },
-    { name: "Thuế", emoji: "🧾", gradient: "linear-gradient(135deg, #a3aab7, #858e9f)" },
-    { name: "BHXH", emoji: "🛡️", gradient: "linear-gradient(135deg, #91ada3, #76988d)" },
-    { name: "Rác", emoji: "♻️", gradient: "linear-gradient(135deg, #a5ae8d, #8f9d78)" },
-    { name: "Giữ xe", emoji: "🅿️", gradient: "linear-gradient(135deg, #a5a3a0, #898987)" },
-    { name: "Khác", emoji: "✦", gradient: "linear-gradient(135deg, #b29aab, #9f7f94)" },
+    { name: "Điện", emoji: "⚡", gradient: "linear-gradient(160deg, #efe4d2 0%, #d9c6a8 100%)" },
+    { name: "Thuê nhà", emoji: "🏠", gradient: "linear-gradient(160deg, #eedfe1 0%, #d8c0c4 100%)" },
+    { name: "Gas", emoji: "🔥", gradient: "linear-gradient(160deg, #f0ddd2 0%, #dbb9a8 100%)" },
+    { name: "Đi chợ", emoji: "🛒", gradient: "linear-gradient(160deg, #dde8dc 0%, #bdcfb9 100%)" },
+    { name: "Bánh mì", emoji: "🥖", gradient: "linear-gradient(160deg, #f0e6d0 0%, #dbc8a6 100%)" },
+    { name: "Nguyên vật liệu", emoji: "🥬", gradient: "linear-gradient(160deg, #e0ead8 0%, #c2d2b6 100%)" },
+    { name: "Rau", emoji: "🥦", gradient: "linear-gradient(160deg, #dcead8 0%, #b8d0b0 100%)" },
+    { name: "Đậu hũ", emoji: "🧈", gradient: "linear-gradient(160deg, #efe8d8 0%, #d8ceb4 100%)" },
+    { name: "Nước tương", emoji: "🫙", gradient: "linear-gradient(160deg, #e8ddd0 0%, #d0bca8 100%)" },
+    { name: "Nước dừa", emoji: "🥥", gradient: "linear-gradient(160deg, #d9e6e6 0%, #b7cbcc 100%)" },
+    { name: "Muối", emoji: "🧂", gradient: "linear-gradient(160deg, #e2e6ea 0%, #c5cbd2 100%)" },
+    { name: "Shopee", emoji: "🛍️", gradient: "linear-gradient(160deg, #eeddd8 0%, #d6b8b0 100%)" },
+    { name: "Internet", emoji: "🌐", gradient: "linear-gradient(160deg, #dde2ec 0%, #b8c2d2 100%)" },
+    { name: "Sửa chữa", emoji: "🛠️", gradient: "linear-gradient(160deg, #e8dfd8 0%, #cec0b4 100%)" },
+    { name: "Vệ sinh", emoji: "🧼", gradient: "linear-gradient(160deg, #d8e8e6 0%, #b4cfcc 100%)" },
+    { name: "Lương NV", emoji: "👥", gradient: "linear-gradient(160deg, #e4dde8 0%, #c8bdd2 100%)" },
+    { name: "Thuế", emoji: "🧾", gradient: "linear-gradient(160deg, #e0e4ea 0%, #c0c6d0 100%)" },
+    { name: "BHXH", emoji: "🛡️", gradient: "linear-gradient(160deg, #d8e6e0 0%, #b4cfc2 100%)" },
+    { name: "Rác", emoji: "♻️", gradient: "linear-gradient(160deg, #e4ead8 0%, #c6d0b4 100%)" },
+    { name: "Giữ xe", emoji: "🅿️", gradient: "linear-gradient(160deg, #e6e4e0 0%, #c8c6c2 100%)" },
+    { name: "Khác", emoji: "✦", gradient: "linear-gradient(160deg, #e8dde6 0%, #d0bac8 100%)" },
   ];
   const frequencyOrder: Record<CategoryFrequency, number> = { daily: 0, weekly: 1, monthly: 2 };
   const quickCategories = QUICK_CATEGORY_DETAILS
@@ -183,14 +208,15 @@ export default function DailyExpenseTable() {
 
       const { data: payments } = await query;
 
+      let groups: PaymentGroupData[] = [];
+      let total = 0;
+
       if (payments && payments.length > 0) {
-        let total = 0;
-        const groups: PaymentGroupData[] = payments.map((p: any) => {
+        groups = payments.map((p: any) => {
           const subs = (p.sub_payments as any[]) || [];
           const paymentTotal = subs.reduce((sum: number, s: any) => sum + Number(s.amount), 0);
           total += paymentTotal;
 
-          // Determine supplier name from payment-level or first sub_payment
           const supplierId = p.supplier_id || (subs.length > 0 ? subs[0].supplier_id : null);
           const supplierName = supplierId
             ? suppliers.find(s => s.id === supplierId)?.name || null
@@ -200,7 +226,7 @@ export default function DailyExpenseTable() {
             paymentId: p.id,
             supplierName,
             total: paymentTotal,
-            date: viewMode === "range" ? p.date : undefined,
+            date: p.date as string,
             entries: subs.map((s: any) => ({
               item_name: s.item_name,
               amount: Number(s.amount),
@@ -210,22 +236,32 @@ export default function DailyExpenseTable() {
             })),
           };
         });
+      }
 
-        // In range mode, newest dates first for easier scanning
-        if (viewMode === "range") {
-          groups.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+      // Inject client mock spend for empty (or sparse) previous-range testing
+      if (viewMode === "range") {
+        const mocks = getMockGroupsForRange(periodStartStr, periodEndStr);
+        if (mocks.length > 0) {
+          const realIds = new Set(groups.map(g => g.paymentId));
+          const extra = mocks.filter(m => !realIds.has(m.paymentId));
+          groups = [...groups, ...extra];
+          total = groups.reduce((s, g) => s + g.total, 0);
         }
+        groups.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+      }
 
-        setPaymentGroups(groups);
-        setDayTotal(total);
+      setPaymentGroups(groups);
+      setDayTotal(total);
+      if (groups.length > 0) {
         if (viewMode === "range") {
           const todayStr = format(new Date(), "yyyy-MM-dd");
-          const todayPayments = payments.filter((p: any) => p.date === todayStr);
+          const todayPayments = groups.filter(g => g.date === todayStr && !isMockPaymentId(g.paymentId));
           setActivePaymentId(
-            todayPayments.length > 0 ? todayPayments[todayPayments.length - 1].id : null
+            todayPayments.length > 0 ? todayPayments[todayPayments.length - 1].paymentId : null
           );
         } else {
-          setActivePaymentId(payments[payments.length - 1].id);
+          const lastReal = [...groups].reverse().find(g => !isMockPaymentId(g.paymentId));
+          setActivePaymentId(lastReal?.paymentId ?? null);
         }
       }
     };
@@ -523,6 +559,12 @@ export default function DailyExpenseTable() {
   // Swipe between days (daily, within period) or periods (range)
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
+  const panelTouchStart = useRef<{ x: number; y: number; target: EventTarget | null } | null>(null);
+
+  const goToNamePhase = useCallback(() => {
+    setPhase("name");
+    setTimeout(() => nameRef.current?.focus(), 50);
+  }, []);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
@@ -548,9 +590,91 @@ export default function DailyExpenseTable() {
     setSelectedDate(format(next, "yyyy-MM-dd"));
   }, [selectedDate, viewMode, period.start, period.end]);
 
+  const handlePanelTouchStart = useCallback((e: React.TouchEvent) => {
+    e.stopPropagation();
+    panelTouchStart.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+      target: e.target,
+    };
+  }, []);
+
+  const handlePanelTouchEnd = useCallback((e: React.TouchEvent) => {
+    e.stopPropagation();
+    const start = panelTouchStart.current;
+    panelTouchStart.current = null;
+    if (!start || justSaved || phase === "done") return;
+
+    const dx = e.changedTouches[0].clientX - start.x;
+    const dy = e.changedTouches[0].clientY - start.y;
+    if (Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx) * 0.65) return;
+
+    // Don't steal horizontal scrolls from the category rail
+    const el = start.target as HTMLElement | null;
+    if (el?.closest(".category-rail")) return;
+
+    if (dx < 0) {
+      // swipe left → next phase
+      if (phase === "name" && nameValue.trim()) handleNameConfirm();
+    } else if (phase === "amount") {
+      // swipe right → previous phase
+      goToNamePhase();
+    }
+  }, [justSaved, phase, nameValue, handleNameConfirm, goToNamePhase]);
+
   const centerLabel = viewMode === "range"
     ? `${format(period.start, "MMM d")} – ${format(period.end, "MMM d")}`
     : format(new Date(selectedDate + "T00:00:00"), "EEE, MMM d");
+
+  const rangeDaySections = useMemo(() => {
+    if (viewMode !== "range") return [];
+    const map = new Map<string, PaymentGroupData[]>();
+    for (const group of paymentGroups) {
+      const key = group.date || "unknown";
+      const list = map.get(key);
+      if (list) list.push(group);
+      else map.set(key, [group]);
+    }
+    return Array.from(map.entries()).map(([date, groups]) => ({
+      date,
+      groups,
+      total: groups.reduce((sum, g) => sum + g.total, 0),
+    }));
+  }, [viewMode, paymentGroups]);
+
+  const formatDayHeading = (dateStr: string) => {
+    try {
+      const d = parseISO(dateStr);
+      if (isToday(d)) return "Hôm nay";
+      if (isYesterday(d)) return "Hôm qua";
+      return format(d, "EEEE, d MMMM", { locale: vi });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const renderPaymentGroup = (group: PaymentGroupData) => (
+    <PaymentGroup
+      key={group.paymentId}
+      group={viewMode === "range" ? { ...group, date: undefined } : group}
+      getCategoryName={getCategoryName}
+      getSupplierName={getSupplierName}
+      highValueThreshold={HIGH_VALUE_THRESHOLD}
+      onEntryClick={(entry) => { setDetailEntry(entry); setDetailOpen(true); }}
+      onEntryDelete={async (paymentId, entry, index) => {
+        if (entry.sub_payment_id && !isMockPaymentId(paymentId)) {
+          await supabase.from("sub_payments").delete().eq("id", entry.sub_payment_id);
+        }
+        setPaymentGroups(prev => prev.map(g => {
+          if (g.paymentId !== paymentId) return g;
+          const newEntries = g.entries.filter((_, i) => i !== index);
+          return { ...g, entries: newEntries, total: newEntries.reduce((s, e) => s + e.amount, 0) };
+        }).filter(g => g.entries.length > 0));
+        setDayTotal(prev => prev - entry.amount);
+        toast.success("Deleted");
+      }}
+    />
+  );
 
   return (
     <div
@@ -627,28 +751,24 @@ export default function DailyExpenseTable() {
             )}
           </div>
         )}
-        {paymentGroups.map((group) => (
-          <PaymentGroup
-            key={group.paymentId}
-            group={group}
-            getCategoryName={getCategoryName}
-            getSupplierName={getSupplierName}
-            highValueThreshold={HIGH_VALUE_THRESHOLD}
-            onEntryClick={(entry) => { setDetailEntry(entry); setDetailOpen(true); }}
-            onEntryDelete={async (paymentId, entry, index) => {
-              if (entry.sub_payment_id) {
-                await supabase.from("sub_payments").delete().eq("id", entry.sub_payment_id);
-              }
-              setPaymentGroups(prev => prev.map(g => {
-                if (g.paymentId !== paymentId) return g;
-                const newEntries = g.entries.filter((_, i) => i !== index);
-                return { ...g, entries: newEntries, total: newEntries.reduce((s, e) => s + e.amount, 0) };
-              }).filter(g => g.entries.length > 0));
-              setDayTotal(prev => prev - entry.amount);
-              toast.success("Deleted");
-            }}
-          />
-        ))}
+
+        {viewMode === "range" ? (
+          rangeDaySections.map(section => (
+            <section key={section.date} className="mb-5">
+              <div className="sticky top-0 z-10 -mx-1 mb-1.5 flex items-baseline justify-between gap-3 bg-background/95 px-1 py-2 backdrop-blur-sm">
+                <h2 className="font-display text-base capitalize leading-none text-foreground">
+                  {formatDayHeading(section.date)}
+                </h2>
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  {section.total.toLocaleString("vi-VN")} ₫
+                </span>
+              </div>
+              {section.groups.map(renderPaymentGroup)}
+            </section>
+          ))
+        ) : (
+          paymentGroups.map(renderPaymentGroup)
+        )}
 
         {/* New purchase button */}
         {paymentGroups.length > 0 && (
@@ -681,6 +801,8 @@ export default function DailyExpenseTable() {
           style={{ height: "45vh" }}
           data-no-double-tap
           onClick={(e) => e.stopPropagation()}
+          onTouchStart={handlePanelTouchStart}
+          onTouchEnd={handlePanelTouchEnd}
         >
           <div
             className="absolute -top-8 left-0 right-0 h-8 pointer-events-none"
@@ -721,27 +843,32 @@ export default function DailyExpenseTable() {
             {/* Name phase */}
             {phase === "name" && !justSaved && (
               <div className="flex-1 flex min-h-0 flex-col px-5 pt-2 pb-3">
-                <div className="category-rail -mx-5 min-h-0 flex-1 overflow-x-auto px-5 pb-3" role="list" aria-label="Danh mục nhanh">
-                  <div className="grid h-full w-max grid-flow-row grid-cols-3 auto-rows-fr gap-1.5">
-                    {quickCategories.map((category, index) => (
-                      <button
-                        key={category.name}
-                        type="button"
-                        onClick={() => handleQuickCategory(category.name)}
-                        style={{ animationDelay: `${index * 18}ms` }}
-                        className={`category-cell group flex h-auto min-h-0 w-max min-w-[7.5rem] items-center gap-2 rounded-[1.1rem] border px-3 py-2 text-left text-slate-800 shadow-warm transition-all active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                          selectedCategoryId && categories.find(c => c.id === selectedCategoryId)?.name === category.name
-                            ? "border-primary ring-2 ring-primary/40 ring-offset-2 ring-offset-background"
-                            : "border-slate-900/10 hover:-translate-y-0.5 hover:border-slate-900/20"
-                        } bg-gradient-to-br ${category.gradient}`}
-                      >
-                        <span className="text-3xl leading-none" aria-hidden="true">{category.emoji}</span>
-                        <span className="block whitespace-nowrap text-sm font-bold leading-tight">{category.name}</span>
-                      </button>
-                    ))}
+                <div className="category-rail -mx-5 shrink-0 overflow-x-auto px-5 pb-2.5" role="list" aria-label="Danh mục nhanh">
+                  <div className="category-rail-track">
+                    {quickCategories.map((category, index) => {
+                      const selected =
+                        selectedCategoryId &&
+                        categories.find(c => c.id === selectedCategoryId)?.name === category.name;
+                      return (
+                        <button
+                          key={category.name}
+                          type="button"
+                          onClick={() => handleQuickCategory(category.name)}
+                          style={{
+                            backgroundImage: category.gradient,
+                            animationDelay: `${index * 16}ms`,
+                          }}
+                          className={`category-cell ${selected ? "category-cell--selected" : ""}`}
+                          aria-pressed={!!selected}
+                        >
+                          <span className="category-cell__emoji" aria-hidden="true">{category.emoji}</span>
+                          <span className="category-cell__label">{category.name}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-                <div className="shrink-0">
+                <div className="min-h-0 flex-1 overflow-hidden">
                   <label className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-2 block">
                     Tên mặt hàng
                   </label>
@@ -844,7 +971,7 @@ export default function DailyExpenseTable() {
                 verifyData={verifyData}
                 setMatch={setMatch}
                 setVerifyData={setVerifyData}
-                onBack={() => { setPhase("name"); setTimeout(() => nameRef.current?.focus(), 50); }}
+                onBack={goToNamePhase}
                 onKeyDown={handleAmountKeyDown}
                 onSave={handleSave}
               />

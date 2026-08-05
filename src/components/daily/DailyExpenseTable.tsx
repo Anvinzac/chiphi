@@ -1,17 +1,19 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { addDays, differenceInCalendarDays, format, isToday, isYesterday, parseISO } from "date-fns";
+import { addDays, differenceInCalendarDays, endOfWeek, format, isToday, isYesterday, parseISO, startOfWeek } from "date-fns";
 import { vi } from "date-fns/locale";
 import { toast } from "sonner";
-import { Check, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import PaymentGroup, { type PaymentGroupData, type PaymentEntry } from "./PaymentGroup";
+import SwipeableEntryRow from "./SwipeableEntryRow";
 import AmountPhase from "./AmountPhase";
 import PurchaseDetailDialog from "./PurchaseDetailDialog";
 import RangeDayPicker from "./RangeDayPicker";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { VerifyData } from "@/types/expense";
 import { getMockGroupsForRange, isMockPaymentId } from "@/lib/mockRangeData";
+import { lockBodyScroll } from "@/lib/focusWithoutScroll";
 
 type ViewMode = "range" | "daily";
 
@@ -108,6 +110,7 @@ export default function DailyExpenseTable() {
   const [phase, setPhase] = useState<InputPhase>("name");
   const [nameValue, setNameValue] = useState("");
   const [amountValue, setAmountValue] = useState("");
+  const [noteValue, setNoteValue] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [match, setMatch] = useState<MatchInfo | null>(null);
   const [verifyData, setVerifyData] = useState<VerifyData | null>(null);
@@ -119,11 +122,19 @@ export default function DailyExpenseTable() {
   const [cardClosing, setCardClosing] = useState(false);
   const [detailEntry, setDetailEntry] = useState<PaymentEntry | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [nameFilter, setNameFilter] = useState<string | null>(null);
 
   const nameRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  const pagerRef = useRef<HTMLDivElement>(null);
+  const pagerReadyRef = useRef(false);
+  const pagerSyncingRef = useRef(false);
   const lastTapRef = useRef(0);
+  const nameValueRef = useRef(nameValue);
+  nameValueRef.current = nameValue;
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
 
   const HIGH_VALUE_THRESHOLD = 200000;
   // Soft dusty pastels — same visual weight across the set
@@ -137,6 +148,7 @@ export default function DailyExpenseTable() {
     { name: "Rau", emoji: "🥦", gradient: "linear-gradient(160deg, #dcead8 0%, #b8d0b0 100%)" },
     { name: "Đậu hũ", emoji: "🧈", gradient: "linear-gradient(160deg, #efe8d8 0%, #d8ceb4 100%)" },
     { name: "Nước tương", emoji: "🫙", gradient: "linear-gradient(160deg, #e8ddd0 0%, #d0bca8 100%)" },
+    { name: "Gạo", emoji: "🌾", gradient: "linear-gradient(160deg, #efe6d4 0%, #d8c8a8 100%)" },
     { name: "Nước dừa", emoji: "🥥", gradient: "linear-gradient(160deg, #d9e6e6 0%, #b7cbcc 100%)" },
     { name: "Muối", emoji: "🧂", gradient: "linear-gradient(160deg, #e2e6ea 0%, #c5cbd2 100%)" },
     { name: "Shopee", emoji: "🛍️", gradient: "linear-gradient(160deg, #eeddd8 0%, #d6b8b0 100%)" },
@@ -196,7 +208,7 @@ export default function DailyExpenseTable() {
     const loadPayments = async () => {
       let query = supabase
         .from("payments")
-        .select("id, date, total_amount, supplier_id, sub_payments(id, item_name, amount, category_id, supplier_id)")
+        .select("id, date, total_amount, supplier_id, sub_payments(id, item_name, amount, category_id, supplier_id, notes)")
         .eq("user_id", user.id)
         .order("created_at", { ascending: true });
 
@@ -233,6 +245,7 @@ export default function DailyExpenseTable() {
               category_id: s.category_id,
               supplier_id: s.supplier_id,
               sub_payment_id: s.id,
+              notes: s.notes ?? null,
             })),
           };
         });
@@ -268,24 +281,83 @@ export default function DailyExpenseTable() {
     loadPayments();
   }, [user, selectedDate, suppliers, viewMode, periodStartStr, periodEndStr]);
 
+  // Lock page scroll while the add panel is open (stops iOS jump-to-bottom on focus)
   useEffect(() => {
-    if (phase === "name" && cardExpanded) nameRef.current?.focus();
-  }, [phase, cardExpanded]);
+    if (!cardExpanded) return;
+    return lockBodyScroll();
+  }, [cardExpanded]);
 
-  // Click outside card to collapse
+  // Never auto-focus text fields on the name step — chips are the primary action
   useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (!cardExpanded || cardClosing) return;
-      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
-        setCardClosing(true);
-        setTimeout(() => {
-          setCardExpanded(false);
-          setCardClosing(false);
-        }, 320);
+    if (!cardExpanded || phase !== "name") return;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && cardRef.current?.contains(active)) {
+      active.blur();
+    }
+  }, [cardExpanded, phase]);
+
+  const scrollPagerTo = useCallback((target: "name" | "amount", smooth: boolean) => {
+    const el = pagerRef.current;
+    if (!el) return;
+    const left = target === "amount" ? el.clientWidth : 0;
+    if (Math.abs(el.scrollLeft - left) < 2) return;
+    pagerSyncingRef.current = true;
+    el.scrollTo({ left, behavior: smooth ? "smooth" : "auto" });
+    window.setTimeout(() => {
+      pagerSyncingRef.current = false;
+    }, smooth ? 420 : 50);
+  }, []);
+
+  const handleNameConfirmRef = useRef<(() => void) | null>(null);
+  const goToNamePhaseRef = useRef<(() => void) | null>(null);
+  const pagerSettleTimerRef = useRef<number | null>(null);
+
+  // Keep the paging scroll view in sync with phase (buttons / keyboard / save reset)
+  useEffect(() => {
+    if (!cardExpanded || justSaved || phase === "done") {
+      if (!cardExpanded) pagerReadyRef.current = false;
+      return;
+    }
+    const target = phase === "amount" ? "amount" : "name";
+    const smooth = pagerReadyRef.current;
+    // Wait a frame so the pager has layout after mount
+    const id = requestAnimationFrame(() => {
+      scrollPagerTo(target, smooth);
+      pagerReadyRef.current = true;
+    });
+    return () => cancelAnimationFrame(id);
+  }, [phase, cardExpanded, justSaved, scrollPagerTo]);
+
+  const settlePagerPage = useCallback(() => {
+    if (pagerSyncingRef.current) return;
+    const el = pagerRef.current;
+    if (!el || el.clientWidth === 0) return;
+    const page = Math.round(el.scrollLeft / el.clientWidth);
+    if (page >= 1) {
+      if (!nameValueRef.current.trim()) {
+        scrollPagerTo("name", true);
+        return;
       }
-    };
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
+      if (phaseRef.current !== "amount") {
+        handleNameConfirmRef.current?.();
+      }
+    } else if (phaseRef.current === "amount") {
+      goToNamePhaseRef.current?.();
+    }
+  }, [scrollPagerTo]);
+
+  const schedulePagerSettle = useCallback(() => {
+    if (pagerSettleTimerRef.current) window.clearTimeout(pagerSettleTimerRef.current);
+    pagerSettleTimerRef.current = window.setTimeout(settlePagerPage, 90);
+  }, [settlePagerPage]);
+
+  const collapseCard = useCallback(() => {
+    if (!cardExpanded || cardClosing) return;
+    setCardClosing(true);
+    setTimeout(() => {
+      setCardExpanded(false);
+      setCardClosing(false);
+    }, 300);
   }, [cardExpanded, cardClosing]);
 
   const findItem = useCallback((name: string): DbItem | undefined => {
@@ -310,17 +382,25 @@ export default function DailyExpenseTable() {
     let categoryId = existing?.id || null;
 
     if (!categoryId) {
+      const frequency: CategoryFrequency =
+        categoryName.toLowerCase() === "gạo" || categoryName.toLowerCase() === "gao"
+          ? "weekly"
+          : "daily";
       const { data, error } = await supabase
         .from("categories")
-        .insert({ name: categoryName, user_id: user.id })
-        .select("id, name")
+        .insert({ name: categoryName, user_id: user.id, frequency })
+        .select("id, name, frequency")
         .single();
       if (error) {
         toast.error(error.message || "Không thể chọn danh mục");
         return;
       }
       if (data) {
-        setCategories(prev => [...prev, { ...data, frequency: "daily" }]);
+        setCategories(prev => [...prev, {
+          id: data.id,
+          name: data.name,
+          frequency: (data.frequency as CategoryFrequency) || frequency,
+        }]);
         categoryId = data.id;
       }
     }
@@ -349,7 +429,6 @@ export default function DailyExpenseTable() {
       categoryId: categoryId ?? undefined,
     });
     setPhase("amount");
-    setTimeout(() => amountRef.current?.focus(), 50);
   }, [user, categories]);
 
   const handleNameConfirm = useCallback(() => {
@@ -387,15 +466,13 @@ export default function DailyExpenseTable() {
         supplierId: matched.default_supplier_id ?? undefined,
       });
       setPhase("amount");
-      setTimeout(() => amountRef.current?.focus(), 50);
     } else {
       setMatch(null);
       setVerifyData(null);
       setPhase("amount");
-      setTimeout(() => amountRef.current?.focus(), 50);
     }
   }, [nameValue, findItem, categories, subCategories, suppliers]);
-
+  handleNameConfirmRef.current = handleNameConfirm;
 
 
   const handleSave = useCallback(async () => {
@@ -418,6 +495,8 @@ export default function DailyExpenseTable() {
     }
     if (!pid) return;
 
+    const note = noteValue.trim() || null;
+
     const { error } = await supabase.from("sub_payments").insert({
       payment_id: pid,
       item_name: nameValue.trim(),
@@ -429,11 +508,12 @@ export default function DailyExpenseTable() {
       sub_category_id: match?.subCategoryId || null,
       sub_sub_category_id: match?.subSubCategoryId || null,
       supplier_id: match?.supplierId || null,
+      notes: note,
       user_id: user.id,
     });
 
     if (error) {
-      toast.error("Lưu thất bại");
+      toast.error(error.message || "Lưu thất bại");
       return;
     }
 
@@ -443,6 +523,7 @@ export default function DailyExpenseTable() {
       category_id: match?.categoryId || null,
       supplier_id: match?.supplierId || null,
       sub_payment_id: undefined,
+      notes: note,
     };
 
     // Update or create group
@@ -472,13 +553,16 @@ export default function DailyExpenseTable() {
     setTimeout(() => {
       setNameValue("");
       setAmountValue("");
+      setNoteValue("");
       setSelectedCategoryId(null);
       setMatch(null);
       setVerifyData(null);
       setJustSaved(false);
       setPhase("name");
+      pagerReadyRef.current = false;
+      requestAnimationFrame(() => scrollPagerTo("name", false));
     }, 600);
-  }, [amountValue, nameValue, match, activePaymentId, user, expenseDate, viewMode]);
+  }, [amountValue, noteValue, nameValue, match, activePaymentId, user, expenseDate, viewMode, scrollPagerTo]);
 
   const handleNameKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === "Tab") {
@@ -494,8 +578,8 @@ export default function DailyExpenseTable() {
     }
     if (e.key === "Backspace" && amountValue === "") {
       e.preventDefault();
+      setNoteValue("");
       setPhase("name");
-      setTimeout(() => nameRef.current?.focus(), 50);
     }
   };
 
@@ -518,7 +602,9 @@ export default function DailyExpenseTable() {
 
   const expandCard = useCallback(() => {
     setCardExpanded(true);
-    setTimeout(() => nameRef.current?.focus(), 100);
+    // Blur any focused field so iOS doesn't zoom / scroll on open
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
   }, []);
 
   const handleMainDoubleActivate = useCallback((target: EventTarget | null) => {
@@ -548,23 +634,27 @@ export default function DailyExpenseTable() {
     setActivePaymentId(null);
     setNameValue("");
     setAmountValue("");
+    setNoteValue("");
     setSelectedCategoryId(null);
     setMatch(null);
     setVerifyData(null);
     setPhase("name");
     setCardExpanded(true);
-    setTimeout(() => nameRef.current?.focus(), 100);
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
   };
 
   // Swipe between days (daily, within period) or periods (range)
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
-  const panelTouchStart = useRef<{ x: number; y: number; target: EventTarget | null } | null>(null);
 
   const goToNamePhase = useCallback(() => {
+    setNoteValue("");
     setPhase("name");
-    setTimeout(() => nameRef.current?.focus(), 50);
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
   }, []);
+  goToNamePhaseRef.current = goToNamePhase;
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
@@ -590,38 +680,6 @@ export default function DailyExpenseTable() {
     setSelectedDate(format(next, "yyyy-MM-dd"));
   }, [selectedDate, viewMode, period.start, period.end]);
 
-  const handlePanelTouchStart = useCallback((e: React.TouchEvent) => {
-    e.stopPropagation();
-    panelTouchStart.current = {
-      x: e.touches[0].clientX,
-      y: e.touches[0].clientY,
-      target: e.target,
-    };
-  }, []);
-
-  const handlePanelTouchEnd = useCallback((e: React.TouchEvent) => {
-    e.stopPropagation();
-    const start = panelTouchStart.current;
-    panelTouchStart.current = null;
-    if (!start || justSaved || phase === "done") return;
-
-    const dx = e.changedTouches[0].clientX - start.x;
-    const dy = e.changedTouches[0].clientY - start.y;
-    if (Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx) * 0.65) return;
-
-    // Don't steal horizontal scrolls from the category rail
-    const el = start.target as HTMLElement | null;
-    if (el?.closest(".category-rail")) return;
-
-    if (dx < 0) {
-      // swipe left → next phase
-      if (phase === "name" && nameValue.trim()) handleNameConfirm();
-    } else if (phase === "amount") {
-      // swipe right → previous phase
-      goToNamePhase();
-    }
-  }, [justSaved, phase, nameValue, handleNameConfirm, goToNamePhase]);
-
   const centerLabel = viewMode === "range"
     ? `${format(period.start, "MMM d")} – ${format(period.end, "MMM d")}`
     : format(new Date(selectedDate + "T00:00:00"), "EEE, MMM d");
@@ -642,6 +700,85 @@ export default function DailyExpenseTable() {
     }));
   }, [viewMode, paymentGroups]);
 
+  const filteredNameSections = useMemo(() => {
+    if (!nameFilter) return null;
+    const needle = nameFilter.toLowerCase().trim();
+    type FlatItem = {
+      entry: PaymentEntry;
+      paymentId: string;
+      date: string;
+      entryIndex: number;
+    };
+    const flat: FlatItem[] = [];
+    for (const group of paymentGroups) {
+      group.entries.forEach((entry, entryIndex) => {
+        if (entry.item_name.toLowerCase().trim() === needle) {
+          flat.push({
+            entry,
+            paymentId: group.paymentId,
+            date: group.date || selectedDate,
+            entryIndex,
+          });
+        }
+      });
+    }
+    flat.sort((a, b) => b.date.localeCompare(a.date));
+
+    type DayBucket = { date: string; total: number; items: FlatItem[] };
+    type WeekBucket = {
+      weekKey: string;
+      weekStart: Date;
+      weekEnd: Date;
+      total: number;
+      days: DayBucket[];
+    };
+
+    const weekMap = new Map<string, {
+      weekStart: Date;
+      weekEnd: Date;
+      total: number;
+      dayMap: Map<string, DayBucket>;
+    }>();
+
+    for (const item of flat) {
+      const d = parseISO(item.date);
+      const weekStart = startOfWeek(d, { weekStartsOn: 1 });
+      const weekEnd = endOfWeek(d, { weekStartsOn: 1 });
+      const weekKey = format(weekStart, "yyyy-MM-dd");
+      let week = weekMap.get(weekKey);
+      if (!week) {
+        week = { weekStart, weekEnd, total: 0, dayMap: new Map() };
+        weekMap.set(weekKey, week);
+      }
+      week.total += item.entry.amount;
+      let day = week.dayMap.get(item.date);
+      if (!day) {
+        day = { date: item.date, total: 0, items: [] };
+        week.dayMap.set(item.date, day);
+      }
+      day.total += item.entry.amount;
+      day.items.push(item);
+    }
+
+    const weeks: WeekBucket[] = Array.from(weekMap.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([weekKey, week]) => ({
+        weekKey,
+        weekStart: week.weekStart,
+        weekEnd: week.weekEnd,
+        total: week.total,
+        days: Array.from(week.dayMap.values()).sort((a, b) => b.date.localeCompare(a.date)),
+      }));
+
+    return {
+      total: flat.reduce((sum, item) => sum + item.entry.amount, 0),
+      count: flat.length,
+      weeks,
+    };
+  }, [nameFilter, paymentGroups, selectedDate]);
+
+  const displayTotal = filteredNameSections ? filteredNameSections.total : dayTotal;
+
   const formatDayHeading = (dateStr: string) => {
     try {
       const d = parseISO(dateStr);
@@ -653,14 +790,23 @@ export default function DailyExpenseTable() {
     }
   };
 
+  const formatWeekHeading = (weekStart: Date, weekEnd: Date) => {
+    const sameMonth = weekStart.getMonth() === weekEnd.getMonth();
+    if (sameMonth) {
+      return `Tuần ${format(weekStart, "d")}–${format(weekEnd, "d MMM", { locale: vi })}`;
+    }
+    return `Tuần ${format(weekStart, "d MMM", { locale: vi })} – ${format(weekEnd, "d MMM", { locale: vi })}`;
+  };
+
   const renderPaymentGroup = (group: PaymentGroupData) => (
     <PaymentGroup
       key={group.paymentId}
-      group={viewMode === "range" ? { ...group, date: undefined } : group}
+      group={viewMode === "range" && !nameFilter ? { ...group, date: undefined } : group}
       getCategoryName={getCategoryName}
       getSupplierName={getSupplierName}
       highValueThreshold={HIGH_VALUE_THRESHOLD}
       onEntryClick={(entry) => { setDetailEntry(entry); setDetailOpen(true); }}
+      onEntryNameClick={(entry) => setNameFilter(entry.item_name)}
       onEntryDelete={async (paymentId, entry, index) => {
         if (entry.sub_payment_id && !isMockPaymentId(paymentId)) {
           await supabase.from("sub_payments").delete().eq("id", entry.sub_payment_id);
@@ -676,6 +822,10 @@ export default function DailyExpenseTable() {
     />
   );
 
+  // Fixed height for both phases — paging must not resize the panel
+  const panelHeight = "min(80svh, 36rem)";
+  const listPadClass = cardExpanded ? "pb-[min(82svh,37rem)]" : "pb-24";
+
   return (
     <div
       className="min-h-screen bg-background flex flex-col"
@@ -688,25 +838,25 @@ export default function DailyExpenseTable() {
         <span className="font-display text-xl text-primary justify-self-start">Mìsè</span>
 
         <Popover open={rangePickerOpen} onOpenChange={setRangePickerOpen}>
-          <div className="flex items-center gap-0.5 justify-self-center">
+          <div className="flex items-center gap-1.5 justify-self-center">
             <button
               type="button"
               onClick={() => shiftPeriod(-1)}
-              className="p-1 text-muted-foreground hover:text-foreground rounded-md"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted/55 text-muted-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.45)] transition-all hover:bg-muted hover:text-foreground active:scale-95"
               aria-label="Previous period"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-4 w-4" strokeWidth={2.25} />
             </button>
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className="px-2.5 py-1 rounded-full border border-border/60 bg-muted/40 hover:bg-muted transition-colors text-center min-w-[8.5rem]"
+                className="px-1.5 py-0.5 text-center transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 rounded-md"
                 aria-label="Open day picker for this period"
               >
-                <span className="block text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                <span className="block text-[10px] uppercase tracking-[0.18em] text-muted-foreground/80">
                   {viewMode === "range" ? "Theo kỳ" : "Theo ngày"}
                 </span>
-                <span className="block text-xs font-display tabular-nums leading-tight">
+                <span className="block text-sm font-display tabular-nums leading-tight text-foreground/90">
                   {centerLabel}
                 </span>
               </button>
@@ -714,10 +864,10 @@ export default function DailyExpenseTable() {
             <button
               type="button"
               onClick={() => shiftPeriod(1)}
-              className="p-1 text-muted-foreground hover:text-foreground rounded-md"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted/55 text-muted-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.45)] transition-all hover:bg-muted hover:text-foreground active:scale-95"
               aria-label="Next period"
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-4 w-4" strokeWidth={2.25} />
             </button>
           </div>
           <PopoverContent className="w-auto p-3 border-border/60" align="center">
@@ -736,13 +886,35 @@ export default function DailyExpenseTable() {
         </Popover>
 
         <div className="justify-self-end text-right">
-          <span className="text-[10px] uppercase tracking-widest text-muted-foreground block">Tổng</span>
-          <span className="text-lg font-display block leading-tight">{dayTotal.toLocaleString("vi-VN")} ₫</span>
+          <span className="text-[10px] uppercase tracking-widest text-muted-foreground block">
+            {nameFilter ? "Lọc" : "Tổng"}
+          </span>
+          <span className="text-lg font-display block leading-tight">{displayTotal.toLocaleString("vi-VN")} ₫</span>
         </div>
       </div>
 
       {/* Grouped entries */}
-      <div className={`flex-1 overflow-auto px-4 ${cardExpanded ? "pb-[50vh]" : "pb-24"}`}>
+      <div
+        className={`flex-1 px-4 ${listPadClass} ${cardExpanded ? "overflow-hidden overscroll-none" : "overflow-auto"}`}
+        data-expense-list
+      >
+        {nameFilter && (
+          <div className="mb-3 flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2" data-no-double-tap>
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Đang lọc</p>
+              <p className="truncate font-display text-base leading-tight">{nameFilter}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setNameFilter(null)}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-background text-muted-foreground shadow-sm transition-colors hover:text-foreground"
+              aria-label="Xóa bộ lọc"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
         {paymentGroups.length === 0 && (
           <div className="text-center pt-12 text-muted-foreground text-sm">
             <p>Chưa có chi tiêu nào</p>
@@ -752,7 +924,69 @@ export default function DailyExpenseTable() {
           </div>
         )}
 
-        {viewMode === "range" ? (
+        {filteredNameSections ? (
+          filteredNameSections.count === 0 ? (
+            <div className="text-center pt-10 text-sm text-muted-foreground">
+              Không có khoản nào tên “{nameFilter}”
+            </div>
+          ) : (
+            filteredNameSections.weeks.map(week => (
+              <section key={week.weekKey} className="mb-6">
+                <div className="mb-2 flex items-baseline justify-between gap-3 px-0.5">
+                  <h2 className="font-display text-sm tracking-wide text-muted-foreground">
+                    {formatWeekHeading(week.weekStart, week.weekEnd)}
+                  </h2>
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    {week.total.toLocaleString("vi-VN")} ₫
+                  </span>
+                </div>
+                {week.days.map(day => (
+                  <div key={day.date} className="mb-4">
+                    <div className="sticky top-0 z-10 -mx-1 mb-1.5 flex items-baseline justify-between gap-3 bg-background/95 px-1 py-2 backdrop-blur-sm">
+                      <h3 className="font-display text-base capitalize leading-none text-foreground">
+                        {formatDayHeading(day.date)}
+                      </h3>
+                      <span className="text-xs tabular-nums text-muted-foreground">
+                        {day.total.toLocaleString("vi-VN")} ₫
+                      </span>
+                    </div>
+                    <div className="rounded-lg">
+                      {day.items.map(item => (
+                        <SwipeableEntryRow
+                          key={item.entry.sub_payment_id || `${item.paymentId}-${item.entryIndex}`}
+                          item_name={item.entry.item_name}
+                          amount={item.entry.amount}
+                          notes={item.entry.notes}
+                          categoryName={getCategoryName(item.entry.category_id)}
+                          supplierName={getSupplierName(item.entry.supplier_id)}
+                          isHighValue={item.entry.amount >= HIGH_VALUE_THRESHOLD}
+                          onNameClick={() => setNameFilter(item.entry.item_name)}
+                          onClick={() => { setDetailEntry(item.entry); setDetailOpen(true); }}
+                          onDelete={async () => {
+                            if (item.entry.sub_payment_id && !isMockPaymentId(item.paymentId)) {
+                              await supabase.from("sub_payments").delete().eq("id", item.entry.sub_payment_id);
+                            }
+                            setPaymentGroups(prev => prev.map(g => {
+                              if (g.paymentId !== item.paymentId) return g;
+                              const newEntries = g.entries.filter((e, i) =>
+                                item.entry.sub_payment_id
+                                  ? e.sub_payment_id !== item.entry.sub_payment_id
+                                  : i !== item.entryIndex
+                              );
+                              return { ...g, entries: newEntries, total: newEntries.reduce((s, e) => s + e.amount, 0) };
+                            }).filter(g => g.entries.length > 0));
+                            setDayTotal(prev => prev - item.entry.amount);
+                            toast.success("Deleted");
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </section>
+            ))
+          )
+        ) : viewMode === "range" ? (
           rangeDaySections.map(section => (
             <section key={section.date} className="mb-5">
               <div className="sticky top-0 z-10 -mx-1 mb-1.5 flex items-baseline justify-between gap-3 bg-background/95 px-1 py-2 backdrop-blur-sm">
@@ -771,7 +1005,7 @@ export default function DailyExpenseTable() {
         )}
 
         {/* New purchase button */}
-        {paymentGroups.length > 0 && (
+        {paymentGroups.length > 0 && !nameFilter && (
           <button
             onClick={startNewPurchase}
             className="w-full mt-2 py-2.5 text-xs text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:border-primary/40 transition-colors flex items-center justify-center gap-1.5"
@@ -782,33 +1016,45 @@ export default function DailyExpenseTable() {
         )}
       </div>
 
-      {/* FAB when collapsed */}
-      {!cardExpanded && (
-        <button
-          onClick={expandCard}
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-14 h-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg active:scale-95 transition-transform animate-in fade-in zoom-in-90 duration-200"
-          aria-label="Add expense"
-        >
-          <Plus className="h-6 w-6" />
-        </button>
-      )}
+      {/* FAB — always mounted; fades out in place while panel is open */}
+      <button
+        type="button"
+        onClick={expandCard}
+        disabled={cardExpanded}
+        tabIndex={cardExpanded ? -1 : 0}
+        aria-hidden={cardExpanded}
+        className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-14 h-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg active:scale-95 transition-opacity duration-200 ease-out ${
+          cardExpanded
+            ? "opacity-0 pointer-events-none"
+            : "opacity-100"
+        }`}
+        aria-label="Add expense"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
 
-      {/* Floating input card */}
+      {/* Floating input card + dismiss scrim */}
       {cardExpanded && (
+        <>
+        <button
+          type="button"
+          className={`expense-add-scrim fixed inset-0 z-40 ${cardClosing ? "expense-scrim-exit" : "expense-scrim-enter"}`}
+          aria-label="Đóng bảng thêm chi tiêu"
+          onClick={(e) => {
+            e.stopPropagation();
+            collapseCard();
+          }}
+          onTouchStart={(e) => e.stopPropagation()}
+        />
         <div
           ref={cardRef}
-          className={`fixed bottom-0 left-0 right-0 z-50 ${cardClosing ? "expense-card-exit" : "expense-card-enter"}`}
-          style={{ height: "45vh" }}
+          className={`expense-add-panel fixed bottom-0 left-0 right-0 z-50 ${cardClosing ? "expense-card-exit" : "expense-card-enter"}`}
+          style={{ height: panelHeight }}
           data-no-double-tap
           onClick={(e) => e.stopPropagation()}
-          onTouchStart={handlePanelTouchStart}
-          onTouchEnd={handlePanelTouchEnd}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
         >
-          <div
-            className="absolute -top-8 left-0 right-0 h-8 pointer-events-none"
-            style={{ background: "linear-gradient(to bottom, transparent, hsl(var(--background)))" }}
-          />
-
           <div
             className={`h-full rounded-t-2xl border-t border-border/60 flex flex-col transition-colors duration-400 overflow-hidden ${
               justSaved ? "bg-secondary/30" : "bg-card"
@@ -816,7 +1062,7 @@ export default function DailyExpenseTable() {
             style={{ boxShadow: "0 -8px 40px -4px hsl(25 30% 20% / 0.10)" }}
           >
             {/* Phase indicator */}
-            <div className="flex items-center gap-2 px-5 pt-4 pb-1">
+            <div className="flex items-center gap-2 px-5 pt-4 pb-1 shrink-0">
               <div className={`h-1.5 flex-1 rounded-full transition-colors duration-400 ${
                 phase === "name" ? "bg-primary" : "bg-primary/30"
               }`} />
@@ -840,144 +1086,158 @@ export default function DailyExpenseTable() {
               </div>
             )}
 
-            {/* Name phase */}
-            {phase === "name" && !justSaved && (
-              <div className="flex-1 flex min-h-0 flex-col px-5 pt-2 pb-3">
-                <div className="category-rail -mx-5 shrink-0 overflow-x-auto px-5 pb-2.5" role="list" aria-label="Danh mục nhanh">
-                  <div className="category-rail-track">
-                    {quickCategories.map((category, index) => {
-                      const selected =
-                        selectedCategoryId &&
-                        categories.find(c => c.id === selectedCategoryId)?.name === category.name;
-                      return (
-                        <button
-                          key={category.name}
-                          type="button"
-                          onClick={() => handleQuickCategory(category.name)}
-                          style={{
-                            backgroundImage: category.gradient,
-                            animationDelay: `${index * 16}ms`,
-                          }}
-                          className={`category-cell ${selected ? "category-cell--selected" : ""}`}
-                          aria-pressed={!!selected}
-                        >
-                          <span className="category-cell__emoji" aria-hidden="true">{category.emoji}</span>
-                          <span className="category-cell__label">{category.name}</span>
-                        </button>
+            {/* Horizontal paging: name | amount */}
+            {!justSaved && (
+              <div
+                ref={pagerRef}
+                className="expense-phase-pager flex-1 min-h-0"
+                onScroll={schedulePagerSettle}
+                onTouchEnd={schedulePagerSettle}
+              >
+                {/* Name page */}
+                <div className="expense-phase-page flex h-full min-h-0 flex-col px-5 pt-2 pb-3">
+                  <div className="category-rail -mx-5 shrink-0 overflow-x-auto px-5 pb-2.5" role="list" aria-label="Danh mục nhanh">
+                    <div className="category-rail-track">
+                      {quickCategories.map((category, index) => {
+                        const selected =
+                          selectedCategoryId &&
+                          categories.find(c => c.id === selectedCategoryId)?.name === category.name;
+                        return (
+                          <button
+                            key={category.name}
+                            type="button"
+                            onClick={() => handleQuickCategory(category.name)}
+                            style={{
+                              backgroundImage: category.gradient,
+                              animationDelay: `${index * 16}ms`,
+                            }}
+                            className={`category-cell ${selected ? "category-cell--selected" : ""}`}
+                            aria-pressed={!!selected}
+                          >
+                            <span className="category-cell__emoji" aria-hidden="true">{category.emoji}</span>
+                            <span className="category-cell__label">{category.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-hidden">
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-2 block">
+                      Tên mặt hàng
+                    </label>
+                    <input
+                      ref={nameRef}
+                      type="text"
+                      value={nameValue}
+                      onChange={(e) => {
+                        setNameValue(e.target.value);
+                        setSelectedCategoryId(null);
+                      }}
+                      onKeyDown={handleNameKeyDown}
+                      placeholder="Bạn mua gì?"
+                      className="expense-name-input bg-transparent text-3xl font-display text-foreground placeholder:text-muted-foreground/40 outline-none w-full caret-primary"
+                      autoComplete="off"
+                      aria-label="Tên mặt hàng"
+                      onFocus={() => {
+                        window.scrollTo(0, 0);
+                        requestAnimationFrame(() => window.scrollTo(0, 0));
+                      }}
+                    />
+                    {/* Recommendation cloud */}
+                    {(() => {
+                      const query = nameValue.toLowerCase().trim();
+                      const filtered = query.length > 0
+                        ? items.filter(i => i.name.toLowerCase().includes(query))
+                        : items;
+                      const sorted = [...filtered].sort((a, b) =>
+                        (itemFrequency[b.id] || 0) - (itemFrequency[a.id] || 0)
                       );
-                    })}
+                      const display = sorted.slice(0, 20);
+                      return display.length > 0 ? (
+                        <div className="flex flex-wrap gap-2 mt-3 max-h-[18vh] overflow-auto">
+                          {display.map(item => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => {
+                                setNameValue(item.name);
+                                const cat = categories.find(c => c.id === item.category_id);
+                                const sub = subCategories.find(s => s.id === item.sub_category_id);
+                                const sup = suppliers.find(s => s.id === item.default_supplier_id);
+                                setMatch({
+                                  itemId: item.id,
+                                  categoryName: cat?.name ?? "",
+                                  subCategoryName: sub?.name ?? "",
+                                  supplierName: sup?.name ?? "",
+                                  unitPrice: item.default_unit_price ?? 0,
+                                  unit: item.unit ?? "unit",
+                                  categoryId: item.category_id,
+                                  subCategoryId: item.sub_category_id,
+                                  subSubCategoryId: item.sub_sub_category_id,
+                                  supplierId: item.default_supplier_id,
+                                });
+                                setVerifyData({
+                                  itemName: item.name,
+                                  categoryName: cat?.name ?? "",
+                                  subCategoryName: sub?.name ?? "",
+                                  supplierName: sup?.name ?? "",
+                                  unitPrice: item.default_unit_price ?? 0,
+                                  unit: item.unit ?? "unit",
+                                  itemId: item.id,
+                                  categoryId: item.category_id ?? undefined,
+                                  subCategoryId: item.sub_category_id ?? undefined,
+                                  supplierId: item.default_supplier_id ?? undefined,
+                                });
+                                setPhase("amount");
+                              }}
+                              className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                                query && item.name.toLowerCase() === query
+                                  ? "bg-primary/15 border-primary/40 text-primary font-medium"
+                                  : "bg-muted/60 border-border/40 text-foreground hover:bg-muted hover:border-border"
+                              }`}
+                            >
+                              {item.name}
+                            </button>
+                          ))}
+                        </div>
+                      ) : query.length > 0 ? (
+                        <p className="text-xs text-muted-foreground/60 mt-3">Không tìm thấy mặt hàng</p>
+                      ) : null;
+                    })()}
+                    <button
+                      onClick={handleNameConfirm}
+                      disabled={!nameValue.trim()}
+                      className="self-end mt-4 flex items-center gap-1 text-sm font-medium text-primary disabled:text-muted-foreground/30 transition-colors"
+                      aria-label="Tiếp theo"
+                    >
+                      Tiếp theo <ChevronRight className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
-                <div className="min-h-0 flex-1 overflow-hidden">
-                  <label className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-2 block">
-                    Tên mặt hàng
-                  </label>
-                <input
-                  ref={nameRef}
-                  type="text"
-                  value={nameValue}
-                  onChange={(e) => {
-                    setNameValue(e.target.value);
-                    setSelectedCategoryId(null);
-                  }}
-                  onKeyDown={handleNameKeyDown}
-                  placeholder="Bạn mua gì?"
-                  className="bg-transparent text-3xl font-display text-foreground placeholder:text-muted-foreground/40 outline-none w-full caret-primary"
-                  autoComplete="off"
-                  aria-label="Tên mặt hàng"
-                />
-                {/* Recommendation cloud */}
-                {(() => {
-                  const query = nameValue.toLowerCase().trim();
-                  const filtered = query.length > 0
-                    ? items.filter(i => i.name.toLowerCase().includes(query))
-                    : items;
-                  const sorted = [...filtered].sort((a, b) =>
-                    (itemFrequency[b.id] || 0) - (itemFrequency[a.id] || 0)
-                  );
-                  const display = sorted.slice(0, 20);
-                  return display.length > 0 ? (
-                    <div className="flex flex-wrap gap-2 mt-3 max-h-[18vh] overflow-auto">
-                      {display.map(item => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => {
-                            setNameValue(item.name);
-                            const cat = categories.find(c => c.id === item.category_id);
-                            const sub = subCategories.find(s => s.id === item.sub_category_id);
-                            const sup = suppliers.find(s => s.id === item.default_supplier_id);
-                            setMatch({
-                              itemId: item.id,
-                              categoryName: cat?.name ?? "",
-                              subCategoryName: sub?.name ?? "",
-                              supplierName: sup?.name ?? "",
-                              unitPrice: item.default_unit_price ?? 0,
-                              unit: item.unit ?? "unit",
-                              categoryId: item.category_id,
-                              subCategoryId: item.sub_category_id,
-                              subSubCategoryId: item.sub_sub_category_id,
-                              supplierId: item.default_supplier_id,
-                            });
-                            setVerifyData({
-                              itemName: item.name,
-                              categoryName: cat?.name ?? "",
-                              subCategoryName: sub?.name ?? "",
-                              supplierName: sup?.name ?? "",
-                              unitPrice: item.default_unit_price ?? 0,
-                              unit: item.unit ?? "unit",
-                              itemId: item.id,
-                              categoryId: item.category_id ?? undefined,
-                              subCategoryId: item.sub_category_id ?? undefined,
-                              supplierId: item.default_supplier_id ?? undefined,
-                            });
-                            setPhase("amount");
-                            setTimeout(() => amountRef.current?.focus(), 50);
-                          }}
-                          className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                            query && item.name.toLowerCase() === query
-                              ? "bg-primary/15 border-primary/40 text-primary font-medium"
-                              : "bg-muted/60 border-border/40 text-foreground hover:bg-muted hover:border-border"
-                          }`}
-                        >
-                          {item.name}
-                        </button>
-                      ))}
-                    </div>
-                  ) : query.length > 0 ? (
-                    <p className="text-xs text-muted-foreground/60 mt-3">Không tìm thấy mặt hàng</p>
-                  ) : null;
-                })()}
-                <button
-                  onClick={handleNameConfirm}
-                  disabled={!nameValue.trim()}
-                  className="self-end mt-4 flex items-center gap-1 text-sm font-medium text-primary disabled:text-muted-foreground/30 transition-colors"
-                  aria-label="Tiếp theo"
-                >
-                  Tiếp theo <ChevronRight className="h-4 w-4" />
-                </button>
+
+                {/* Amount page */}
+                <div className="expense-phase-page flex h-full min-h-0 flex-col">
+                  <AmountPhase
+                    nameValue={nameValue}
+                    amountValue={amountValue}
+                    setAmountValue={setAmountValue}
+                    noteValue={noteValue}
+                    setNoteValue={setNoteValue}
+                    amountRef={amountRef}
+                    match={match}
+                    verifyData={verifyData}
+                    setMatch={setMatch}
+                    setVerifyData={setVerifyData}
+                    onBack={goToNamePhase}
+                    onKeyDown={handleAmountKeyDown}
+                    onSave={handleSave}
+                  />
                 </div>
               </div>
             )}
-
-            {/* Amount + inline verify phase */}
-            {phase === "amount" && !justSaved && (
-              <AmountPhase
-                nameValue={nameValue}
-                amountValue={amountValue}
-                setAmountValue={setAmountValue}
-                amountRef={amountRef}
-                match={match}
-                verifyData={verifyData}
-                setMatch={setMatch}
-                setVerifyData={setVerifyData}
-                onBack={goToNamePhase}
-                onKeyDown={handleAmountKeyDown}
-                onSave={handleSave}
-              />
-            )}
           </div>
         </div>
+        </>
       )}
 
       {/* Purchase detail dialog */}

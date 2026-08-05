@@ -118,14 +118,11 @@
     animation: slideDown 0.2s ease-in forwards;
   }
 
-  .amount-phase-enter {
-    animation: amountPhaseEnter 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-
   .category-rail {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--primary) / 0.3) transparent;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
   }
 
   .category-rail-track {
@@ -221,8 +218,57 @@
     border-radius: 999px;
   }
 
+  .expense-add-panel {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+    max-height: 80svh;
+  }
+
+  /* While add panel is open, keep the page from rubber-banding under keyboard */
+  html:has(.expense-add-panel),
+  html:has(.expense-add-panel) body {
+    overscroll-behavior: none;
+  }
+
+  .expense-add-panel input,
+  .expense-add-panel textarea {
+    /* Reduce iOS scroll-into-view jank */
+    scroll-margin: 0;
+    scroll-padding: 0;
+  }
+
+  /* iOS Safari auto-zooms focused fields under 16px */
+  .expense-add-panel input:not(.expense-name-input),
+  .expense-add-panel textarea,
+  .expense-add-panel select {
+    font-size: 16px !important;
+  }
+
+  .expense-add-panel .expense-name-input {
+    font-size: 1.875rem; /* keep large display name field */
+  }
+
+  .expense-add-scrim {
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    background: hsl(25 20% 12% / 0.22);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .expense-scrim-enter {
+    animation: expenseScrimEnter 0.28s ease-out both;
+  }
+
+  .expense-scrim-exit {
+    animation: expenseScrimExit 0.28s ease-in forwards;
+  }
+
+  .amount-note input::placeholder {
+    font-style: italic;
+  }
+
   .keypad-key {
-    min-height: 3.25rem;
+    min-height: clamp(2.75rem, 6.2svh, 3.25rem);
     -webkit-tap-highlight-color: transparent;
     transition: transform 120ms ease, background-color 160ms ease, box-shadow 160ms ease;
   }
@@ -232,39 +278,52 @@
   }
 
   .expense-card-enter {
-    animation: expenseCardEnter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: expenseCardEnter 0.48s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   .expense-card-exit {
-    animation: expenseCardExit 0.32s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    animation: expenseCardExit 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+
+  .expense-phase-pager {
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .expense-phase-pager::-webkit-scrollbar {
+    display: none;
+  }
+
+  .expense-phase-page {
+    box-sizing: border-box;
+    flex: 0 0 100%;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .amount-phase-enter,
     .category-cell,
     .expense-card-enter,
-    .expense-card-exit {
+    .expense-card-exit,
+    .expense-scrim-enter,
+    .expense-scrim-exit {
       animation: none;
     }
 
     .keypad-key {
       transition: none;
     }
-  }
-}
-
-@keyframes amountPhaseEnter {
-  0% {
-    opacity: 0;
-    transform: translate3d(48px, 18px, 0) scale(0.98);
-  }
-  60% {
-    opacity: 1;
-    transform: translate3d(-4px, -2px, 0) scale(1.005);
-  }
-  100% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
@@ -281,36 +340,45 @@
 
 @keyframes expenseCardEnter {
   0% {
-    opacity: 0;
-    transform: translateY(40px) scaleY(0.85);
-    transform-origin: bottom center;
+    opacity: 0.85;
+    transform: translateY(100%);
   }
-  60% {
+  70% {
     opacity: 1;
-    transform: translateY(-3px) scaleY(1.01);
-    transform-origin: bottom center;
+    transform: translateY(-6px);
   }
   100% {
     opacity: 1;
-    transform: translateY(0) scaleY(1);
-    transform-origin: bottom center;
+    transform: translateY(0);
   }
 }
 
 @keyframes expenseCardExit {
   0% {
     opacity: 1;
-    transform: translateY(0) scaleY(1);
-    transform-origin: bottom center;
-  }
-  40% {
-    opacity: 0.7;
-    transform: translateY(8px) scaleY(0.95);
+    transform: translateY(0);
   }
   100% {
     opacity: 0;
-    transform: translateY(48px) scaleY(0.8);
-    transform-origin: bottom center;
+    transform: translateY(100%);
+  }
+}
+
+@keyframes expenseScrimEnter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes expenseScrimExit {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }
 

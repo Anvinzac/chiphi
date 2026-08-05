@@ -9,6 +9,7 @@ export interface PaymentEntry {
   category_id: string | null;
   supplier_id: string | null;
   sub_payment_id?: string;
+  notes?: string | null;
 }
 
 export interface PaymentGroupData {
@@ -25,10 +26,19 @@ interface PaymentGroupProps {
   getSupplierName: (id: string | null) => string | undefined;
   highValueThreshold: number;
   onEntryClick: (entry: PaymentEntry) => void;
+  onEntryNameClick?: (entry: PaymentEntry) => void;
   onEntryDelete: (paymentId: string, entry: PaymentEntry, index: number) => void;
 }
 
-export default function PaymentGroup({ group, getCategoryName, getSupplierName, highValueThreshold, onEntryClick, onEntryDelete }: PaymentGroupProps) {
+export default function PaymentGroup({
+  group,
+  getCategoryName,
+  getSupplierName,
+  highValueThreshold,
+  onEntryClick,
+  onEntryNameClick,
+  onEntryDelete,
+}: PaymentGroupProps) {
   const [expanded, setExpanded] = useState(true);
 
   return (
@@ -71,10 +81,12 @@ export default function PaymentGroup({ group, getCategoryName, getSupplierName, 
               key={entry.sub_payment_id || i}
               item_name={entry.item_name}
               amount={entry.amount}
+              notes={entry.notes}
               categoryName={getCategoryName(entry.category_id)}
               supplierName={getSupplierName(entry.supplier_id)}
               isHighValue={entry.amount >= highValueThreshold}
               onClick={() => onEntryClick(entry)}
+              onNameClick={onEntryNameClick ? () => onEntryNameClick(entry) : undefined}
               onDelete={() => onEntryDelete(group.paymentId, entry, i)}
             />
           ))}

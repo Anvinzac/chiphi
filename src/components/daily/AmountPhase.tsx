@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
-import { ArrowLeft, Check, Delete, Pencil } from "lucide-react";
+import { ArrowLeft, Check, Pencil } from "lucide-react";
 import type { VerifyData } from "@/types/expense";
+import { focusWithoutScroll } from "@/lib/focusWithoutScroll";
 
 interface MatchInfo {
   itemId: string;
@@ -19,6 +20,8 @@ interface AmountPhaseProps {
   nameValue: string;
   amountValue: string;
   setAmountValue: (v: string) => void;
+  noteValue: string;
+  setNoteValue: (v: string) => void;
   amountRef: React.RefObject<HTMLInputElement>;
   match: MatchInfo | null;
   verifyData: VerifyData | null;
@@ -35,6 +38,8 @@ export default function AmountPhase({
   nameValue,
   amountValue,
   setAmountValue,
+  noteValue,
+  setNoteValue,
   amountRef,
   match,
   verifyData,
@@ -47,6 +52,7 @@ export default function AmountPhase({
   const [editingField, setEditingField] = useState<EditableField>(null);
   const [editValue, setEditValue] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
+  const noteRef = useRef<HTMLInputElement>(null);
 
   const openEdit = (field: EditableField) => {
     if (!field) return;
@@ -55,7 +61,7 @@ export default function AmountPhase({
       : String(verifyData?.[field as keyof VerifyData] ?? "");
     setEditValue(current);
     setEditingField(field);
-    setTimeout(() => editInputRef.current?.focus(), 50);
+    setTimeout(() => focusWithoutScroll(editInputRef.current), 50);
   };
 
   const commitEdit = () => {
@@ -124,7 +130,7 @@ export default function AmountPhase({
   ];
 
   return (
-    <div className="amount-phase-enter flex-1 flex flex-col px-5 pt-2 pb-3 min-h-0 overflow-y-auto">
+    <div className="flex-1 flex flex-col px-5 pt-2 pb-2 min-h-0 overflow-hidden">
       <div className="flex items-center justify-between mb-2 shrink-0">
         <button
           onClick={onBack}
@@ -137,7 +143,7 @@ export default function AmountPhase({
         <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Số tiền</span>
       </div>
 
-      <div className="flex items-end justify-between gap-3 mb-2 shrink-0">
+      <div className="flex items-end justify-between gap-4 mb-2 shrink-0">
         <div className="min-w-0 flex-1">
           <input
             ref={amountRef}
@@ -146,13 +152,22 @@ export default function AmountPhase({
             value={amountValue}
             onChange={(e) => setAmountValue(e.target.value.replace(/[^\d.]/g, ""))}
             onKeyDown={onKeyDown}
-            className="sr-only"
+            className="sr-only text-base"
             aria-label="Số tiền"
+            onFocus={() => {
+              window.scrollTo(0, 0);
+              requestAnimationFrame(() => window.scrollTo(0, 0));
+            }}
           />
           <button
             type="button"
             className="flex items-baseline max-w-full text-left cursor-text"
-            onClick={() => amountRef.current?.focus()}
+            onClick={() => {
+              // Only focus the hidden field for hardware/desktop keyboards — avoid iOS zoom
+              if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+                focusWithoutScroll(amountRef.current);
+              }
+            }}
             aria-label="Nhập số tiền"
           >
             <span className="text-4xl font-display tabular-nums text-foreground leading-none break-all">
@@ -160,8 +175,42 @@ export default function AmountPhase({
             </span>
             <span className="text-2xl font-display text-muted-foreground/35 ml-1">.000</span>
           </button>
+          <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
+            nghìn ₫
+          </p>
         </div>
-        <span className="text-xs text-muted-foreground pb-1">nghìn ₫</span>
+
+        <div className="amount-note group w-[min(42%,11.5rem)] shrink-0 self-stretch flex flex-col justify-end">
+          <label
+            htmlFor="expense-note"
+            className="mb-1 block text-right text-[9px] uppercase tracking-[0.18em] text-muted-foreground/65 transition-colors group-focus-within:text-primary/80"
+          >
+            Ghi chú
+          </label>
+          <input
+            ref={noteRef}
+            id="expense-note"
+            type="text"
+            value={noteValue}
+            onChange={(e) => setNoteValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                onSave();
+              }
+            }}
+            placeholder="Tùy chọn"
+            maxLength={80}
+            className="w-full bg-transparent text-right text-base font-medium leading-tight text-foreground placeholder:font-normal placeholder:text-muted-foreground/30 outline-none border-b border-border/45 pb-1.5 transition-[border-color,box-shadow] duration-200 caret-primary focus:border-primary/55 focus:shadow-[0_1px_0_0_hsl(var(--primary)/0.35)]"
+            aria-label="Ghi chú thêm (tùy chọn)"
+            autoComplete="off"
+            enterKeyHint="done"
+            onFocus={() => {
+              window.scrollTo(0, 0);
+              requestAnimationFrame(() => window.scrollTo(0, 0));
+            }}
+          />
+        </div>
       </div>
 
       {hasMeta && (
@@ -171,12 +220,12 @@ export default function AmountPhase({
               <span className="text-[10px] text-muted-foreground">{label}:</span>
               <input
                 ref={editInputRef}
-                className="bg-transparent outline-none w-20 text-foreground font-medium text-xs caret-primary"
+                className="bg-transparent outline-none w-24 text-foreground font-medium text-base caret-primary"
                 value={editValue}
                 onChange={(e) => setEditValue(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") { commitEdit(); amountRef.current?.focus(); }
-                  if (e.key === "Escape") { setEditingField(null); amountRef.current?.focus(); }
+                  if (e.key === "Enter") { commitEdit(); focusWithoutScroll(amountRef.current); }
+                  if (e.key === "Escape") { setEditingField(null); focusWithoutScroll(amountRef.current); }
                 }}
                 onBlur={commitEdit}
                 aria-label={`Sửa ${label}`}
@@ -198,9 +247,9 @@ export default function AmountPhase({
         </div>
       )}
 
-      <div className="space-y-2 mt-auto pt-1">
+      <div className="mt-auto flex min-h-0 flex-1 flex-col justify-end gap-1.5 pt-1">
         {keys.map((row, ri) => (
-          <div key={ri} className="grid grid-cols-3 gap-2">
+          <div key={ri} className="grid grid-cols-3 gap-1.5">
             {row.map(({ label, action, muted }) => (
               <button
                 key={label}
@@ -218,7 +267,7 @@ export default function AmountPhase({
             ))}
           </div>
         ))}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-1.5">
           <button
             type="button"
             onClick={clearAmount}

@@ -18,10 +18,10 @@ const Index = () => {
         <Link
           to="/admin"
           className="flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
-          aria-label="Open Admin Dashboard"
+          aria-label="Open Admin"
         >
           <LayoutDashboard className="h-4 w-4" />
-          Admin Dashboard
+          Admin
         </Link>
         {!isDemo ? (
           <button onClick={signOut} className="flex items-center gap-1.5 text-xs text-muted-foreground px-3 py-2 rounded-lg hover:bg-muted">

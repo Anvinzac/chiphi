@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { signInAsAdmin } from "@/hooks/useAdminDemoAuth";
+import { isDemoUser } from "@/hooks/useDemoAuth";
+import { isSandboxUser, signInAsSandbox } from "@/hooks/useSandboxAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -15,21 +17,27 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const isDemoSession = session?.user?.email === "demo@mise.local";
+  // Throwaway sessions shouldn't block signing in as someone else
+  const isDemoSession = isDemoUser(session?.user?.email) || isSandboxUser(session?.user?.email);
+  const arrivalHandled = useRef(false);
 
   useEffect(() => {
-    // If arriving as demo user, sign out so they can create a real account
-    if (!loading && session && isDemoSession) {
-      supabase.auth.signOut();
-      return;
+    if (loading) return;
+
+    // Only the session we arrived with gets dropped — not one created here
+    if (!arrivalHandled.current) {
+      arrivalHandled.current = true;
+      if (session && isDemoSession) {
+        supabase.auth.signOut();
+        return;
+      }
     }
-    if (!loading && session && !isDemoSession) {
-      navigate("/", { replace: true });
-    }
+
+    if (session) navigate("/", { replace: true });
   }, [session, loading, navigate, isDemoSession]);
 
   if (loading) return null;
-  if (session && !isDemoSession) return null;
+  if (session && arrivalHandled.current && !isDemoSession) return null;
 
   // Convert username to a synthetic email for Supabase auth
   const toEmail = (u: string) => `${u.toLowerCase().trim()}@mise.local`;
@@ -95,23 +103,42 @@ export default function Auth() {
           <Button type="submit" className="w-full" disabled={submitting}>
             {submitting ? "..." : isLogin ? "Sign In" : "Sign Up"}
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full text-xs"
-            onClick={async () => {
-              setSubmitting(true);
-              try {
-                await signInAsAdmin();
-              } catch (err: any) {
-                toast.error(err.message);
-              } finally {
-                setSubmitting(false);
-              }
-            }}
-          >
-            Quick Admin Login
-          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full text-xs"
+              onClick={async () => {
+                setSubmitting(true);
+                try {
+                  await signInAsAdmin();
+                } catch (err: any) {
+                  toast.error(err.message);
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+            >
+              Quick Admin Login
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full text-xs"
+              onClick={async () => {
+                setSubmitting(true);
+                try {
+                  await signInAsSandbox();
+                } catch (err: any) {
+                  toast.error(err.message);
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+            >
+              Sandbox Login
+            </Button>
+          </div>
         </form>
         <p className="text-center text-sm text-muted-foreground">
           {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}

@@ -20,7 +20,9 @@ function AutoDemoRoute({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!loading && !session) {
       setDemoLoading(true);
-      signInAsDemo().finally(() => setDemoLoading(false));
+      signInAsDemo()
+        .catch((err) => console.error("Demo sign-in failed:", err))
+        .finally(() => setDemoLoading(false));
     }
   }, [loading, session]);
 

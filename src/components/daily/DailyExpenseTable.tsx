@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Check, ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import PaymentGroup, { type PaymentGroupData, type PaymentEntry } from "./PaymentGroup";
 import SwipeableEntryRow from "./SwipeableEntryRow";
+import ClearFieldButton from "./ClearFieldButton";
 import AmountPhase from "./AmountPhase";
 import PurchaseDetailDialog from "./PurchaseDetailDialog";
 import RangeDayPicker from "./RangeDayPicker";
@@ -14,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import type { VerifyData } from "@/types/expense";
 import { getMockGroupsForRange, isMockPaymentId } from "@/lib/mockRangeData";
 import { lockBodyScroll } from "@/lib/focusWithoutScroll";
+import { formatDayMonth, formatDayMonthRange } from "@/lib/formatDateVi";
 
 type ViewMode = "range" | "daily";
 
@@ -138,34 +140,51 @@ export default function DailyExpenseTable() {
 
   const HIGH_VALUE_THRESHOLD = 200000;
   // Soft dusty pastels — same visual weight across the set
-  const QUICK_CATEGORY_DETAILS: { name: string; emoji: string; gradient: string }[] = [
-    { name: "Điện", emoji: "⚡", gradient: "linear-gradient(160deg, #efe4d2 0%, #d9c6a8 100%)" },
-    { name: "Thuê nhà", emoji: "🏠", gradient: "linear-gradient(160deg, #eedfe1 0%, #d8c0c4 100%)" },
-    { name: "Gas", emoji: "🔥", gradient: "linear-gradient(160deg, #f0ddd2 0%, #dbb9a8 100%)" },
-    { name: "Đi chợ", emoji: "🛒", gradient: "linear-gradient(160deg, #dde8dc 0%, #bdcfb9 100%)" },
-    { name: "Bánh mì", emoji: "🥖", gradient: "linear-gradient(160deg, #f0e6d0 0%, #dbc8a6 100%)" },
-    { name: "Nguyên vật liệu", emoji: "🥬", gradient: "linear-gradient(160deg, #e0ead8 0%, #c2d2b6 100%)" },
-    { name: "Rau", emoji: "🥦", gradient: "linear-gradient(160deg, #dcead8 0%, #b8d0b0 100%)" },
-    { name: "Đậu hũ", emoji: "🧈", gradient: "linear-gradient(160deg, #efe8d8 0%, #d8ceb4 100%)" },
-    { name: "Nước tương", emoji: "🫙", gradient: "linear-gradient(160deg, #e8ddd0 0%, #d0bca8 100%)" },
-    { name: "Gạo", emoji: "🌾", gradient: "linear-gradient(160deg, #efe6d4 0%, #d8c8a8 100%)" },
-    { name: "Nước dừa", emoji: "🥥", gradient: "linear-gradient(160deg, #d9e6e6 0%, #b7cbcc 100%)" },
-    { name: "Muối", emoji: "🧂", gradient: "linear-gradient(160deg, #e2e6ea 0%, #c5cbd2 100%)" },
-    { name: "Shopee", emoji: "🛍️", gradient: "linear-gradient(160deg, #eeddd8 0%, #d6b8b0 100%)" },
-    { name: "Internet", emoji: "🌐", gradient: "linear-gradient(160deg, #dde2ec 0%, #b8c2d2 100%)" },
-    { name: "Sửa chữa", emoji: "🛠️", gradient: "linear-gradient(160deg, #e8dfd8 0%, #cec0b4 100%)" },
-    { name: "Vệ sinh", emoji: "🧼", gradient: "linear-gradient(160deg, #d8e8e6 0%, #b4cfcc 100%)" },
-    { name: "Lương NV", emoji: "👥", gradient: "linear-gradient(160deg, #e4dde8 0%, #c8bdd2 100%)" },
-    { name: "Thuế", emoji: "🧾", gradient: "linear-gradient(160deg, #e0e4ea 0%, #c0c6d0 100%)" },
-    { name: "BHXH", emoji: "🛡️", gradient: "linear-gradient(160deg, #d8e6e0 0%, #b4cfc2 100%)" },
-    { name: "Rác", emoji: "♻️", gradient: "linear-gradient(160deg, #e4ead8 0%, #c6d0b4 100%)" },
-    { name: "Giữ xe", emoji: "🅿️", gradient: "linear-gradient(160deg, #e6e4e0 0%, #c8c6c2 100%)" },
-    { name: "Khác", emoji: "✦", gradient: "linear-gradient(160deg, #e8dde6 0%, #d0bac8 100%)" },
+  const QUICK_CATEGORY_DETAILS: { name: string; emoji: string; gradient: string; frequency: CategoryFrequency }[] = [
+    { name: "Điện", emoji: "⚡", gradient: "linear-gradient(160deg, #efe4d2 0%, #d9c6a8 100%)", frequency: "daily" },
+    { name: "Thuê nhà", emoji: "🏠", gradient: "linear-gradient(160deg, #eedfe1 0%, #d8c0c4 100%)", frequency: "daily" },
+    { name: "Gas", emoji: "🔥", gradient: "linear-gradient(160deg, #f0ddd2 0%, #dbb9a8 100%)", frequency: "daily" },
+    { name: "Đi chợ", emoji: "🛒", gradient: "linear-gradient(160deg, #dde8dc 0%, #bdcfb9 100%)", frequency: "daily" },
+    { name: "Bánh mì", emoji: "🥖", gradient: "linear-gradient(160deg, #f0e6d0 0%, #dbc8a6 100%)", frequency: "daily" },
+    { name: "Nguyên vật liệu", emoji: "🥬", gradient: "linear-gradient(160deg, #e0ead8 0%, #c2d2b6 100%)", frequency: "daily" },
+    { name: "Rau", emoji: "🥦", gradient: "linear-gradient(160deg, #dcead8 0%, #b8d0b0 100%)", frequency: "daily" },
+    { name: "Đậu hũ", emoji: "🧈", gradient: "linear-gradient(160deg, #efe8d8 0%, #d8ceb4 100%)", frequency: "daily" },
+    { name: "Nước tương", emoji: "🫙", gradient: "linear-gradient(160deg, #e8ddd0 0%, #d0bca8 100%)", frequency: "daily" },
+    { name: "Gạo", emoji: "🌾", gradient: "linear-gradient(160deg, #efe6d4 0%, #d8c8a8 100%)", frequency: "weekly" },
+    { name: "Nước dừa", emoji: "🥥", gradient: "linear-gradient(160deg, #d9e6e6 0%, #b7cbcc 100%)", frequency: "weekly" },
+    { name: "Muối", emoji: "🧂", gradient: "linear-gradient(160deg, #e2e6ea 0%, #c5cbd2 100%)", frequency: "weekly" },
+    { name: "Shopee", emoji: "🛍️", gradient: "linear-gradient(160deg, #eeddd8 0%, #d6b8b0 100%)", frequency: "weekly" },
+    { name: "Internet", emoji: "🌐", gradient: "linear-gradient(160deg, #dde2ec 0%, #b8c2d2 100%)", frequency: "weekly" },
+    { name: "Sửa chữa", emoji: "🛠️", gradient: "linear-gradient(160deg, #e8dfd8 0%, #cec0b4 100%)", frequency: "weekly" },
+    { name: "Vệ sinh", emoji: "🧼", gradient: "linear-gradient(160deg, #d8e8e6 0%, #b4cfcc 100%)", frequency: "weekly" },
+    { name: "Lương NV", emoji: "👥", gradient: "linear-gradient(160deg, #e4dde8 0%, #c8bdd2 100%)", frequency: "monthly" },
+    { name: "Thuế", emoji: "🧾", gradient: "linear-gradient(160deg, #e0e4ea 0%, #c0c6d0 100%)", frequency: "monthly" },
+    { name: "BHXH", emoji: "🛡️", gradient: "linear-gradient(160deg, #d8e6e0 0%, #b4cfc2 100%)", frequency: "monthly" },
+    { name: "Rác", emoji: "♻️", gradient: "linear-gradient(160deg, #e4ead8 0%, #c6d0b4 100%)", frequency: "monthly" },
+    { name: "Giữ xe", emoji: "🅿️", gradient: "linear-gradient(160deg, #e6e4e0 0%, #c8c6c2 100%)", frequency: "monthly" },
+    { name: "Khác", emoji: "✦", gradient: "linear-gradient(160deg, #e8dde6 0%, #d0bac8 100%)", frequency: "monthly" },
   ];
-  const frequencyOrder: Record<CategoryFrequency, number> = { daily: 0, weekly: 1, monthly: 2 };
-  const quickCategories = QUICK_CATEGORY_DETAILS
-    .map(detail => ({ ...detail, category: categories.find(category => category.name.toLowerCase() === detail.name.toLowerCase()) }))
-    .sort((a, b) => frequencyOrder[a.category?.frequency || "daily"] - frequencyOrder[b.category?.frequency || "daily"]);
+  const CHIP_FREQ_PAGES: { key: CategoryFrequency; label: string }[] = [
+    { key: "monthly", label: "Tháng" },
+    { key: "daily", label: "Ngày" },
+    { key: "weekly", label: "Tuần" },
+  ];
+  const chipsByFrequency = useMemo(() => {
+    const groups: Record<CategoryFrequency, typeof QUICK_CATEGORY_DETAILS> = {
+      monthly: [],
+      daily: [],
+      weekly: [],
+    };
+    for (const detail of QUICK_CATEGORY_DETAILS) {
+      const fromDb = categories.find(c => c.name.toLowerCase() === detail.name.toLowerCase());
+      groups[fromDb?.frequency || detail.frequency].push(detail);
+    }
+    return groups;
+  }, [categories]);
+
+  const [chipFreqPage, setChipFreqPage] = useState<CategoryFrequency>("daily");
+  const chipPagerRef = useRef<HTMLDivElement>(null);
+  const chipPagerReadyRef = useRef(false);
 
   // Load reference data once
   useEffect(() => {
@@ -296,6 +315,33 @@ export default function DailyExpenseTable() {
     }
   }, [cardExpanded, phase]);
 
+  // Chip pager: monthly | daily | weekly — always open on daily (center)
+  useEffect(() => {
+    if (!cardExpanded || phase !== "name" || justSaved) {
+      chipPagerReadyRef.current = false;
+      return;
+    }
+    const el = chipPagerRef.current;
+    if (!el) return;
+    const id = requestAnimationFrame(() => {
+      const dailyIndex = CHIP_FREQ_PAGES.findIndex(p => p.key === "daily");
+      el.scrollTo({ left: Math.max(0, dailyIndex) * el.clientWidth, behavior: "auto" });
+      setChipFreqPage("daily");
+      chipPagerReadyRef.current = true;
+    });
+    return () => cancelAnimationFrame(id);
+  }, [cardExpanded, phase, justSaved]);
+
+  const settleChipFreqPage = useCallback(() => {
+    const el = chipPagerRef.current;
+    if (!el || el.clientWidth === 0) return;
+    const page = Math.min(
+      CHIP_FREQ_PAGES.length - 1,
+      Math.max(0, Math.round(el.scrollLeft / el.clientWidth)),
+    );
+    setChipFreqPage(CHIP_FREQ_PAGES[page].key);
+  }, []);
+
   const scrollPagerTo = useCallback((target: "name" | "amount", smooth: boolean) => {
     const el = pagerRef.current;
     if (!el) return;
@@ -382,10 +428,8 @@ export default function DailyExpenseTable() {
     let categoryId = existing?.id || null;
 
     if (!categoryId) {
-      const frequency: CategoryFrequency =
-        categoryName.toLowerCase() === "gạo" || categoryName.toLowerCase() === "gao"
-          ? "weekly"
-          : "daily";
+      const preset = QUICK_CATEGORY_DETAILS.find(d => d.name.toLowerCase() === categoryName.toLowerCase());
+      const frequency: CategoryFrequency = preset?.frequency || "daily";
       const { data, error } = await supabase
         .from("categories")
         .insert({ name: categoryName, user_id: user.id, frequency })
@@ -681,8 +725,8 @@ export default function DailyExpenseTable() {
   }, [selectedDate, viewMode, period.start, period.end]);
 
   const centerLabel = viewMode === "range"
-    ? `${format(period.start, "MMM d")} – ${format(period.end, "MMM d")}`
-    : format(new Date(selectedDate + "T00:00:00"), "EEE, MMM d");
+    ? formatDayMonthRange(period.start, period.end)
+    : `${format(new Date(selectedDate + "T00:00:00"), "EEE", { locale: vi })}, ${formatDayMonth(new Date(selectedDate + "T00:00:00"))}`;
 
   const rangeDaySections = useMemo(() => {
     if (viewMode !== "range") return [];
@@ -791,11 +835,7 @@ export default function DailyExpenseTable() {
   };
 
   const formatWeekHeading = (weekStart: Date, weekEnd: Date) => {
-    const sameMonth = weekStart.getMonth() === weekEnd.getMonth();
-    if (sameMonth) {
-      return `Tuần ${format(weekStart, "d")}–${format(weekEnd, "d MMM", { locale: vi })}`;
-    }
-    return `Tuần ${format(weekStart, "d MMM", { locale: vi })} – ${format(weekEnd, "d MMM", { locale: vi })}`;
+    return `Tuần ${formatDayMonth(weekStart)} – ${formatDayMonth(weekEnd)}`;
   };
 
   const renderPaymentGroup = (group: PaymentGroupData) => (
@@ -1096,53 +1136,91 @@ export default function DailyExpenseTable() {
               >
                 {/* Name page */}
                 <div className="expense-phase-page flex h-full min-h-0 flex-col px-5 pt-2 pb-3">
-                  <div className="category-rail -mx-5 shrink-0 overflow-x-auto px-5 pb-2.5" role="list" aria-label="Danh mục nhanh">
-                    <div className="category-rail-track">
-                      {quickCategories.map((category, index) => {
-                        const selected =
-                          selectedCategoryId &&
-                          categories.find(c => c.id === selectedCategoryId)?.name === category.name;
-                        return (
-                          <button
-                            key={category.name}
-                            type="button"
-                            onClick={() => handleQuickCategory(category.name)}
-                            style={{
-                              backgroundImage: category.gradient,
-                              animationDelay: `${index * 16}ms`,
-                            }}
-                            className={`category-cell ${selected ? "category-cell--selected" : ""}`}
-                            aria-pressed={!!selected}
-                          >
-                            <span className="category-cell__emoji" aria-hidden="true">{category.emoji}</span>
-                            <span className="category-cell__label">{category.name}</span>
-                          </button>
-                        );
-                      })}
+                  <div className="shrink-0 pb-2" data-no-double-tap>
+                    <div className="mb-1.5 flex items-center justify-center gap-1" aria-hidden="true">
+                      {CHIP_FREQ_PAGES.map(page => (
+                        <span
+                          key={page.key}
+                          className={`h-1 rounded-full transition-all ${
+                            chipFreqPage === page.key ? "w-3.5 bg-primary/70" : "w-1 bg-border"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <div
+                      ref={chipPagerRef}
+                      className="category-freq-pager -mx-5"
+                      onScroll={settleChipFreqPage}
+                      onTouchEnd={settleChipFreqPage}
+                      aria-label="Danh mục theo chu kỳ"
+                    >
+                      {CHIP_FREQ_PAGES.map(page => (
+                        <div
+                          key={page.key}
+                          className="category-freq-page"
+                          role="list"
+                          aria-label={`Danh mục ${page.label.toLowerCase()}`}
+                        >
+                          <div className="category-freq-track">
+                            {chipsByFrequency[page.key].map((category, index) => {
+                              const selected =
+                                selectedCategoryId &&
+                                categories.find(c => c.id === selectedCategoryId)?.name === category.name;
+                              return (
+                                <button
+                                  key={category.name}
+                                  type="button"
+                                  onClick={() => handleQuickCategory(category.name)}
+                                  style={{
+                                    backgroundImage: category.gradient,
+                                    animationDelay: `${index * 16}ms`,
+                                  }}
+                                  className={`category-cell ${selected ? "category-cell--selected" : ""}`}
+                                  aria-pressed={!!selected}
+                                >
+                                  <span className="category-cell__emoji" aria-hidden="true">{category.emoji}</span>
+                                  <span className="category-cell__label">{category.name}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                   <div className="min-h-0 flex-1 overflow-hidden">
                     <label className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-2 block">
                       Tên mặt hàng
                     </label>
-                    <input
-                      ref={nameRef}
-                      type="text"
-                      value={nameValue}
-                      onChange={(e) => {
-                        setNameValue(e.target.value);
-                        setSelectedCategoryId(null);
-                      }}
-                      onKeyDown={handleNameKeyDown}
-                      placeholder="Bạn mua gì?"
-                      className="expense-name-input bg-transparent text-3xl font-display text-foreground placeholder:text-muted-foreground/40 outline-none w-full caret-primary"
-                      autoComplete="off"
-                      aria-label="Tên mặt hàng"
-                      onFocus={() => {
-                        window.scrollTo(0, 0);
-                        requestAnimationFrame(() => window.scrollTo(0, 0));
-                      }}
-                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={nameRef}
+                        type="text"
+                        value={nameValue}
+                        onChange={(e) => {
+                          setNameValue(e.target.value);
+                          setSelectedCategoryId(null);
+                        }}
+                        onKeyDown={handleNameKeyDown}
+                        placeholder="Bạn mua gì?"
+                        className="expense-name-input bg-transparent text-3xl font-display text-foreground placeholder:text-muted-foreground/40 outline-none w-full min-w-0 caret-primary"
+                        autoComplete="off"
+                        aria-label="Tên mặt hàng"
+                        onFocus={() => {
+                          window.scrollTo(0, 0);
+                          requestAnimationFrame(() => window.scrollTo(0, 0));
+                        }}
+                      />
+                      <ClearFieldButton
+                        visible={nameValue.length > 0}
+                        onClear={() => {
+                          setNameValue("");
+                          setSelectedCategoryId(null);
+                          nameRef.current?.focus();
+                        }}
+                        label="Xóa tên mặt hàng"
+                      />
+                    </div>
                     {/* Recommendation cloud */}
                     {(() => {
                       const query = nameValue.toLowerCase().trim();

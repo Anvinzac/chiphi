@@ -1,0 +1,20 @@
+---
+description: Vietnamese short date display (d th M) for user-facing UI
+globs: src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Vietnamese date labels
+
+For user-facing dates in the expense app UI, prefer the short Vietnamese day–month form:
+
+- Pattern: `{day} th {month}` where month is the numeric month (1–12)
+- Examples: `5 th 8`, `3 th 9` (not `Aug 5`, `Sep 3`, or `5 thg 8`)
+- Ranges: `5 th 8 – 3 th 9`
+
+Use helpers from `src/lib/formatDateVi.ts`:
+
+- `formatDayMonth(date)` → `"5 th 8"`
+- `formatDayMonthRange(start, end)` → `"5 th 8 – 3 th 9"`
+
+Do not use English `MMM` / `MMMM` abbreviations (`Aug`, `Sep`) for primary period/day labels in the daily expense UI. Admin/analytics English labels may stay as-is unless the screen is localized.

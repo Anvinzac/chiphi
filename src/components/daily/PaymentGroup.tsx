@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { format, parseISO } from "date-fns";
+import { parseISO } from "date-fns";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import SwipeableEntryRow from "./SwipeableEntryRow";
+import { formatDayMonth } from "@/lib/formatDateVi";
 
 export interface PaymentEntry {
   item_name: string;
@@ -60,7 +61,7 @@ export default function PaymentGroup({
             </span>
             {group.date && (
               <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
-                {format(parseISO(group.date), "MMM d")}
+                {formatDayMonth(parseISO(group.date))}
               </span>
             )}
             <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded-full bg-muted tabular-nums">

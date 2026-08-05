@@ -8,6 +8,7 @@ import {
   endOfWeek,
 } from "date-fns";
 import { vi } from "date-fns/locale";
+import { formatDayMonth, formatDayMonthRange } from "@/lib/formatDateVi";
 
 interface RangeDayPickerProps {
   rangeStart: Date;
@@ -134,9 +135,9 @@ export default function RangeDayPicker({
         </div>
 
         <p className="mt-3 text-center text-[10px] text-muted-foreground">
-          {format(rangeStart, "d MMM", { locale: vi })}
-          {" – "}
-          {format(rangeEnd, "d MMM yyyy", { locale: vi })}
+          {formatDayMonthRange(rangeStart, rangeEnd)}
+          <span className="mx-1.5 text-border">·</span>
+          {format(rangeEnd, "yyyy")}
           <span className="mx-1.5 text-border">·</span>
           {daysInRange.length} ngày
         </p>

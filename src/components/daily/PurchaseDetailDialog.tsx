@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Pencil, Check, History } from "lucide-react";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from "date-fns";
+import ClearFieldButton from "./ClearFieldButton";
 
 interface PurchaseDetailDialogProps {
   open: boolean;
@@ -179,13 +180,22 @@ export default function PurchaseDetailDialog({
               <span className="text-xs text-muted-foreground min-w-[70px]">Name</span>
               {editingField === "name" ? (
                 <div className="flex items-center gap-1.5 flex-1">
-                  <Input
-                    autoFocus
-                    className="h-8 text-sm"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSave()}
-                  />
+                  <div className="relative flex-1">
+                    <Input
+                      autoFocus
+                      className="h-8 text-sm pr-8"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleSave()}
+                    />
+                    <ClearFieldButton
+                      visible={editName.length > 0}
+                      size="sm"
+                      label="Xóa tên"
+                      className="absolute right-1 top-1/2 -translate-y-1/2"
+                      onClear={() => setEditName("")}
+                    />
+                  </div>
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSave}>
                     <Check className="h-3.5 w-3.5" />
                   </Button>
@@ -205,14 +215,23 @@ export default function PurchaseDetailDialog({
               <span className="text-xs text-muted-foreground min-w-[70px]">Amount</span>
               {editingField === "amount" ? (
                 <div className="flex items-center gap-1.5 flex-1">
-                  <Input
-                    autoFocus
-                    type="number"
-                    className="h-8 text-sm"
-                    value={editAmount}
-                    onChange={(e) => setEditAmount(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSave()}
-                  />
+                  <div className="relative flex-1">
+                    <Input
+                      autoFocus
+                      type="number"
+                      className="h-8 text-sm pr-8"
+                      value={editAmount}
+                      onChange={(e) => setEditAmount(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleSave()}
+                    />
+                    <ClearFieldButton
+                      visible={editAmount.length > 0}
+                      size="sm"
+                      label="Xóa số tiền"
+                      className="absolute right-1 top-1/2 -translate-y-1/2"
+                      onClear={() => setEditAmount("")}
+                    />
+                  </div>
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSave}>
                     <Check className="h-3.5 w-3.5" />
                   </Button>

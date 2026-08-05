@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { ArrowLeft, Check, Pencil } from "lucide-react";
 import type { VerifyData } from "@/types/expense";
 import { focusWithoutScroll } from "@/lib/focusWithoutScroll";
+import ClearFieldButton from "./ClearFieldButton";
 
 interface MatchInfo {
   itemId: string;
@@ -159,22 +160,30 @@ export default function AmountPhase({
               requestAnimationFrame(() => window.scrollTo(0, 0));
             }}
           />
-          <button
-            type="button"
-            className="flex items-baseline max-w-full text-left cursor-text"
-            onClick={() => {
-              // Only focus the hidden field for hardware/desktop keyboards — avoid iOS zoom
-              if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
-                focusWithoutScroll(amountRef.current);
-              }
-            }}
-            aria-label="Nhập số tiền"
-          >
-            <span className="text-4xl font-display tabular-nums text-foreground leading-none break-all">
-              {amountValue ? Number(amountValue).toLocaleString("vi-VN") : <span className="text-muted-foreground/25">0</span>}
-            </span>
-            <span className="text-2xl font-display text-muted-foreground/35 ml-1">.000</span>
-          </button>
+          <div className="flex items-start gap-2">
+            <button
+              type="button"
+              className="flex min-w-0 flex-1 items-baseline text-left cursor-text"
+              onClick={() => {
+                // Only focus the hidden field for hardware/desktop keyboards — avoid iOS zoom
+                if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+                  focusWithoutScroll(amountRef.current);
+                }
+              }}
+              aria-label="Nhập số tiền"
+            >
+              <span className="text-4xl font-display tabular-nums text-foreground leading-none break-all">
+                {amountValue ? Number(amountValue).toLocaleString("vi-VN") : <span className="text-muted-foreground/25">0</span>}
+              </span>
+              <span className="text-2xl font-display text-muted-foreground/35 ml-1">.000</span>
+            </button>
+            <ClearFieldButton
+              visible={amountValue.length > 0}
+              onClear={clearAmount}
+              label="Xóa số tiền"
+              className="mt-1"
+            />
+          </div>
           <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
             nghìn ₫
           </p>
@@ -187,29 +196,40 @@ export default function AmountPhase({
           >
             Ghi chú
           </label>
-          <input
-            ref={noteRef}
-            id="expense-note"
-            type="text"
-            value={noteValue}
-            onChange={(e) => setNoteValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                onSave();
-              }
-            }}
-            placeholder="Tùy chọn"
-            maxLength={80}
-            className="w-full bg-transparent text-right text-base font-medium leading-tight text-foreground placeholder:font-normal placeholder:text-muted-foreground/30 outline-none border-b border-border/45 pb-1.5 transition-[border-color,box-shadow] duration-200 caret-primary focus:border-primary/55 focus:shadow-[0_1px_0_0_hsl(var(--primary)/0.35)]"
-            aria-label="Ghi chú thêm (tùy chọn)"
-            autoComplete="off"
-            enterKeyHint="done"
-            onFocus={() => {
-              window.scrollTo(0, 0);
-              requestAnimationFrame(() => window.scrollTo(0, 0));
-            }}
-          />
+          <div className="flex items-center gap-1.5">
+            <ClearFieldButton
+              visible={noteValue.length > 0}
+              onClear={() => {
+                setNoteValue("");
+                focusWithoutScroll(noteRef.current);
+              }}
+              label="Xóa ghi chú"
+              size="sm"
+            />
+            <input
+              ref={noteRef}
+              id="expense-note"
+              type="text"
+              value={noteValue}
+              onChange={(e) => setNoteValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  onSave();
+                }
+              }}
+              placeholder="Tùy chọn"
+              maxLength={80}
+              className="w-full min-w-0 bg-transparent text-right text-base font-medium leading-tight text-foreground placeholder:font-normal placeholder:text-muted-foreground/30 outline-none border-b border-border/45 pb-1.5 transition-[border-color,box-shadow] duration-200 caret-primary focus:border-primary/55 focus:shadow-[0_1px_0_0_hsl(var(--primary)/0.35)]"
+              aria-label="Ghi chú thêm (tùy chọn)"
+              autoComplete="off"
+              enterKeyHint="done"
+              onFocus={() => {
+                window.scrollTo(0, 0);
+                requestAnimationFrame(() => window.scrollTo(0, 0));
+              }}
+            />
+          </div>
         </div>
       </div>
 
@@ -229,6 +249,15 @@ export default function AmountPhase({
                 }}
                 onBlur={commitEdit}
                 aria-label={`Sửa ${label}`}
+              />
+              <ClearFieldButton
+                visible={editValue.length > 0}
+                size="sm"
+                label={`Xóa ${label}`}
+                onClear={() => {
+                  setEditValue("");
+                  focusWithoutScroll(editInputRef.current);
+                }}
               />
             </div>
           ) : (

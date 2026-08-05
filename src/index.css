@@ -118,6 +118,37 @@
     animation: slideDown 0.2s ease-in forwards;
   }
 
+  .category-freq-pager {
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .category-freq-pager::-webkit-scrollbar {
+    display: none;
+  }
+
+  .category-freq-page {
+    box-sizing: border-box;
+    flex: 0 0 100%;
+    width: 100%;
+    min-width: 0;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    padding: 0 1.25rem 0.35rem;
+  }
+
+  .category-freq-track {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    align-content: flex-start;
+  }
+
   .category-rail {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--primary) / 0.3) transparent;

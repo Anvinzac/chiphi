@@ -1058,9 +1058,11 @@ export default function DailyExpenseTable() {
                 <h2 className="font-display text-base capitalize leading-none text-foreground">
                   {formatDayHeading(section.date)}
                 </h2>
-                <span className="text-xs tabular-nums text-muted-foreground">
-                  {section.total.toLocaleString("vi-VN")} ₫
-                </span>
+                <MoneyLabel
+                  amount={section.total}
+                  className="text-xs text-muted-foreground"
+                  smallClassName="text-[0.7em]"
+                />
               </div>
               {section.groups.map(renderPaymentGroup)}
             </section>

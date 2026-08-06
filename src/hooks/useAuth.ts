@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { seedDataForUser } from "@/lib/seedData";
+import { clearAutoLogin } from "@/lib/autoLogin";
 import type { Session } from "@supabase/supabase-js";
 
 let seedPromise: Promise<void> | null = null;
@@ -33,6 +34,7 @@ export function useAuth() {
 
   const signOut = async () => {
     seedPromise = null;
+    clearAutoLogin();
     await supabase.auth.signOut();
   };
 

@@ -12,6 +12,7 @@ import AmountPhase from "./AmountPhase";
 import PurchaseDetailDialog from "./PurchaseDetailDialog";
 import RangeDayPicker from "./RangeDayPicker";
 import MoneyLabel from "./MoneyLabel";
+import WeekPager, { type WeekPage } from "./WeekPager";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { VerifyData } from "@/types/expense";
 import { getMockGroupsForRange, isMockPaymentId } from "@/lib/mockRangeData";
@@ -761,6 +762,38 @@ export default function DailyExpenseTable() {
     }));
   }, [viewMode, paymentGroups]);
 
+  type RangeDaySection = { date: string; groups: PaymentGroupData[]; total: number };
+
+  // Split the range listing into one page per ISO week (Mon–Sun)
+  const rangeWeekPages = useMemo<WeekPage<RangeDaySection>[]>(() => {
+    if (viewMode !== "range") return [];
+    const map = new Map<string, WeekPage<RangeDaySection>>();
+    for (const section of rangeDaySections) {
+      let d: Date;
+      try {
+        d = parseISO(section.date);
+      } catch {
+        continue;
+      }
+      if (Number.isNaN(d.getTime())) continue;
+      const weekStart = startOfWeek(d, { weekStartsOn: 1 });
+      const key = format(weekStart, "yyyy-MM-dd");
+      let page = map.get(key);
+      if (!page) {
+        page = { key, weekStart, weekEnd: endOfWeek(d, { weekStartsOn: 1 }), total: 0, sections: [] };
+        map.set(key, page);
+      }
+      page.total += section.total;
+      page.sections.push(section);
+    }
+    return Array.from(map.values())
+      .sort((a, b) => b.key.localeCompare(a.key))
+      .map(page => ({
+        ...page,
+        sections: page.sections.sort((a, b) => b.date.localeCompare(a.date)),
+      }));
+  }, [viewMode, rangeDaySections]);
+
   const filteredNameSections = useMemo(() => {
     if (!nameFilter) return null;
     const needle = nameFilter.toLowerCase().trim();
@@ -1052,21 +1085,24 @@ export default function DailyExpenseTable() {
             ))
           )
         ) : viewMode === "range" ? (
-          rangeDaySections.map(section => (
-            <section key={section.date} className="mb-5">
-              <div className="sticky top-0 z-10 -mx-1 mb-1.5 flex items-baseline justify-between gap-3 bg-background/95 px-1 py-2 backdrop-blur-sm">
-                <h2 className="font-display text-base capitalize leading-none text-foreground">
-                  {formatDayHeading(section.date)}
-                </h2>
-                <MoneyLabel
-                  amount={section.total}
-                  className="text-xs text-muted-foreground"
-                  smallClassName="text-[0.7em]"
-                />
-              </div>
-              {section.groups.map(renderPaymentGroup)}
-            </section>
-          ))
+          <WeekPager
+            weeks={rangeWeekPages}
+            renderSection={(section) => (
+              <section key={section.date} className="mb-5">
+                <div className="sticky top-0 z-10 -mx-1 mb-1.5 flex items-baseline justify-between gap-3 bg-background/95 px-1 py-2 backdrop-blur-sm">
+                  <h2 className="font-display text-base capitalize leading-none text-foreground">
+                    {formatDayHeading(section.date)}
+                  </h2>
+                  <MoneyLabel
+                    amount={section.total}
+                    className="text-xs text-muted-foreground"
+                    smallClassName="text-[0.7em]"
+                  />
+                </div>
+                {section.groups.map(renderPaymentGroup)}
+              </section>
+            )}
+          />
         ) : (
           paymentGroups.map(renderPaymentGroup)
         )}

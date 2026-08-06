@@ -4,6 +4,8 @@ import { createQuickSignIn } from "@/lib/quickAuth";
 const ADMIN_EMAIL = "admin@mise.local";
 const ADMIN_PASSWORD = "AdminDemo2024!";
 
+export const ADMIN_CREDENTIALS = { email: ADMIN_EMAIL, password: ADMIN_PASSWORD };
+
 async function ensureAdminRole() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;

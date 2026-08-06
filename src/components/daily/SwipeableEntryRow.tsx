@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from "react";
+import MoneyLabel from "./MoneyLabel";
 
 interface SwipeableEntryRowProps {
   item_name: string;

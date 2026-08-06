@@ -123,7 +123,8 @@ export default function DailyExpenseTable() {
 
   // UI state
   const [rangePickerOpen, setRangePickerOpen] = useState(false);
-  const [cardExpanded, setCardExpanded] = useState(true);
+  // Panel starts closed: returning to this page must not auto-open the add panel
+  const [cardExpanded, setCardExpanded] = useState(false);
   const [cardClosing, setCardClosing] = useState(false);
   const [detailEntry, setDetailEntry] = useState<PaymentEntry | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);

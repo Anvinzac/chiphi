@@ -286,7 +286,7 @@ export default function PurchaseDetailDialog({
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-medium">{group.label}</span>
                     <div className="text-right">
-                      <span className="text-sm font-display tabular-nums">{group.total.toLocaleString()}</span>
+                      <MoneyLabel amount={group.total} className="text-sm font-display" smallClassName="text-[0.75em]" suffix="" />
                       <span className="text-[10px] text-muted-foreground ml-1.5">({group.count}x)</span>
                     </div>
                   </div>

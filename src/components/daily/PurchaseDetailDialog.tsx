@@ -294,7 +294,7 @@ export default function PurchaseDetailDialog({
                     {group.entries.map((e, i) => (
                       <div key={i} className="flex items-center justify-between text-xs text-muted-foreground">
                         <span>{format(new Date(e.date + "T00:00:00"), "MMM d")}</span>
-                        <span className="tabular-nums">{e.amount.toLocaleString()}</span>
+                        <MoneyLabel amount={e.amount} suffix="" smallClassName="text-[0.75em]" />
                       </div>
                     ))}
                   </div>

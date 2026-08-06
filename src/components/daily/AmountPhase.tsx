@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { ArrowLeft, Check, Pencil } from "lucide-react";
+import { ArrowLeft, Check, Pencil, Plus, X } from "lucide-react";
 import type { VerifyData } from "@/types/expense";
 import { focusWithoutScroll } from "@/lib/focusWithoutScroll";
 import ClearFieldButton from "./ClearFieldButton";
@@ -23,6 +23,8 @@ interface AmountPhaseProps {
   setAmountValue: (v: string) => void;
   noteValue: string;
   setNoteValue: (v: string) => void;
+  lines: { amount: string; note: string }[];
+  setLines: React.Dispatch<React.SetStateAction<{ amount: string; note: string }[]>>;
   amountRef: React.RefObject<HTMLInputElement>;
   match: MatchInfo | null;
   verifyData: VerifyData | null;
@@ -42,6 +44,8 @@ export default function AmountPhase({
   setAmountValue,
   noteValue,
   setNoteValue,
+  lines,
+  setLines,
   amountRef,
   match,
   verifyData,
@@ -94,6 +98,38 @@ export default function AmountPhase({
   const removeLastDigit = () => setAmountValue(amountValue.slice(0, -1));
   const clearAmount = () => setAmountValue("");
 
+  // Long-press backspace clears the whole amount
+  const holdRef = useRef<number | null>(null);
+  const heldRef = useRef(false);
+  const startHold = () => {
+    heldRef.current = false;
+    holdRef.current = window.setTimeout(() => {
+      heldRef.current = true;
+      clearAmount();
+    }, 500);
+  };
+  const endHold = () => {
+    if (holdRef.current) window.clearTimeout(holdRef.current);
+    holdRef.current = null;
+  };
+  const handleBackspaceClick = () => {
+    if (heldRef.current) {
+      heldRef.current = false;
+      return;
+    }
+    removeLastDigit();
+  };
+
+  const currentValid = !!amountValue.trim() && Number(amountValue) > 0;
+  const canSave = currentValid || lines.length > 0;
+
+  const addLine = () => {
+    if (!currentValid) return;
+    setLines(prev => [...prev, { amount: amountValue, note: noteValue.trim() }]);
+    setAmountValue("");
+    setNoteValue("");
+  };
+
   const supplier = match?.supplierName || verifyData?.supplierName || "";
   const category = match?.categoryName || verifyData?.categoryName || "";
   const subCategory = match?.subCategoryName || verifyData?.subCategoryName || "";
@@ -128,7 +164,6 @@ export default function AmountPhase({
     [
       { label: ".", action: appendDecimal, muted: true },
       { label: "0", action: () => appendDigit("0") },
-      { label: "⌫", action: removeLastDigit, muted: true },
     ],
   ];
 

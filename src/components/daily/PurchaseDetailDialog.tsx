@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Pencil, Check, History } from "lucide-react";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from "date-fns";
+import MoneyLabel from "./MoneyLabel";
 import ClearFieldButton from "./ClearFieldButton";
 
 interface PurchaseDetailDialogProps {

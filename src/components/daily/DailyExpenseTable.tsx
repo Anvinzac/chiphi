@@ -175,12 +175,12 @@ export default function DailyExpenseTable() {
       daily: [],
       weekly: [],
     };
+    // Single, fixed presentation: monthly (left) | daily (center) | weekly (right)
     for (const detail of QUICK_CATEGORY_DETAILS) {
-      const fromDb = categories.find(c => c.name.toLowerCase() === detail.name.toLowerCase());
-      groups[fromDb?.frequency || detail.frequency].push(detail);
+      groups[detail.frequency].push(detail);
     }
     return groups;
-  }, [categories]);
+  }, []);
 
   const [chipFreqPage, setChipFreqPage] = useState<CategoryFrequency>("daily");
 

@@ -247,7 +247,7 @@ export default function AdminDashboard() {
                   ? `${format(dateRange.from!, "MMM d")} – ${format(dateRange.to, "MMM d, y")}`
                   : format(dateRange.from!, "MMM d, y")}
               </p>
-              <p className="text-2xl font-display mt-1">{rangeTotal.toLocaleString()}</p>
+              <MoneyLabel amount={rangeTotal} className="text-2xl font-display mt-1 block" suffix="" smallClassName="text-[0.65em]" />
             </div>
           )}
 

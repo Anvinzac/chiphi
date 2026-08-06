@@ -1,3 +1,5 @@
+import MoneyLabel from "./MoneyLabel";
+
 interface EntryRowProps {
   item_name: string;
   amount: number;

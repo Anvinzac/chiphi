@@ -1009,9 +1009,11 @@ export default function DailyExpenseTable() {
                       <h3 className="font-display text-base capitalize leading-none text-foreground">
                         {formatDayHeading(day.date)}
                       </h3>
-                      <span className="text-xs tabular-nums text-muted-foreground">
-                        {day.total.toLocaleString("vi-VN")} ₫
-                      </span>
+                      <MoneyLabel
+                        amount={day.total}
+                        className="text-xs text-muted-foreground"
+                        smallClassName="text-[0.7em]"
+                      />
                     </div>
                     <div className="rounded-lg">
                       {day.items.map(item => (

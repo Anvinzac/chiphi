@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import type { DateRange } from "react-day-picker";
 import MoneyLabel from "@/components/daily/MoneyLabel";
 
-type AdminTab = "summary" | "categories" | "suppliers" | "items";
+type AdminTab = "summary" | "categories" | "subcategories" | "suppliers" | "items";
 type CategoryFrequency = "daily" | "weekly" | "monthly";
 
 const CHART_COLORS = [
@@ -49,6 +49,11 @@ export default function AdminDashboard() {
   const [newItemPrice, setNewItemPrice] = useState("");
   const [newItemUnit, setNewItemUnit] = useState("kg");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [subFilterCat, setSubFilterCat] = useState("");
+  const [newSubCatId, setNewSubCatId] = useState("");
+  const [newSubFlatName, setNewSubFlatName] = useState("");
+  const [editingSubId, setEditingSubId] = useState<string | null>(null);
+  const [editingSubName, setEditingSubName] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -72,6 +77,7 @@ export default function AdminDashboard() {
   const tabs: { key: AdminTab; label: string; icon: React.ReactNode }[] = [
     { key: "summary", label: "Summary", icon: <BarChart3 className="h-4 w-4" /> },
     { key: "categories", label: "Categories", icon: <Tag className="h-4 w-4" /> },
+    { key: "subcategories", label: "Sub-categories", icon: <Tag className="h-4 w-4" /> },
     { key: "suppliers", label: "Suppliers", icon: <Users className="h-4 w-4" /> },
     { key: "items", label: "Items", icon: <Tag className="h-4 w-4" /> },
   ];
@@ -156,6 +162,26 @@ export default function AdminDashboard() {
   const deleteSubCategory = async (id: string) => {
     await supabase.from("sub_categories").delete().eq("id", id);
     setSubCategories(prev => prev.filter(s => s.id !== id));
+  };
+
+  const addSubFlat = async () => {
+    if (!newSubFlatName.trim() || !newSubCatId || !user) return;
+    const { data, error } = await supabase.from("sub_categories").insert({
+      name: newSubFlatName.trim(), category_id: newSubCatId,
+      parent_sub_category_id: null, user_id: user.id,
+    }).select("id, name, category_id, parent_sub_category_id").single();
+    if (error) { toast.error(error.message); return; }
+    if (data) setSubCategories(prev => [...prev, data]);
+    setNewSubFlatName("");
+  };
+
+  const renameSubCategory = async (id: string) => {
+    const name = editingSubName.trim();
+    setEditingSubId(null);
+    if (!name) return;
+    const { error } = await supabase.from("sub_categories").update({ name }).eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    setSubCategories(prev => prev.map(s => s.id === id ? { ...s, name } : s));
   };
 
   const addSupplier = async () => {
@@ -350,6 +376,63 @@ export default function AdminDashboard() {
                     )}
                   </div>
                 )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {activeTab === "subcategories" && (
+        <div className="space-y-3">
+          <div className="card-editorial p-3 flex gap-2 flex-wrap">
+            <select value={newSubCatId} onChange={(e) => setNewSubCatId(e.target.value)} className="h-10 rounded-md border border-input bg-background px-2 text-sm">
+              <option value="">Parent category</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <Input placeholder="New sub-category..." value={newSubFlatName} onChange={(e) => setNewSubFlatName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addSubFlat()} className="flex-1 min-w-[140px]" />
+            <Button onClick={addSubFlat} disabled={!newSubFlatName.trim() || !newSubCatId} size="sm"><Plus className="h-4 w-4" /></Button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <select value={subFilterCat} onChange={(e) => setSubFilterCat(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+              <option value="">All categories</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <span className="text-xs text-muted-foreground">{subCategories.filter(s => !subFilterCat || s.category_id === subFilterCat).length} sub-categories</span>
+          </div>
+
+          {categories.filter(c => !subFilterCat || c.id === subFilterCat).map(cat => {
+            const subs = getLevel1Subs(cat.id);
+            return (
+              <div key={cat.id} className="card-editorial overflow-hidden">
+                <div className="px-4 py-2 border-b border-border/60 text-sm font-medium flex items-center justify-between">
+                  <span>{cat.name}</span>
+                  <span className="text-xs text-muted-foreground">{subs.length}</span>
+                </div>
+                <div className="divide-y divide-border/40">
+                  {subs.length === 0 && <p className="px-4 py-2 text-sm text-muted-foreground">No sub-categories</p>}
+                  {subs.map(sub => (
+                    <div key={sub.id}>
+                      <div className="flex items-center gap-2 px-4 py-1.5 text-sm">
+                        {editingSubId === sub.id ? (
+                          <Input autoFocus className="h-7 text-sm flex-1" value={editingSubName}
+                            onChange={(e) => setEditingSubName(e.target.value)}
+                            onBlur={() => renameSubCategory(sub.id)}
+                            onKeyDown={(e) => { if (e.key === "Enter") renameSubCategory(sub.id); if (e.key === "Escape") setEditingSubId(null); }} />
+                        ) : (
+                          <button className="flex-1 text-left hover:text-primary" onClick={() => { setEditingSubId(sub.id); setEditingSubName(sub.name); }}>{sub.name}</button>
+                        )}
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteSubCategory(sub.id)}><Trash2 className="h-3 w-3" /></Button>
+                      </div>
+                      {getLevel2Subs(sub.id).map(ss => (
+                        <div key={ss.id} className="flex items-center gap-2 pl-9 pr-4 py-1 text-sm text-muted-foreground">
+                          <span className="flex-1">{ss.name}</span>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteSubCategory(ss.id)}><Trash2 className="h-2.5 w-2.5" /></Button>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
               </div>
             );
           })}

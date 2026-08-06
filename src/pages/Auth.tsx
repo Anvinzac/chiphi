@@ -51,6 +51,7 @@ export default function Auth() {
     const email = toEmail(username);
     try {
       if (isLogin) {
+        clearAutoLogin();
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast.success("Welcome back!");

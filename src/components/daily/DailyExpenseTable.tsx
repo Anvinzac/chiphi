@@ -1085,21 +1085,24 @@ export default function DailyExpenseTable() {
             ))
           )
         ) : viewMode === "range" ? (
-          rangeDaySections.map(section => (
-            <section key={section.date} className="mb-5">
-              <div className="sticky top-0 z-10 -mx-1 mb-1.5 flex items-baseline justify-between gap-3 bg-background/95 px-1 py-2 backdrop-blur-sm">
-                <h2 className="font-display text-base capitalize leading-none text-foreground">
-                  {formatDayHeading(section.date)}
-                </h2>
-                <MoneyLabel
-                  amount={section.total}
-                  className="text-xs text-muted-foreground"
-                  smallClassName="text-[0.7em]"
-                />
-              </div>
-              {section.groups.map(renderPaymentGroup)}
-            </section>
-          ))
+          <WeekPager
+            weeks={rangeWeekPages}
+            renderSection={(section) => (
+              <section key={section.date} className="mb-5">
+                <div className="sticky top-0 z-10 -mx-1 mb-1.5 flex items-baseline justify-between gap-3 bg-background/95 px-1 py-2 backdrop-blur-sm">
+                  <h2 className="font-display text-base capitalize leading-none text-foreground">
+                    {formatDayHeading(section.date)}
+                  </h2>
+                  <MoneyLabel
+                    amount={section.total}
+                    className="text-xs text-muted-foreground"
+                    smallClassName="text-[0.7em]"
+                  />
+                </div>
+                {section.groups.map(renderPaymentGroup)}
+              </section>
+            )}
+          />
         ) : (
           paymentGroups.map(renderPaymentGroup)
         )}

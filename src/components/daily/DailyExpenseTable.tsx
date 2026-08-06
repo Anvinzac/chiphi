@@ -12,6 +12,7 @@ import AmountPhase from "./AmountPhase";
 import PurchaseDetailDialog from "./PurchaseDetailDialog";
 import RangeDayPicker from "./RangeDayPicker";
 import MoneyLabel from "./MoneyLabel";
+import DaySection from "./DaySection";
 import WeekPager, { type WeekPage } from "./WeekPager";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { VerifyData } from "@/types/expense";
@@ -157,16 +158,16 @@ export default function DailyExpenseTable() {
     { name: "Gạo", emoji: "🌾", gradient: "linear-gradient(160deg, #efe6d4 0%, #d8c8a8 100%)", frequency: "weekly" },
     { name: "Nước dừa", emoji: "🥥", gradient: "linear-gradient(160deg, #d9e6e6 0%, #b7cbcc 100%)", frequency: "weekly" },
     { name: "Muối", emoji: "🧂", gradient: "linear-gradient(160deg, #e2e6ea 0%, #c5cbd2 100%)", frequency: "weekly" },
-    { name: "Shopee", emoji: "🛍️", gradient: "linear-gradient(160deg, #eeddd8 0%, #d6b8b0 100%)", frequency: "weekly" },
+    { name: "Shopee", emoji: "🛍️", gradient: "linear-gradient(160deg, #eeddd8 0%, #d6b8b0 100%)", frequency: "daily" },
     { name: "Internet", emoji: "🌐", gradient: "linear-gradient(160deg, #dde2ec 0%, #b8c2d2 100%)", frequency: "monthly" },
-    { name: "Sửa chữa", emoji: "🛠️", gradient: "linear-gradient(160deg, #e8dfd8 0%, #cec0b4 100%)", frequency: "weekly" },
-    { name: "Vệ sinh", emoji: "🧼", gradient: "linear-gradient(160deg, #d8e8e6 0%, #b4cfcc 100%)", frequency: "weekly" },
+    { name: "Sửa chữa", emoji: "🛠️", gradient: "linear-gradient(160deg, #e8dfd8 0%, #cec0b4 100%)", frequency: "daily" },
+    { name: "Vệ sinh", emoji: "🧼", gradient: "linear-gradient(160deg, #d8e8e6 0%, #b4cfcc 100%)", frequency: "daily" },
     { name: "Lương NV", emoji: "👥", gradient: "linear-gradient(160deg, #e4dde8 0%, #c8bdd2 100%)", frequency: "monthly" },
     { name: "Thuế", emoji: "🧾", gradient: "linear-gradient(160deg, #e0e4ea 0%, #c0c6d0 100%)", frequency: "monthly" },
     { name: "BHXH", emoji: "🛡️", gradient: "linear-gradient(160deg, #d8e6e0 0%, #b4cfc2 100%)", frequency: "monthly" },
     { name: "Rác", emoji: "♻️", gradient: "linear-gradient(160deg, #e4ead8 0%, #c6d0b4 100%)", frequency: "monthly" },
     { name: "Giữ xe", emoji: "🅿️", gradient: "linear-gradient(160deg, #e6e4e0 0%, #c8c6c2 100%)", frequency: "monthly" },
-    { name: "Khác", emoji: "✦", gradient: "linear-gradient(160deg, #e8dde6 0%, #d0bac8 100%)", frequency: "monthly" },
+    { name: "Khác", emoji: "✦", gradient: "linear-gradient(160deg, #e8dde6 0%, #d0bac8 100%)", frequency: "daily" },
   ];
   const CHIP_FREQ_PAGES: { key: CategoryFrequency; label: string }[] = [
     { key: "monthly", label: "Tháng" },
@@ -179,12 +180,14 @@ export default function DailyExpenseTable() {
       daily: [],
       weekly: [],
     };
-    // Single, fixed presentation: monthly (left) | daily (center) | weekly (right)
+    // Prefer DB frequency (Admin edits) over the hardcoded preset
     for (const detail of QUICK_CATEGORY_DETAILS) {
-      groups[detail.frequency].push(detail);
+      const fromDb = categories.find(c => c.name.toLowerCase() === detail.name.toLowerCase());
+      const freq = fromDb?.frequency || detail.frequency;
+      groups[freq].push(detail);
     }
     return groups;
-  }, []);
+  }, [categories]);
 
   const [chipFreqPage, setChipFreqPage] = useState<CategoryFrequency>("daily");
 
@@ -1046,49 +1049,41 @@ export default function DailyExpenseTable() {
                   />
                 </div>
                 {week.days.map(day => (
-                  <div key={day.date} className="mb-4">
-                    <div className="sticky top-0 z-10 -mx-1 mb-1.5 flex items-baseline justify-between gap-3 bg-background/95 px-1 py-2 backdrop-blur-sm">
-                      <h3 className="font-display text-base capitalize leading-none text-foreground">
-                        {formatDayHeading(day.date)}
-                      </h3>
-                      <MoneyLabel
-                        amount={day.total}
-                        className="text-xs text-muted-foreground"
-                        smallClassName="text-[0.7em]"
+                  <DaySection
+                    key={day.date}
+                    title={formatDayHeading(day.date)}
+                    total={day.total}
+                  >
+                    {day.items.map(item => (
+                      <SwipeableEntryRow
+                        key={item.entry.sub_payment_id || `${item.paymentId}-${item.entryIndex}`}
+                        item_name={item.entry.item_name}
+                        amount={item.entry.amount}
+                        notes={item.entry.notes}
+                        categoryName={getCategoryName(item.entry.category_id)}
+                        supplierName={getSupplierName(item.entry.supplier_id)}
+                        isHighValue={item.entry.amount >= HIGH_VALUE_THRESHOLD}
+                        onNameClick={() => setNameFilter(item.entry.item_name)}
+                        onClick={() => { setDetailEntry(item.entry); setDetailOpen(true); }}
+                        onDelete={async () => {
+                          if (item.entry.sub_payment_id && !isMockPaymentId(item.paymentId)) {
+                            await supabase.from("sub_payments").delete().eq("id", item.entry.sub_payment_id);
+                          }
+                          setPaymentGroups(prev => prev.map(g => {
+                            if (g.paymentId !== item.paymentId) return g;
+                            const newEntries = g.entries.filter((e, i) =>
+                              item.entry.sub_payment_id
+                                ? e.sub_payment_id !== item.entry.sub_payment_id
+                                : i !== item.entryIndex
+                            );
+                            return { ...g, entries: newEntries, total: newEntries.reduce((s, e) => s + e.amount, 0) };
+                          }).filter(g => g.entries.length > 0));
+                          setDayTotal(prev => prev - item.entry.amount);
+                          toast.success("Deleted");
+                        }}
                       />
-                    </div>
-                    <div className="rounded-lg">
-                      {day.items.map(item => (
-                        <SwipeableEntryRow
-                          key={item.entry.sub_payment_id || `${item.paymentId}-${item.entryIndex}`}
-                          item_name={item.entry.item_name}
-                          amount={item.entry.amount}
-                          notes={item.entry.notes}
-                          categoryName={getCategoryName(item.entry.category_id)}
-                          supplierName={getSupplierName(item.entry.supplier_id)}
-                          isHighValue={item.entry.amount >= HIGH_VALUE_THRESHOLD}
-                          onNameClick={() => setNameFilter(item.entry.item_name)}
-                          onClick={() => { setDetailEntry(item.entry); setDetailOpen(true); }}
-                          onDelete={async () => {
-                            if (item.entry.sub_payment_id && !isMockPaymentId(item.paymentId)) {
-                              await supabase.from("sub_payments").delete().eq("id", item.entry.sub_payment_id);
-                            }
-                            setPaymentGroups(prev => prev.map(g => {
-                              if (g.paymentId !== item.paymentId) return g;
-                              const newEntries = g.entries.filter((e, i) =>
-                                item.entry.sub_payment_id
-                                  ? e.sub_payment_id !== item.entry.sub_payment_id
-                                  : i !== item.entryIndex
-                              );
-                              return { ...g, entries: newEntries, total: newEntries.reduce((s, e) => s + e.amount, 0) };
-                            }).filter(g => g.entries.length > 0));
-                            setDayTotal(prev => prev - item.entry.amount);
-                            toast.success("Deleted");
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
+                    ))}
+                  </DaySection>
                 ))}
               </section>
             ))
@@ -1097,19 +1092,13 @@ export default function DailyExpenseTable() {
           <WeekPager
             weeks={rangeWeekPages}
             renderSection={(section) => (
-              <section key={section.date} className="mb-5">
-                <div className="sticky top-0 z-10 -mx-1 mb-1.5 flex items-baseline justify-between gap-3 bg-background/95 px-1 py-2 backdrop-blur-sm">
-                  <h2 className="font-display text-base capitalize leading-none text-foreground">
-                    {formatDayHeading(section.date)}
-                  </h2>
-                  <MoneyLabel
-                    amount={section.total}
-                    className="text-xs text-muted-foreground"
-                    smallClassName="text-[0.7em]"
-                  />
-                </div>
+              <DaySection
+                key={section.date}
+                title={formatDayHeading(section.date)}
+                total={section.total}
+              >
                 {section.groups.map(renderPaymentGroup)}
-              </section>
+              </DaySection>
             )}
           />
         ) : (

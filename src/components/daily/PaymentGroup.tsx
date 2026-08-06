@@ -42,10 +42,30 @@ export default function PaymentGroup({
   onEntryDelete,
 }: PaymentGroupProps) {
   const [expanded, setExpanded] = useState(true);
+  const hasSupplier = Boolean(group.supplierName?.trim());
+
+  const rows = group.entries.map((entry, i) => (
+    <SwipeableEntryRow
+      key={entry.sub_payment_id || i}
+      item_name={entry.item_name}
+      amount={entry.amount}
+      notes={entry.notes}
+      categoryName={getCategoryName(entry.category_id)}
+      supplierName={getSupplierName(entry.supplier_id)}
+      isHighValue={entry.amount >= highValueThreshold}
+      onClick={() => onEntryClick(entry)}
+      onNameClick={onEntryNameClick ? () => onEntryNameClick(entry) : undefined}
+      onDelete={() => onEntryDelete(group.paymentId, entry, i)}
+    />
+  ));
+
+  // No supplier → flat list (default). Don't invent an "Uncategorized" group.
+  if (!hasSupplier) {
+    return <div className="mb-1">{rows}</div>;
+  }
 
   return (
     <div className="mb-2">
-      {/* Container header */}
       <button
         onClick={() => setExpanded(prev => !prev)}
         className="w-full flex items-center gap-2 py-2.5 px-1 rounded-lg hover:bg-muted/40 transition-colors"
@@ -57,16 +77,14 @@ export default function PaymentGroup({
         )}
         <div className="flex-1 min-w-0 flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-sm font-medium truncate">
-              {group.supplierName || "Chưa phân loại"}
-            </span>
+            <span className="text-sm font-medium truncate">{group.supplierName}</span>
             {group.date && (
               <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
                 {formatDayMonth(parseISO(group.date))}
               </span>
             )}
             <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded-full bg-muted tabular-nums">
-              {group.entries.length} {group.entries.length === 1 ? "mặt hàng" : "mặt hàng"}
+              {group.entries.length} mặt hàng
             </span>
           </div>
           <MoneyLabel
@@ -77,23 +95,9 @@ export default function PaymentGroup({
         </div>
       </button>
 
-      {/* Indented entries */}
       {expanded && (
         <div className="ml-5 pl-3 border-l border-border/50 animate-in fade-in slide-in-from-top-1 duration-150">
-          {group.entries.map((entry, i) => (
-            <SwipeableEntryRow
-              key={entry.sub_payment_id || i}
-              item_name={entry.item_name}
-              amount={entry.amount}
-              notes={entry.notes}
-              categoryName={getCategoryName(entry.category_id)}
-              supplierName={getSupplierName(entry.supplier_id)}
-              isHighValue={entry.amount >= highValueThreshold}
-              onClick={() => onEntryClick(entry)}
-              onNameClick={onEntryNameClick ? () => onEntryNameClick(entry) : undefined}
-              onDelete={() => onEntryDelete(group.paymentId, entry, i)}
-            />
-          ))}
+          {rows}
         </div>
       )}
     </div>

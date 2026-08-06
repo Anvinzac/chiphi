@@ -25,9 +25,9 @@ export default function WeekPager<T>({ weeks, renderSection }: WeekPagerProps<T>
     scrollerRef.current?.scrollTo({ left: 0 });
   }, [weeks.length, weeks[0]?.key]);
 
-  const handleScroll = () => {
+  const settleActive = () => {
     const el = scrollerRef.current;
-    if (!el) return;
+    if (!el || el.clientWidth === 0) return;
     const idx = Math.round(el.scrollLeft / el.clientWidth);
     setActive(Math.max(0, Math.min(weeks.length - 1, idx)));
   };
@@ -36,17 +36,44 @@ export default function WeekPager<T>({ weeks, renderSection }: WeekPagerProps<T>
     const el = scrollerRef.current;
     if (!el) return;
     el.scrollTo({ left: idx * el.clientWidth, behavior: "smooth" });
+    setActive(idx);
   };
 
   if (weeks.length === 0) return null;
 
   return (
     <div data-no-double-tap>
+      {/* Sticky page control — stays in view while the list scrolls */}
+      {weeks.length > 1 && (
+        <div className="sticky top-0 z-20 -mx-1 mb-1 flex items-center justify-center gap-2 bg-background/95 px-1 py-2 backdrop-blur-sm">
+          <div className="flex items-center gap-1.5" role="tablist" aria-label="Tuần trong kỳ">
+            {weeks.map((week, i) => (
+              <button
+                key={week.key}
+                type="button"
+                role="tab"
+                onClick={() => goTo(i)}
+                aria-label={`Tuần ${formatDayMonth(week.weekStart)} – ${formatDayMonth(week.weekEnd)}`}
+                aria-selected={i === active}
+                className={`h-1.5 rounded-full transition-all duration-200 ${
+                  i === active
+                    ? "w-5 bg-primary"
+                    : "w-1.5 bg-border hover:bg-muted-foreground/40"
+                }`}
+              />
+            ))}
+          </div>
+          <span className="text-[10px] tabular-nums text-muted-foreground/70">
+            {active + 1}/{weeks.length}
+          </span>
+        </div>
+      )}
+
       <div
         ref={scrollerRef}
-        onScroll={handleScroll}
+        onScroll={settleActive}
+        onTouchEnd={settleActive}
         onTouchStart={(e) => e.stopPropagation()}
-        onTouchEnd={(e) => e.stopPropagation()}
         className="-mx-4 flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain no-scrollbar"
       >
         {weeks.map(week => (
@@ -65,23 +92,6 @@ export default function WeekPager<T>({ weeks, renderSection }: WeekPagerProps<T>
           </div>
         ))}
       </div>
-
-      {weeks.length > 1 && (
-        <div className="mt-1 flex items-center justify-center gap-1.5 py-2">
-          {weeks.map((week, i) => (
-            <button
-              key={week.key}
-              type="button"
-              onClick={() => goTo(i)}
-              aria-label={`Tuần ${formatDayMonth(week.weekStart)}`}
-              aria-current={i === active}
-              className={`h-1.5 rounded-full transition-all ${
-                i === active ? "w-5 bg-primary" : "w-1.5 bg-border"
-              }`}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }

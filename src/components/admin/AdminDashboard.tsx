@@ -107,7 +107,7 @@ export default function AdminDashboard() {
     filteredPayments.forEach(p => {
       (p.sub_payments || []).forEach((sp: any) => {
         const cat = categories.find(c => c.id === sp.category_id);
-        const name = cat?.name ?? "Uncategorized";
+        const name = cat?.name ?? "Khác";
         map.set(name, (map.get(name) ?? 0) + Number(sp.amount));
       });
     });

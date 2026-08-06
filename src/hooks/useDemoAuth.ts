@@ -3,7 +3,7 @@ import { createQuickSignIn } from "@/lib/quickAuth";
 const DEMO_EMAIL = "demo@mise.local";
 const DEMO_PASSWORD = "MiseDemo2024!";
 
-/** Shared demo account used for the auto sign-in on the home route. */
+/** Shared demo account (manual sign-in only — never auto-logged). */
 export const signInAsDemo = createQuickSignIn({
   email: DEMO_EMAIL,
   password: DEMO_PASSWORD,

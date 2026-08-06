@@ -255,7 +255,7 @@ export default function AdminDashboard() {
             {[{ label: "Today", value: dailyTotal }, { label: "This Month", value: monthlyTotal }, { label: "This Year", value: yearlyTotal }].map(({ label, value }) => (
               <div key={label} className="card-editorial p-4">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
-                <p className="text-2xl font-display mt-1">{value.toLocaleString()}</p>
+                <MoneyLabel amount={value} className="text-2xl font-display mt-1 block" suffix="" smallClassName="text-[0.65em]" />
               </div>
             ))}
           </div>

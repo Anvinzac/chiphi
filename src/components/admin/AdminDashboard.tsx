@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import type { DateRange } from "react-day-picker";
 import MoneyLabel from "@/components/daily/MoneyLabel";
 
-type AdminTab = "summary" | "categories" | "suppliers" | "items";
+type AdminTab = "summary" | "categories" | "subcategories" | "suppliers" | "items";
 type CategoryFrequency = "daily" | "weekly" | "monthly";
 
 const CHART_COLORS = [
@@ -49,6 +49,11 @@ export default function AdminDashboard() {
   const [newItemPrice, setNewItemPrice] = useState("");
   const [newItemUnit, setNewItemUnit] = useState("kg");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [subFilterCat, setSubFilterCat] = useState("");
+  const [newSubCatId, setNewSubCatId] = useState("");
+  const [newSubFlatName, setNewSubFlatName] = useState("");
+  const [editingSubId, setEditingSubId] = useState<string | null>(null);
+  const [editingSubName, setEditingSubName] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -72,6 +77,7 @@ export default function AdminDashboard() {
   const tabs: { key: AdminTab; label: string; icon: React.ReactNode }[] = [
     { key: "summary", label: "Summary", icon: <BarChart3 className="h-4 w-4" /> },
     { key: "categories", label: "Categories", icon: <Tag className="h-4 w-4" /> },
+    { key: "subcategories", label: "Sub-categories", icon: <Tag className="h-4 w-4" /> },
     { key: "suppliers", label: "Suppliers", icon: <Users className="h-4 w-4" /> },
     { key: "items", label: "Items", icon: <Tag className="h-4 w-4" /> },
   ];
@@ -156,6 +162,26 @@ export default function AdminDashboard() {
   const deleteSubCategory = async (id: string) => {
     await supabase.from("sub_categories").delete().eq("id", id);
     setSubCategories(prev => prev.filter(s => s.id !== id));
+  };
+
+  const addSubFlat = async () => {
+    if (!newSubFlatName.trim() || !newSubCatId || !user) return;
+    const { data, error } = await supabase.from("sub_categories").insert({
+      name: newSubFlatName.trim(), category_id: newSubCatId,
+      parent_sub_category_id: null, user_id: user.id,
+    }).select("id, name, category_id, parent_sub_category_id").single();
+    if (error) { toast.error(error.message); return; }
+    if (data) setSubCategories(prev => [...prev, data]);
+    setNewSubFlatName("");
+  };
+
+  const renameSubCategory = async (id: string) => {
+    const name = editingSubName.trim();
+    setEditingSubId(null);
+    if (!name) return;
+    const { error } = await supabase.from("sub_categories").update({ name }).eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    setSubCategories(prev => prev.map(s => s.id === id ? { ...s, name } : s));
   };
 
   const addSupplier = async () => {

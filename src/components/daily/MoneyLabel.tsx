@@ -35,7 +35,11 @@ export default function MoneyLabel({
       ) : (
         <span className={mainClassName}>{main}</span>
       )}
-      {suffix && <span className={cn("ml-0.5", suffixClassName)}>{suffix}</span>}
+      {suffix && (
+        <span className={cn("ml-0.5 align-super text-[0.65em] opacity-60 -translate-y-0.5", suffixClassName)}>
+          {suffix}
+        </span>
+      )}
     </span>
   );
 }

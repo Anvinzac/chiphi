@@ -382,10 +382,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {activeTab === "suppliers" && (
-        <></>
-      )}
-
       {activeTab === "subcategories" && (
         <div className="space-y-3">
           <div className="card-editorial p-3 flex gap-2 flex-wrap">

@@ -11,6 +11,7 @@ import ClearFieldButton from "./ClearFieldButton";
 import AmountPhase from "./AmountPhase";
 import PurchaseDetailDialog from "./PurchaseDetailDialog";
 import RangeDayPicker from "./RangeDayPicker";
+import MoneyLabel from "./MoneyLabel";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { VerifyData } from "@/types/expense";
 import { getMockGroupsForRange, isMockPaymentId } from "@/lib/mockRangeData";
@@ -608,18 +609,21 @@ export default function DailyExpenseTable() {
     setPhase("done");
     setJustSaved(true);
     setTimeout(() => {
-      setNameValue("");
-      setAmountValue("");
-      setNoteValue("");
-      setSelectedCategoryId(null);
-      setMatch(null);
-      setVerifyData(null);
-      setJustSaved(false);
-      setPhase("name");
-      pagerReadyRef.current = false;
-      requestAnimationFrame(() => scrollPagerTo("name", false));
+      collapseCard();
+      // Reset form after the card has finished sliding out
+      setTimeout(() => {
+        setNameValue("");
+        setAmountValue("");
+        setNoteValue("");
+        setSelectedCategoryId(null);
+        setMatch(null);
+        setVerifyData(null);
+        setJustSaved(false);
+        setPhase("name");
+        pagerReadyRef.current = false;
+      }, 300);
     }, 600);
-  }, [amountValue, noteValue, nameValue, match, activePaymentId, user, expenseDate, viewMode, scrollPagerTo]);
+  }, [amountValue, noteValue, nameValue, match, activePaymentId, user, expenseDate, viewMode, collapseCard]);
 
   const handleNameKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === "Tab") {
@@ -942,7 +946,11 @@ export default function DailyExpenseTable() {
           <span className="text-[10px] uppercase tracking-widest text-muted-foreground block">
             {nameFilter ? "Lọc" : "Tổng"}
           </span>
-          <span className="text-lg font-display block leading-tight">{displayTotal.toLocaleString("vi-VN")} ₫</span>
+          <MoneyLabel
+            amount={displayTotal}
+            className="text-lg font-display block leading-tight"
+            smallClassName="text-[0.65em]"
+          />
         </div>
       </div>
 
@@ -989,9 +997,11 @@ export default function DailyExpenseTable() {
                   <h2 className="font-display text-sm tracking-wide text-muted-foreground">
                     {formatWeekHeading(week.weekStart, week.weekEnd)}
                   </h2>
-                  <span className="text-xs tabular-nums text-muted-foreground">
-                    {week.total.toLocaleString("vi-VN")} ₫
-                  </span>
+                  <MoneyLabel
+                    amount={week.total}
+                    className="text-xs text-muted-foreground"
+                    smallClassName="text-[0.7em]"
+                  />
                 </div>
                 {week.days.map(day => (
                   <div key={day.date} className="mb-4">
@@ -999,9 +1009,11 @@ export default function DailyExpenseTable() {
                       <h3 className="font-display text-base capitalize leading-none text-foreground">
                         {formatDayHeading(day.date)}
                       </h3>
-                      <span className="text-xs tabular-nums text-muted-foreground">
-                        {day.total.toLocaleString("vi-VN")} ₫
-                      </span>
+                      <MoneyLabel
+                        amount={day.total}
+                        className="text-xs text-muted-foreground"
+                        smallClassName="text-[0.7em]"
+                      />
                     </div>
                     <div className="rounded-lg">
                       {day.items.map(item => (
@@ -1046,9 +1058,11 @@ export default function DailyExpenseTable() {
                 <h2 className="font-display text-base capitalize leading-none text-foreground">
                   {formatDayHeading(section.date)}
                 </h2>
-                <span className="text-xs tabular-nums text-muted-foreground">
-                  {section.total.toLocaleString("vi-VN")} ₫
-                </span>
+                <MoneyLabel
+                  amount={section.total}
+                  className="text-xs text-muted-foreground"
+                  smallClassName="text-[0.7em]"
+                />
               </div>
               {section.groups.map(renderPaymentGroup)}
             </section>
@@ -1133,7 +1147,11 @@ export default function DailyExpenseTable() {
                   </div>
                   <div>
                     <p className="text-lg font-display">{nameValue}</p>
-                    <p className="text-2xl font-display">{(Number(amountValue) * 1000).toLocaleString("vi-VN")} ₫</p>
+                    <MoneyLabel
+                      amount={Number(amountValue) * 1000}
+                      className="text-2xl font-display"
+                      smallClassName="text-[0.65em]"
+                    />
                   </div>
                 </div>
               </div>

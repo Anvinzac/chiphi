@@ -10,6 +10,7 @@ import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO, isW
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from "recharts";
 import { toast } from "sonner";
 import type { DateRange } from "react-day-picker";
+import MoneyLabel from "@/components/daily/MoneyLabel";
 
 type AdminTab = "summary" | "categories" | "suppliers" | "items";
 type CategoryFrequency = "daily" | "weekly" | "monthly";
@@ -246,7 +247,7 @@ export default function AdminDashboard() {
                   ? `${format(dateRange.from!, "MMM d")} – ${format(dateRange.to, "MMM d, y")}`
                   : format(dateRange.from!, "MMM d, y")}
               </p>
-              <p className="text-2xl font-display mt-1">{rangeTotal.toLocaleString()}</p>
+              <MoneyLabel amount={rangeTotal} className="text-2xl font-display mt-1 block" suffix="" smallClassName="text-[0.65em]" />
             </div>
           )}
 
@@ -254,7 +255,7 @@ export default function AdminDashboard() {
             {[{ label: "Today", value: dailyTotal }, { label: "This Month", value: monthlyTotal }, { label: "This Year", value: yearlyTotal }].map(({ label, value }) => (
               <div key={label} className="card-editorial p-4">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
-                <p className="text-2xl font-display mt-1">{value.toLocaleString()}</p>
+                <MoneyLabel amount={value} className="text-2xl font-display mt-1 block" suffix="" smallClassName="text-[0.65em]" />
               </div>
             ))}
           </div>
@@ -397,7 +398,7 @@ export default function AdminDashboard() {
               <tbody>{items.map(item => {
                 const cat = categories.find(c => c.id === item.category_id);
                 return (
-                  <tr key={item.id} className="border-b border-border/40"><td className="px-4 py-2">{item.name}</td><td className="px-4 py-2 text-muted-foreground hidden sm:table-cell">{cat?.name ?? "—"}</td><td className="px-4 py-2 text-right">{item.default_unit_price?.toLocaleString() ?? "—"}/{item.unit}</td><td className="px-2 py-2"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteItem(item.id)}><Trash2 className="h-3 w-3" /></Button></td></tr>
+                  <tr key={item.id} className="border-b border-border/40"><td className="px-4 py-2">{item.name}</td><td className="px-4 py-2 text-muted-foreground hidden sm:table-cell">{cat?.name ?? "—"}</td><td className="px-4 py-2 text-right">{item.default_unit_price != null ? <MoneyLabel amount={item.default_unit_price} suffix="" smallClassName="text-[0.8em]" /> : "—"}/{item.unit}</td><td className="px-2 py-2"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteItem(item.id)}><Trash2 className="h-3 w-3" /></Button></td></tr>
                 );
               })}</tbody>
             </table>

@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Pencil, Check, History } from "lucide-react";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from "date-fns";
+import MoneyLabel from "./MoneyLabel";
 import ClearFieldButton from "./ClearFieldButton";
 
 interface PurchaseDetailDialogProps {
@@ -238,7 +239,7 @@ export default function PurchaseDetailDialog({
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5 flex-1 justify-end">
-                  <span className="text-sm font-display tabular-nums">{Number(editAmount).toLocaleString()}</span>
+                  <MoneyLabel amount={Number(editAmount)} className="text-sm font-display" smallClassName="text-[0.75em]" suffix="" />
                   <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => setEditingField("amount")}>
                     <Pencil className="h-3 w-3" />
                   </Button>
@@ -285,7 +286,7 @@ export default function PurchaseDetailDialog({
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-medium">{group.label}</span>
                     <div className="text-right">
-                      <span className="text-sm font-display tabular-nums">{group.total.toLocaleString()}</span>
+                      <MoneyLabel amount={group.total} className="text-sm font-display" smallClassName="text-[0.75em]" suffix="" />
                       <span className="text-[10px] text-muted-foreground ml-1.5">({group.count}x)</span>
                     </div>
                   </div>
@@ -293,7 +294,7 @@ export default function PurchaseDetailDialog({
                     {group.entries.map((e, i) => (
                       <div key={i} className="flex items-center justify-between text-xs text-muted-foreground">
                         <span>{format(new Date(e.date + "T00:00:00"), "MMM d")}</span>
-                        <span className="tabular-nums">{e.amount.toLocaleString()}</span>
+                        <MoneyLabel amount={e.amount} suffix="" smallClassName="text-[0.75em]" />
                       </div>
                     ))}
                   </div>

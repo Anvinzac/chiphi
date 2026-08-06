@@ -165,7 +165,7 @@ export default function AmountPhase({
           <div className="flex items-start gap-2">
             <button
               type="button"
-              className="flex min-w-0 flex-1 items-baseline text-left cursor-text"
+              className="flex min-w-0 flex-1 items-baseline text-left cursor-text whitespace-nowrap"
               onClick={() => {
                 // Only focus the hidden field for hardware/desktop keyboards — avoid iOS zoom
                 if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
@@ -174,7 +174,7 @@ export default function AmountPhase({
               }}
               aria-label="Nhập số tiền"
             >
-              <span className="text-4xl font-display tabular-nums text-foreground leading-none break-all">
+              <span className="text-4xl font-display tabular-nums text-foreground leading-none">
                 {amountValue ? Number(amountValue).toLocaleString("vi-VN") : <span className="text-muted-foreground/25">0</span>}
               </span>
               <span className="text-2xl font-display text-muted-foreground/35 ml-1">.000</span>

@@ -163,9 +163,11 @@ export default function SwipeableEntryRow({
               )}
             </div>
           </div>
-          <span className="text-sm font-display tabular-nums whitespace-nowrap pt-0.5 pl-1 text-foreground/85">
-            {amount.toLocaleString("vi-VN")} ₫
-          </span>
+          <MoneyLabel
+            amount={amount}
+            className="text-sm font-display pt-0.5 pl-1 text-foreground/85"
+            smallClassName="text-[0.7em]"
+          />
         </div>
       </div>
     </div>

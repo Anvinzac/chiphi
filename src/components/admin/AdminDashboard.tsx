@@ -10,6 +10,7 @@ import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO, isW
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from "recharts";
 import { toast } from "sonner";
 import type { DateRange } from "react-day-picker";
+import MoneyLabel from "@/components/daily/MoneyLabel";
 
 type AdminTab = "summary" | "categories" | "suppliers" | "items";
 type CategoryFrequency = "daily" | "weekly" | "monthly";

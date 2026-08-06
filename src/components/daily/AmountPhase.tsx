@@ -338,6 +338,31 @@ export default function AmountPhase({
       )}
 
       <div className="mt-auto flex min-h-0 flex-1 flex-col justify-end gap-1.5 pt-1">
+        {lines.length > 0 && (
+          <div className="mb-1 max-h-24 space-y-1 overflow-y-auto no-scrollbar">
+            {lines.map((l, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-2 rounded-xl border border-border/60 bg-muted/50 px-2.5 py-1 text-xs"
+              >
+                <Plus className="h-3 w-3 shrink-0 text-primary/70" />
+                <span className="font-display tabular-nums text-foreground">
+                  {Number(l.amount).toLocaleString("vi-VN")}
+                  <span className="text-muted-foreground/60">.000</span>
+                </span>
+                {l.note && <span className="truncate text-muted-foreground">{l.note}</span>}
+                <button
+                  type="button"
+                  onClick={() => setLines(prev => prev.filter((_, idx) => idx !== i))}
+                  className="ml-auto shrink-0 rounded-full p-1 text-muted-foreground hover:text-foreground"
+                  aria-label="Xóa dòng"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         {keys.map((row, ri) => (
           <div key={ri} className="grid grid-cols-3 gap-1.5">
             {row.map(({ label, action, muted }) => (
@@ -355,21 +380,37 @@ export default function AmountPhase({
                 {label}
               </button>
             ))}
+            {ri === keys.length - 1 && (
+              <button
+                type="button"
+                onClick={handleBackspaceClick}
+                onPointerDown={startHold}
+                onPointerUp={endHold}
+                onPointerLeave={endHold}
+                onPointerCancel={endHold}
+                onContextMenu={(e) => e.preventDefault()}
+                className="keypad-key rounded-2xl border border-border/60 bg-background text-xl font-medium text-muted-foreground shadow-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="Xóa số cuối (giữ để xóa hết)"
+              >
+                ⌫
+              </button>
+            )}
           </div>
         ))}
         <div className="grid grid-cols-3 gap-1.5">
           <button
             type="button"
-            onClick={clearAmount}
-            className="keypad-key rounded-2xl border border-border/60 bg-muted/70 text-xs font-medium text-muted-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Xóa số tiền"
+            onClick={addLine}
+            disabled={!currentValid}
+            className="keypad-key rounded-2xl border border-primary/40 bg-primary/10 font-medium text-primary shadow-sm disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Thêm dòng"
           >
-            C
+            <Plus className="inline-block h-5 w-5" />
           </button>
           <button
             type="button"
             onClick={onSave}
-            disabled={!amountValue.trim() || Number(amountValue) === 0}
+            disabled={!canSave}
             className="keypad-key col-span-2 rounded-2xl bg-primary text-primary-foreground font-semibold shadow-warm disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Lưu"
           >

@@ -123,7 +123,8 @@ export default function DailyExpenseTable() {
 
   // UI state
   const [rangePickerOpen, setRangePickerOpen] = useState(false);
-  const [cardExpanded, setCardExpanded] = useState(true);
+  // Panel starts closed: returning to this page must not auto-open the add panel
+  const [cardExpanded, setCardExpanded] = useState(false);
   const [cardClosing, setCardClosing] = useState(false);
   const [detailEntry, setDetailEntry] = useState<PaymentEntry | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -929,7 +930,10 @@ export default function DailyExpenseTable() {
       onClick={handleMainClick}
     >
       {/* Top bar: brand | centered range switcher | total */}
-      <div className="px-4 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2" data-no-double-tap>
+      <div
+        className="topbar-surface sticky top-0 z-30 shrink-0 px-4 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2"
+        data-no-double-tap
+      >
         <span className="font-display text-xl text-primary justify-self-start">Mìsè</span>
 
         <Popover open={rangePickerOpen} onOpenChange={setRangePickerOpen}>

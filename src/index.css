@@ -52,6 +52,9 @@
     --shadow-warm-xl: 0 16px 50px -8px hsl(25 30% 30% / 0.15);
 
     --editorial-border: 2px solid hsl(20 50% 53% / 0.3);
+
+    --gradient-topbar: linear-gradient(180deg, hsl(32 42% 93%) 0%, hsl(30 32% 96%) 62%, hsl(30 30% 96% / 0.92) 100%);
+    --shadow-topbar: 0 6px 18px -12px hsl(25 30% 25% / 0.45);
   }
 
   .dark {
@@ -74,6 +77,9 @@
     --border: 25 10% 22%;
     --input: 25 10% 22%;
     --ring: 20 50% 60%;
+
+    --gradient-topbar: linear-gradient(180deg, hsl(25 18% 15%) 0%, hsl(25 15% 12%) 62%, hsl(25 15% 10% / 0.92) 100%);
+    --shadow-topbar: 0 6px 18px -12px hsl(0 0% 0% / 0.6);
   }
 }
 
@@ -96,6 +102,13 @@
 }
 
 @layer components {
+  .topbar-surface {
+    background-image: var(--gradient-topbar);
+    box-shadow: var(--shadow-topbar);
+    border-bottom: 1px solid hsl(var(--border) / 0.6);
+    backdrop-filter: blur(8px);
+  }
+
   .card-editorial {
     @apply bg-card rounded-lg border-l-2 border-l-primary/30 border border-border;
     box-shadow: var(--shadow-warm);

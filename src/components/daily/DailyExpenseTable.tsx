@@ -115,6 +115,7 @@ export default function DailyExpenseTable() {
   const [nameValue, setNameValue] = useState("");
   const [amountValue, setAmountValue] = useState("");
   const [noteValue, setNoteValue] = useState("");
+  const [amountLines, setAmountLines] = useState<{ amount: string; note: string }[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [match, setMatch] = useState<MatchInfo | null>(null);
   const [verifyData, setVerifyData] = useState<VerifyData | null>(null);
@@ -535,10 +536,13 @@ export default function DailyExpenseTable() {
 
 
   const handleSave = useCallback(async () => {
-    if (!amountValue.trim() || !user) return;
+    if (!user) return;
     // User types in thousands — multiply by 1000 to get real VND amount
-    const amount = (Number(amountValue) || 0) * 1000;
-    if (amount === 0) return;
+    const entries = [...amountLines, { amount: amountValue, note: noteValue }]
+      .map(l => ({ amount: (Number(l.amount) || 0) * 1000, note: l.note.trim() || null }))
+      .filter(l => l.amount > 0);
+    if (entries.length === 0) return;
+    const amount = entries.reduce((s, l) => s + l.amount, 0);
 
     let pid = activePaymentId;
     if (!pid) {
@@ -554,36 +558,36 @@ export default function DailyExpenseTable() {
     }
     if (!pid) return;
 
-    const note = noteValue.trim() || null;
-
-    const { error } = await supabase.from("sub_payments").insert({
-      payment_id: pid,
-      item_name: nameValue.trim(),
-      item_id: match?.itemId || null,
-      quantity: match?.unitPrice ? amount / match.unitPrice : 1,
-      unit_price: match?.unitPrice || amount,
-      amount,
-      category_id: match?.categoryId || null,
-      sub_category_id: match?.subCategoryId || null,
-      sub_sub_category_id: match?.subSubCategoryId || null,
-      supplier_id: match?.supplierId || null,
-      notes: note,
-      user_id: user.id,
-    });
+    const { error } = await supabase.from("sub_payments").insert(
+      entries.map(l => ({
+        payment_id: pid,
+        item_name: nameValue.trim(),
+        item_id: match?.itemId || null,
+        quantity: match?.unitPrice ? l.amount / match.unitPrice : 1,
+        unit_price: match?.unitPrice || l.amount,
+        amount: l.amount,
+        category_id: match?.categoryId || null,
+        sub_category_id: match?.subCategoryId || null,
+        sub_sub_category_id: match?.subSubCategoryId || null,
+        supplier_id: match?.supplierId || null,
+        notes: l.note,
+        user_id: user.id,
+      }))
+    );
 
     if (error) {
       toast.error(error.message || "Lưu thất bại");
       return;
     }
 
-    const newEntry: PaymentEntry = {
+    const newEntries: PaymentEntry[] = entries.map(l => ({
       item_name: nameValue.trim(),
-      amount,
+      amount: l.amount,
       category_id: match?.categoryId || null,
       supplier_id: match?.supplierId || null,
       sub_payment_id: undefined,
-      notes: note,
-    };
+      notes: l.note,
+    }));
 
     // Update or create group
     setPaymentGroups(prev => {
@@ -591,7 +595,7 @@ export default function DailyExpenseTable() {
       if (existing) {
         return prev.map(g => g.paymentId === pid ? {
           ...g,
-          entries: [...g.entries, newEntry],
+          entries: [...g.entries, ...newEntries],
           total: g.total + amount,
           supplierName: g.supplierName || (match?.supplierName || null),
         } : g);
@@ -601,7 +605,7 @@ export default function DailyExpenseTable() {
           supplierName: match?.supplierName || null,
           total: amount,
           date: viewMode === "range" ? expenseDate : undefined,
-          entries: [newEntry],
+          entries: newEntries,
         }];
       }
     });
@@ -616,6 +620,7 @@ export default function DailyExpenseTable() {
         setNameValue("");
         setAmountValue("");
         setNoteValue("");
+        setAmountLines([]);
         setSelectedCategoryId(null);
         setMatch(null);
         setVerifyData(null);
@@ -624,7 +629,7 @@ export default function DailyExpenseTable() {
         pagerReadyRef.current = false;
       }, 300);
     }, 600);
-  }, [amountValue, noteValue, nameValue, match, activePaymentId, user, expenseDate, viewMode, collapseCard]);
+  }, [amountValue, noteValue, amountLines, nameValue, match, activePaymentId, user, expenseDate, viewMode, collapseCard]);
 
   const handleNameKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === "Tab") {
@@ -1184,7 +1189,12 @@ export default function DailyExpenseTable() {
                   <div>
                     <p className="text-lg font-display">{nameValue}</p>
                     <MoneyLabel
-                      amount={Number(amountValue) * 1000}
+                      amount={
+                        [...amountLines, { amount: amountValue }].reduce(
+                          (s, l) => s + (Number(l.amount) || 0) * 1000,
+                          0
+                        )
+                      }
                       className="text-2xl font-display"
                       smallClassName="text-[0.65em]"
                     />
@@ -1368,6 +1378,8 @@ export default function DailyExpenseTable() {
                     setAmountValue={setAmountValue}
                     noteValue={noteValue}
                     setNoteValue={setNoteValue}
+                    lines={amountLines}
+                    setLines={setAmountLines}
                     amountRef={amountRef}
                     match={match}
                     verifyData={verifyData}

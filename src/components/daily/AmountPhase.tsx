@@ -31,6 +31,7 @@ interface AmountPhaseProps {
   onBack: () => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
   onSave: () => void;
+  noteSuggestions?: string[];
 }
 
 type EditableField = "supplierName" | "categoryName" | "subCategoryName" | "unitPrice" | null;
@@ -49,6 +50,7 @@ export default function AmountPhase({
   onBack,
   onKeyDown,
   onSave,
+  noteSuggestions = [],
 }: AmountPhaseProps) {
   const [editingField, setEditingField] = useState<EditableField>(null);
   const [editValue, setEditValue] = useState("");

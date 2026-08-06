@@ -183,6 +183,19 @@ export default function DailyExpenseTable() {
   }, [categories]);
 
   const [chipFreqPage, setChipFreqPage] = useState<CategoryFrequency>("daily");
+
+  // Sub-categories of the active category — quick-tap note suggestions
+  const noteSuggestions = useMemo(() => {
+    const catId =
+      selectedCategoryId ||
+      match?.categoryId ||
+      verifyData?.categoryId ||
+      null;
+    if (!catId) return [];
+    return subCategories
+      .filter(s => s.category_id === catId)
+      .map(s => s.name);
+  }, [selectedCategoryId, match, verifyData, subCategories]);
   const chipPagerRef = useRef<HTMLDivElement>(null);
   const chipPagerReadyRef = useRef(false);
 

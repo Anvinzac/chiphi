@@ -1147,7 +1147,11 @@ export default function DailyExpenseTable() {
                   </div>
                   <div>
                     <p className="text-lg font-display">{nameValue}</p>
-                    <p className="text-2xl font-display">{(Number(amountValue) * 1000).toLocaleString("vi-VN")} ₫</p>
+                    <MoneyLabel
+                      amount={Number(amountValue) * 1000}
+                      className="text-2xl font-display"
+                      smallClassName="text-[0.65em]"
+                    />
                   </div>
                 </div>
               </div>

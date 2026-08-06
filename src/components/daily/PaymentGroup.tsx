@@ -69,9 +69,11 @@ export default function PaymentGroup({
               {group.entries.length} {group.entries.length === 1 ? "mặt hàng" : "mặt hàng"}
             </span>
           </div>
-          <span className="text-sm font-display tabular-nums whitespace-nowrap">
-            {group.total.toLocaleString("vi-VN")} ₫
-          </span>
+          <MoneyLabel
+            amount={group.total}
+            className="text-sm font-display"
+            smallClassName="text-[0.7em]"
+          />
         </div>
       </button>
 

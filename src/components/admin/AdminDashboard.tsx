@@ -383,6 +383,67 @@ export default function AdminDashboard() {
       )}
 
       {activeTab === "suppliers" && (
+        <></>
+      )}
+
+      {activeTab === "subcategories" && (
+        <div className="space-y-3">
+          <div className="card-editorial p-3 flex gap-2 flex-wrap">
+            <select value={newSubCatId} onChange={(e) => setNewSubCatId(e.target.value)} className="h-10 rounded-md border border-input bg-background px-2 text-sm">
+              <option value="">Parent category</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <Input placeholder="New sub-category..." value={newSubFlatName} onChange={(e) => setNewSubFlatName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addSubFlat()} className="flex-1 min-w-[140px]" />
+            <Button onClick={addSubFlat} disabled={!newSubFlatName.trim() || !newSubCatId} size="sm"><Plus className="h-4 w-4" /></Button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <select value={subFilterCat} onChange={(e) => setSubFilterCat(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+              <option value="">All categories</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <span className="text-xs text-muted-foreground">{subCategories.filter(s => !subFilterCat || s.category_id === subFilterCat).length} sub-categories</span>
+          </div>
+
+          {categories.filter(c => !subFilterCat || c.id === subFilterCat).map(cat => {
+            const subs = getLevel1Subs(cat.id);
+            return (
+              <div key={cat.id} className="card-editorial overflow-hidden">
+                <div className="px-4 py-2 border-b border-border/60 text-sm font-medium flex items-center justify-between">
+                  <span>{cat.name}</span>
+                  <span className="text-xs text-muted-foreground">{subs.length}</span>
+                </div>
+                <div className="divide-y divide-border/40">
+                  {subs.length === 0 && <p className="px-4 py-2 text-sm text-muted-foreground">No sub-categories</p>}
+                  {subs.map(sub => (
+                    <div key={sub.id}>
+                      <div className="flex items-center gap-2 px-4 py-1.5 text-sm">
+                        {editingSubId === sub.id ? (
+                          <Input autoFocus className="h-7 text-sm flex-1" value={editingSubName}
+                            onChange={(e) => setEditingSubName(e.target.value)}
+                            onBlur={() => renameSubCategory(sub.id)}
+                            onKeyDown={(e) => { if (e.key === "Enter") renameSubCategory(sub.id); if (e.key === "Escape") setEditingSubId(null); }} />
+                        ) : (
+                          <button className="flex-1 text-left hover:text-primary" onClick={() => { setEditingSubId(sub.id); setEditingSubName(sub.name); }}>{sub.name}</button>
+                        )}
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteSubCategory(sub.id)}><Trash2 className="h-3 w-3" /></Button>
+                      </div>
+                      {getLevel2Subs(sub.id).map(ss => (
+                        <div key={ss.id} className="flex items-center gap-2 pl-9 pr-4 py-1 text-sm text-muted-foreground">
+                          <span className="flex-1">{ss.name}</span>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteSubCategory(ss.id)}><Trash2 className="h-2.5 w-2.5" /></Button>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {activeTab === "suppliers" && (
         <div className="space-y-3">
           <div className="card-editorial p-3 flex gap-2">
             <Input placeholder="Name..." value={newSupName} onChange={(e) => setNewSupName(e.target.value)} className="flex-1" />

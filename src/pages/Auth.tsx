@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { signInAsAdmin } from "@/hooks/useAdminDemoAuth";
+import { ADMIN_CREDENTIALS } from "@/hooks/useAdminDemoAuth";
+import { saveAutoLogin, clearAutoLogin } from "@/lib/autoLogin";
 import { isDemoUser } from "@/hooks/useDemoAuth";
 import { isSandboxUser, signInAsSandbox } from "@/hooks/useSandboxAuth";
 import { Button } from "@/components/ui/button";
@@ -112,6 +114,7 @@ export default function Auth() {
                 setSubmitting(true);
                 try {
                   await signInAsAdmin();
+                  saveAutoLogin(ADMIN_CREDENTIALS);
                 } catch (err: any) {
                   toast.error(err.message);
                 } finally {
@@ -128,6 +131,7 @@ export default function Auth() {
               onClick={async () => {
                 setSubmitting(true);
                 try {
+                  clearAutoLogin();
                   await signInAsSandbox();
                 } catch (err: any) {
                   toast.error(err.message);

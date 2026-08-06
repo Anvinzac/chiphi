@@ -2,6 +2,7 @@ import { useState } from "react";
 import { parseISO } from "date-fns";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import SwipeableEntryRow from "./SwipeableEntryRow";
+import MoneyLabel from "./MoneyLabel";
 import { formatDayMonth } from "@/lib/formatDateVi";
 
 export interface PaymentEntry {

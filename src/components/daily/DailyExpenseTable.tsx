@@ -997,9 +997,11 @@ export default function DailyExpenseTable() {
                   <h2 className="font-display text-sm tracking-wide text-muted-foreground">
                     {formatWeekHeading(week.weekStart, week.weekEnd)}
                   </h2>
-                  <span className="text-xs tabular-nums text-muted-foreground">
-                    {week.total.toLocaleString("vi-VN")} ₫
-                  </span>
+                  <MoneyLabel
+                    amount={week.total}
+                    className="text-xs text-muted-foreground"
+                    smallClassName="text-[0.7em]"
+                  />
                 </div>
                 {week.days.map(day => (
                   <div key={day.date} className="mb-4">

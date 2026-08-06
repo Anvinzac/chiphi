@@ -31,6 +31,7 @@ interface AmountPhaseProps {
   onBack: () => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
   onSave: () => void;
+  noteSuggestions?: string[];
 }
 
 type EditableField = "supplierName" | "categoryName" | "subCategoryName" | "unitPrice" | null;
@@ -49,6 +50,7 @@ export default function AmountPhase({
   onBack,
   onKeyDown,
   onSave,
+  noteSuggestions = [],
 }: AmountPhaseProps) {
   const [editingField, setEditingField] = useState<EditableField>(null);
   const [editValue, setEditValue] = useState("");
@@ -232,6 +234,30 @@ export default function AmountPhase({
           </div>
         </div>
       </div>
+
+      {noteSuggestions.length > 0 && (
+        <div className="-mt-1 mb-2 flex gap-1.5 overflow-x-auto pb-1 shrink-0 no-scrollbar">
+          {noteSuggestions.map((s) => {
+            const active = noteValue.trim().toLowerCase() === s.toLowerCase();
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setNoteValue(active ? "" : s)}
+                className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] transition-all active:scale-95 ${
+                  active
+                    ? "border-primary/50 bg-primary/15 text-primary font-medium"
+                    : "border-border/60 bg-muted text-muted-foreground hover:border-primary/30"
+                }`}
+                aria-pressed={active}
+                aria-label={`Ghi chú ${s}`}
+              >
+                {s}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {hasMeta && (
         <div className="flex flex-wrap gap-1.5 mb-2 shrink-0">

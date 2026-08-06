@@ -99,7 +99,7 @@ export default function DailyExpenseTable() {
   // Reference data
   const [items, setItems] = useState<DbItem[]>([]);
   const [categories, setCategories] = useState<QuickCategory[]>([]);
-  const [subCategories, setSubCategories] = useState<{ id: string; name: string }[]>([]);
+  const [subCategories, setSubCategories] = useState<{ id: string; name: string; category_id?: string | null }[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
   const [itemFrequency, setItemFrequency] = useState<Record<string, number>>({});
 
@@ -183,6 +183,19 @@ export default function DailyExpenseTable() {
   }, [categories]);
 
   const [chipFreqPage, setChipFreqPage] = useState<CategoryFrequency>("daily");
+
+  // Sub-categories of the active category — quick-tap note suggestions
+  const noteSuggestions = useMemo(() => {
+    const catId =
+      selectedCategoryId ||
+      match?.categoryId ||
+      verifyData?.categoryId ||
+      null;
+    if (!catId) return [];
+    return subCategories
+      .filter(s => s.category_id === catId)
+      .map(s => s.name);
+  }, [selectedCategoryId, match, verifyData, subCategories]);
   const chipPagerRef = useRef<HTMLDivElement>(null);
   const chipPagerReadyRef = useRef(false);
 
@@ -193,7 +206,7 @@ export default function DailyExpenseTable() {
       const [itemsRes, catsRes, subsRes, supsRes, freqRes] = await Promise.all([
         supabase.from("items").select("*").eq("user_id", user.id),
         supabase.from("categories").select("id, name, frequency").eq("user_id", user.id),
-        supabase.from("sub_categories").select("id, name").eq("user_id", user.id),
+        supabase.from("sub_categories").select("id, name, category_id").eq("user_id", user.id),
         supabase.from("suppliers").select("id, name").eq("user_id", user.id),
         supabase.from("sub_payments").select("item_id").eq("user_id", user.id).not("item_id", "is", null),
       ]);
@@ -1309,6 +1322,7 @@ export default function DailyExpenseTable() {
                     onBack={goToNamePhase}
                     onKeyDown={handleAmountKeyDown}
                     onSave={handleSave}
+                    noteSuggestions={noteSuggestions}
                   />
                 </div>
               </div>

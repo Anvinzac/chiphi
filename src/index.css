@@ -132,6 +132,14 @@
     display: none;
   }
 
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   .category-freq-page {
     box-sizing: border-box;
     flex: 0 0 100%;

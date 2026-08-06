@@ -239,7 +239,7 @@ export default function PurchaseDetailDialog({
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5 flex-1 justify-end">
-                  <span className="text-sm font-display tabular-nums">{Number(editAmount).toLocaleString()}</span>
+                  <MoneyLabel amount={Number(editAmount)} className="text-sm font-display" smallClassName="text-[0.75em]" suffix="" />
                   <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => setEditingField("amount")}>
                     <Pencil className="h-3 w-3" />
                   </Button>

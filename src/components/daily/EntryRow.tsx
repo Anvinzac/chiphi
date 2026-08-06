@@ -31,9 +31,11 @@ export default function EntryRow({ item_name, amount, categoryName, supplierName
           )}
         </div>
       </div>
-      <span className="text-sm font-display tabular-nums whitespace-nowrap pt-0.5">
-        {amount.toLocaleString()}
-      </span>
+      <MoneyLabel
+        amount={amount}
+        className="text-sm font-display pt-0.5"
+        smallClassName="text-[0.7em]"
+      />
     </div>
   );
 }

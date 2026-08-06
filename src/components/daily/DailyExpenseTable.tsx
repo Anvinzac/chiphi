@@ -946,7 +946,11 @@ export default function DailyExpenseTable() {
           <span className="text-[10px] uppercase tracking-widest text-muted-foreground block">
             {nameFilter ? "Lọc" : "Tổng"}
           </span>
-          <span className="text-lg font-display block leading-tight">{displayTotal.toLocaleString("vi-VN")} ₫</span>
+          <MoneyLabel
+            amount={displayTotal}
+            className="text-lg font-display block leading-tight"
+            smallClassName="text-[0.65em]"
+          />
         </div>
       </div>
 

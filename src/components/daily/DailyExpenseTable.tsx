@@ -609,18 +609,21 @@ export default function DailyExpenseTable() {
     setPhase("done");
     setJustSaved(true);
     setTimeout(() => {
-      setNameValue("");
-      setAmountValue("");
-      setNoteValue("");
-      setSelectedCategoryId(null);
-      setMatch(null);
-      setVerifyData(null);
-      setJustSaved(false);
-      setPhase("name");
-      pagerReadyRef.current = false;
-      requestAnimationFrame(() => scrollPagerTo("name", false));
+      collapseCard();
+      // Reset form after the card has finished sliding out
+      setTimeout(() => {
+        setNameValue("");
+        setAmountValue("");
+        setNoteValue("");
+        setSelectedCategoryId(null);
+        setMatch(null);
+        setVerifyData(null);
+        setJustSaved(false);
+        setPhase("name");
+        pagerReadyRef.current = false;
+      }, 300);
     }, 600);
-  }, [amountValue, noteValue, nameValue, match, activePaymentId, user, expenseDate, viewMode, scrollPagerTo]);
+  }, [amountValue, noteValue, nameValue, match, activePaymentId, user, expenseDate, viewMode, collapseCard]);
 
   const handleNameKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === "Tab") {

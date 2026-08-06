@@ -1189,7 +1189,12 @@ export default function DailyExpenseTable() {
                   <div>
                     <p className="text-lg font-display">{nameValue}</p>
                     <MoneyLabel
-                      amount={Number(amountValue) * 1000}
+                      amount={
+                        [...amountLines, { amount: amountValue }].reduce(
+                          (s, l) => s + (Number(l.amount) || 0) * 1000,
+                          0
+                        )
+                      }
                       className="text-2xl font-display"
                       smallClassName="text-[0.65em]"
                     />

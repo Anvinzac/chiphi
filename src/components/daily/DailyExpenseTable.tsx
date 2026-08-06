@@ -11,6 +11,7 @@ import ClearFieldButton from "./ClearFieldButton";
 import AmountPhase from "./AmountPhase";
 import PurchaseDetailDialog from "./PurchaseDetailDialog";
 import RangeDayPicker from "./RangeDayPicker";
+import MoneyLabel from "./MoneyLabel";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { VerifyData } from "@/types/expense";
 import { getMockGroupsForRange, isMockPaymentId } from "@/lib/mockRangeData";

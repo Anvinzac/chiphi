@@ -106,6 +106,92 @@ export type Database = {
           },
         ]
       }
+      order_items: {
+        Row: {
+          created_at: string
+          fulfilled_qty: number | null
+          id: string
+          name: string
+          notice: string | null
+          order_id: string
+          quantity: number
+          retail_price: number | null
+          sort_order: number
+          status: string
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          fulfilled_qty?: number | null
+          id?: string
+          name: string
+          notice?: string | null
+          order_id: string
+          quantity?: number
+          retail_price?: number | null
+          sort_order?: number
+          status?: string
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          fulfilled_qty?: number | null
+          id?: string
+          name?: string
+          notice?: string | null
+          order_id?: string
+          quantity?: number
+          retail_price?: number | null
+          sort_order?: number
+          status?: string
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          created_at: string
+          id: string
+          share_token: string
+          status: string
+          supplier_pin_hash: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          share_token: string
+          status?: string
+          supplier_pin_hash: string
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          share_token?: string
+          status?: string
+          supplier_pin_hash?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           created_at: string
@@ -339,11 +425,78 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_shared_order: {
+        Args: { p_token: string }
+        Returns: {
+          created_at: string
+          id: string
+          status: string
+          title: string
+          updated_at: string
+        }[]
+      }
+      get_shared_order_items: {
+        Args: { p_token: string }
+        Returns: {
+          created_at: string
+          fulfilled_qty: number | null
+          id: string
+          name: string
+          notice: string | null
+          order_id: string
+          quantity: number
+          retail_price: number | null
+          sort_order: number
+          status: string
+          unit: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "order_items"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      update_shared_order_item: {
+        Args: {
+          p_fulfilled_qty: number
+          p_item_id: string
+          p_notice: string
+          p_retail_price: number
+          p_status: string
+          p_token: string
+        }
+        Returns: {
+          created_at: string
+          fulfilled_qty: number | null
+          id: string
+          name: string
+          notice: string | null
+          order_id: string
+          quantity: number
+          retail_price: number | null
+          sort_order: number
+          status: string
+          unit: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "order_items"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      verify_order_pin: {
+        Args: { p_pin: string; p_token: string }
         Returns: boolean
       }
     }

@@ -97,7 +97,8 @@ export default function DailyExpenseTable() {
   const period = useMemo(() => getPeriodBounds(periodOffset), [periodOffset]);
   const periodStartStr = format(period.start, "yyyy-MM-dd");
   const periodEndStr = format(period.end, "yyyy-MM-dd");
-  const expenseDate = viewMode === "daily" ? selectedDate : format(new Date(), "yyyy-MM-dd");
+  // Range mode: new spend lands on the period's last day (works for past periods too)
+  const expenseDate = viewMode === "daily" ? selectedDate : periodEndStr;
 
   // Reference data
   const [items, setItems] = useState<DbItem[]>([]);
@@ -306,15 +307,16 @@ export default function DailyExpenseTable() {
       setDayTotal(total);
       if (groups.length > 0) {
         if (viewMode === "range") {
-          const todayStr = format(new Date(), "yyyy-MM-dd");
-          const todayPayments = groups.filter(g => g.date === todayStr && !isMockPaymentId(g.paymentId));
+          const endPayments = groups.filter(g => g.date === periodEndStr && !isMockPaymentId(g.paymentId));
           setActivePaymentId(
-            todayPayments.length > 0 ? todayPayments[todayPayments.length - 1].paymentId : null
+            endPayments.length > 0 ? endPayments[endPayments.length - 1].paymentId : null
           );
         } else {
           const lastReal = [...groups].reverse().find(g => !isMockPaymentId(g.paymentId));
           setActivePaymentId(lastReal?.paymentId ?? null);
         }
+      } else {
+        setActivePaymentId(null);
       }
     };
     loadPayments();
@@ -1171,6 +1173,11 @@ export default function DailyExpenseTable() {
                 phase === "amount" || phase === "done" ? "bg-primary" : "bg-muted"
               }`} />
             </div>
+            {viewMode === "range" && !justSaved && (
+              <p className="px-5 pb-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground/75">
+                Lưu vào ngày cuối kỳ · {formatDayMonth(period.end)}
+              </p>
+            )}
 
             {/* Success flash */}
             {justSaved && (
@@ -1206,7 +1213,42 @@ export default function DailyExpenseTable() {
               >
                 {/* Name page */}
                 <div className="expense-phase-page flex h-full min-h-0 flex-col px-5 pt-2 pb-3">
-                  <div className="shrink-0 pb-2" data-no-double-tap>
+                  <div className="shrink-0">
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-2 block">
+                      Tên mặt hàng
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={nameRef}
+                        type="text"
+                        value={nameValue}
+                        onChange={(e) => {
+                          setNameValue(e.target.value);
+                          setSelectedCategoryId(null);
+                        }}
+                        onKeyDown={handleNameKeyDown}
+                        placeholder="Bạn mua gì?"
+                        className="expense-name-input bg-transparent text-3xl font-display text-foreground placeholder:text-muted-foreground/40 outline-none w-full min-w-0 caret-primary"
+                        autoComplete="off"
+                        aria-label="Tên mặt hàng"
+                        onFocus={() => {
+                          window.scrollTo(0, 0);
+                          requestAnimationFrame(() => window.scrollTo(0, 0));
+                        }}
+                      />
+                      <ClearFieldButton
+                        visible={nameValue.length > 0}
+                        onClear={() => {
+                          setNameValue("");
+                          setSelectedCategoryId(null);
+                          nameRef.current?.focus();
+                        }}
+                        label="Xóa tên mặt hàng"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 pt-3 pb-2" data-no-double-tap>
                     <div className="mb-1.5 flex items-center justify-center gap-1" aria-hidden="true">
                       {CHIP_FREQ_PAGES.map(page => (
                         <span
@@ -1258,39 +1300,8 @@ export default function DailyExpenseTable() {
                       ))}
                     </div>
                   </div>
-                  <div className="min-h-0 flex-1 overflow-hidden">
-                    <label className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-2 block">
-                      Tên mặt hàng
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        ref={nameRef}
-                        type="text"
-                        value={nameValue}
-                        onChange={(e) => {
-                          setNameValue(e.target.value);
-                          setSelectedCategoryId(null);
-                        }}
-                        onKeyDown={handleNameKeyDown}
-                        placeholder="Bạn mua gì?"
-                        className="expense-name-input bg-transparent text-3xl font-display text-foreground placeholder:text-muted-foreground/40 outline-none w-full min-w-0 caret-primary"
-                        autoComplete="off"
-                        aria-label="Tên mặt hàng"
-                        onFocus={() => {
-                          window.scrollTo(0, 0);
-                          requestAnimationFrame(() => window.scrollTo(0, 0));
-                        }}
-                      />
-                      <ClearFieldButton
-                        visible={nameValue.length > 0}
-                        onClear={() => {
-                          setNameValue("");
-                          setSelectedCategoryId(null);
-                          nameRef.current?.focus();
-                        }}
-                        label="Xóa tên mặt hàng"
-                      />
-                    </div>
+
+                  <div className="min-h-0 flex-1 overflow-hidden flex flex-col">
                     {/* Recommendation cloud */}
                     {(() => {
                       const query = nameValue.toLowerCase().trim();
@@ -1302,7 +1313,7 @@ export default function DailyExpenseTable() {
                       );
                       const display = sorted.slice(0, 20);
                       return display.length > 0 ? (
-                        <div className="flex flex-wrap gap-2 mt-3 max-h-[18vh] overflow-auto">
+                        <div className="flex flex-wrap gap-2 mt-1 max-h-[18vh] overflow-auto">
                           {display.map(item => (
                             <button
                               key={item.id}
@@ -1349,13 +1360,13 @@ export default function DailyExpenseTable() {
                           ))}
                         </div>
                       ) : query.length > 0 ? (
-                        <p className="text-xs text-muted-foreground/60 mt-3">Không tìm thấy mặt hàng</p>
+                        <p className="text-xs text-muted-foreground/60 mt-1">Không tìm thấy mặt hàng</p>
                       ) : null;
                     })()}
                     <button
                       onClick={handleNameConfirm}
                       disabled={!nameValue.trim()}
-                      className="self-end mt-4 flex items-center gap-1 text-sm font-medium text-primary disabled:text-muted-foreground/30 transition-colors"
+                      className="self-end mt-auto flex items-center gap-1 text-sm font-medium text-primary disabled:text-muted-foreground/30 transition-colors"
                       aria-label="Tiếp theo"
                     >
                       Tiếp theo <ChevronRight className="h-4 w-4" />

@@ -1,0 +1,2941 @@
+{
+  "categories": [
+    {
+      "key": "vegetables",
+      "nameVi": "Rau củ",
+      "sort_order": 0
+    },
+    {
+      "key": "proteins",
+      "nameVi": "Đạm",
+      "sort_order": 1
+    },
+    {
+      "key": "tofu",
+      "nameVi": "Đậu hũ",
+      "sort_order": 2
+    },
+    {
+      "key": "dairy",
+      "nameVi": "Sữa / phô mai",
+      "sort_order": 3
+    },
+    {
+      "key": "grains",
+      "nameVi": "Tinh bột",
+      "sort_order": 4
+    },
+    {
+      "key": "oils",
+      "nameVi": "Dầu",
+      "sort_order": 5
+    },
+    {
+      "key": "sauces",
+      "nameVi": "Gia vị nước",
+      "sort_order": 6
+    },
+    {
+      "key": "spices",
+      "nameVi": "Gia vị khô",
+      "sort_order": 7
+    },
+    {
+      "key": "equipment",
+      "nameVi": "Dụng cụ",
+      "sort_order": 8
+    },
+    {
+      "key": "tissue",
+      "nameVi": "Giấy / bao bì",
+      "sort_order": 9
+    },
+    {
+      "key": "gas",
+      "nameVi": "Gas / nhiên liệu",
+      "sort_order": 10
+    }
+  ],
+  "ingredients": [
+    {
+      "source_key": "v1",
+      "category_key": "vegetables",
+      "subcategory": "root-vegetables",
+      "name": "Cà Rốt",
+      "unit": "kg",
+      "reference_price_vnd": 1500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v2",
+      "category_key": "vegetables",
+      "subcategory": "root-vegetables",
+      "name": "Khoai Tây",
+      "unit": "kg",
+      "reference_price_vnd": 1200,
+      "quick_quantities": [
+        2,
+        5
+      ]
+    },
+    {
+      "source_key": "v3",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Hành Tây",
+      "unit": "kg",
+      "reference_price_vnd": 1000,
+      "quick_quantities": [
+        1,
+        3
+      ]
+    },
+    {
+      "source_key": "v4",
+      "category_key": "vegetables",
+      "subcategory": "root-vegetables",
+      "name": "Tỏi",
+      "unit": "kg",
+      "reference_price_vnd": 5000,
+      "quick_quantities": [
+        0.5,
+        1
+      ]
+    },
+    {
+      "source_key": "v20",
+      "category_key": "vegetables",
+      "subcategory": "root-vegetables",
+      "name": "Gừng",
+      "unit": "kg",
+      "reference_price_vnd": 8000,
+      "quick_quantities": [
+        0.2,
+        0.5
+      ]
+    },
+    {
+      "source_key": "v21",
+      "category_key": "vegetables",
+      "subcategory": "root-vegetables",
+      "name": "Củ Dền",
+      "unit": "kg",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v22",
+      "category_key": "vegetables",
+      "subcategory": "root-vegetables",
+      "name": "Củ Cải",
+      "unit": "kg",
+      "reference_price_vnd": 2500,
+      "quick_quantities": [
+        0.5,
+        1
+      ]
+    },
+    {
+      "source_key": "v23",
+      "category_key": "vegetables",
+      "subcategory": "root-vegetables",
+      "name": "Củ Cải Trắng",
+      "unit": "kg",
+      "reference_price_vnd": 1800,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v24",
+      "category_key": "vegetables",
+      "subcategory": "root-vegetables",
+      "name": "Khoai Lang",
+      "unit": "kg",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        1,
+        3
+      ]
+    },
+    {
+      "source_key": "v25",
+      "category_key": "vegetables",
+      "subcategory": "root-vegetables",
+      "name": "Khoai Môn",
+      "unit": "kg",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v6",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Xà Lách",
+      "unit": "cái",
+      "reference_price_vnd": 1000,
+      "quick_quantities": [
+        2,
+        5
+      ]
+    },
+    {
+      "source_key": "v10",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Rau Bina",
+      "unit": "bịch",
+      "reference_price_vnd": 2500,
+      "quick_quantities": [
+        1,
+        3
+      ]
+    },
+    {
+      "source_key": "v16",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Bắp Cải",
+      "unit": "cái",
+      "reference_price_vnd": 1500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v26",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Cải Thìa",
+      "unit": "kg",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v27",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Cải Xoăn",
+      "unit": "bịch",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v28",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Cải Cầu Vồng",
+      "unit": "bịch",
+      "reference_price_vnd": 2500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v29",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Rau Rocket",
+      "unit": "bịch",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v30",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Rau Càng Cua",
+      "unit": "bịch",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v13",
+      "category_key": "vegetables",
+      "subcategory": "herbs",
+      "name": "Cần Tây",
+      "unit": "cái",
+      "reference_price_vnd": 1500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v31",
+      "category_key": "vegetables",
+      "subcategory": "herbs",
+      "name": "Hành Lá",
+      "unit": "kg",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        0.5,
+        1
+      ]
+    },
+    {
+      "source_key": "v32",
+      "category_key": "vegetables",
+      "subcategory": "herbs",
+      "name": "Ngò Rí",
+      "unit": "bịch",
+      "reference_price_vnd": 1500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v33",
+      "category_key": "vegetables",
+      "subcategory": "herbs",
+      "name": "Húng Lủi",
+      "unit": "bịch",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v34",
+      "category_key": "vegetables",
+      "subcategory": "herbs",
+      "name": "Húng Quế",
+      "unit": "bịch",
+      "reference_price_vnd": 2500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v35",
+      "category_key": "vegetables",
+      "subcategory": "herbs",
+      "name": "Thì Là",
+      "unit": "bịch",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v36",
+      "category_key": "vegetables",
+      "subcategory": "herbs",
+      "name": "Mùi Tây",
+      "unit": "bịch",
+      "reference_price_vnd": 1500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v37",
+      "category_key": "vegetables",
+      "subcategory": "herbs",
+      "name": "Sả",
+      "unit": "kg",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        0.5,
+        1
+      ]
+    },
+    {
+      "source_key": "v38",
+      "category_key": "vegetables",
+      "subcategory": "herbs",
+      "name": "Hẹ",
+      "unit": "bịch",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v39",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Rau Muống",
+      "unit": "kg",
+      "reference_price_vnd": 1500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v5",
+      "category_key": "vegetables",
+      "subcategory": "fruit-vegetables",
+      "name": "Cà Chua",
+      "unit": "kg",
+      "reference_price_vnd": 2500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v7",
+      "category_key": "vegetables",
+      "subcategory": "fruit-vegetables",
+      "name": "Dưa Leo",
+      "unit": "cái",
+      "reference_price_vnd": 800,
+      "quick_quantities": [
+        3,
+        6
+      ]
+    },
+    {
+      "source_key": "v8",
+      "category_key": "vegetables",
+      "subcategory": "fruit-vegetables",
+      "name": "Ớt Chuông",
+      "unit": "cái",
+      "reference_price_vnd": 1500,
+      "quick_quantities": [
+        3,
+        6
+      ]
+    },
+    {
+      "source_key": "v9",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Bông Cải Xanh",
+      "unit": "cái",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        2,
+        4
+      ]
+    },
+    {
+      "source_key": "v11",
+      "category_key": "vegetables",
+      "subcategory": "mushrooms",
+      "name": "Nấm",
+      "unit": "gói",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v12",
+      "category_key": "vegetables",
+      "subcategory": "fruit-vegetables",
+      "name": "Bắp Ngô",
+      "unit": "cái",
+      "reference_price_vnd": 500,
+      "quick_quantities": [
+        4,
+        8
+      ]
+    },
+    {
+      "source_key": "v14",
+      "category_key": "vegetables",
+      "subcategory": "fruit-vegetables",
+      "name": "Bí Ngòi",
+      "unit": "cái",
+      "reference_price_vnd": 1200,
+      "quick_quantities": [
+        2,
+        4
+      ]
+    },
+    {
+      "source_key": "v15",
+      "category_key": "vegetables",
+      "subcategory": "fruit-vegetables",
+      "name": "Cà Tím",
+      "unit": "cái",
+      "reference_price_vnd": 1800,
+      "quick_quantities": [
+        2,
+        4
+      ]
+    },
+    {
+      "source_key": "v17",
+      "category_key": "vegetables",
+      "subcategory": "beans-legumes",
+      "name": "Đậu Que",
+      "unit": "kg",
+      "reference_price_vnd": 4000,
+      "quick_quantities": [
+        0.5,
+        1
+      ]
+    },
+    {
+      "source_key": "v18",
+      "category_key": "vegetables",
+      "subcategory": "beans-legumes",
+      "name": "Đậu Hà Lan",
+      "unit": "kg",
+      "reference_price_vnd": 3500,
+      "quick_quantities": [
+        0.5,
+        1
+      ]
+    },
+    {
+      "source_key": "v19",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Ớt",
+      "unit": "kg",
+      "reference_price_vnd": 6000,
+      "quick_quantities": [
+        0.2,
+        0.5
+      ]
+    },
+    {
+      "source_key": "v40",
+      "category_key": "vegetables",
+      "subcategory": "stems-shoots",
+      "name": "Súp Lơ",
+      "unit": "cái",
+      "reference_price_vnd": 2500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v41",
+      "category_key": "vegetables",
+      "subcategory": "stems-shoots",
+      "name": "Măng",
+      "unit": "lon",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v42",
+      "category_key": "vegetables",
+      "subcategory": "stems-shoots",
+      "name": "Giá Đỗ",
+      "unit": "kg",
+      "reference_price_vnd": 1500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "s1",
+      "category_key": "sauces",
+      "subcategory": null,
+      "name": "Nước Tương",
+      "unit": "chai",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "s2",
+      "category_key": "sauces",
+      "subcategory": null,
+      "name": "Dầu Hào",
+      "unit": "chai",
+      "reference_price_vnd": 4000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "s3",
+      "category_key": "sauces",
+      "subcategory": null,
+      "name": "Nước Mắm",
+      "unit": "chai",
+      "reference_price_vnd": 3500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "s4",
+      "category_key": "sauces",
+      "subcategory": null,
+      "name": "Sốt Cà",
+      "unit": "lon",
+      "reference_price_vnd": 1500,
+      "quick_quantities": [
+        2,
+        4
+      ]
+    },
+    {
+      "source_key": "s5",
+      "category_key": "sauces",
+      "subcategory": null,
+      "name": "Tương Ớt",
+      "unit": "chai",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "s6",
+      "category_key": "sauces",
+      "subcategory": null,
+      "name": "Giấm",
+      "unit": "chai",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "s7",
+      "category_key": "sauces",
+      "subcategory": null,
+      "name": "Mù Tạt",
+      "unit": "chai",
+      "reference_price_vnd": 2500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "s8",
+      "category_key": "sauces",
+      "subcategory": null,
+      "name": "Sốt Mayo",
+      "unit": "chai",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "s9",
+      "category_key": "sauces",
+      "subcategory": null,
+      "name": "Tương Cà",
+      "unit": "chai",
+      "reference_price_vnd": 2500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "s10",
+      "category_key": "sauces",
+      "subcategory": null,
+      "name": "Sốt BBQ",
+      "unit": "chai",
+      "reference_price_vnd": 4000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "s11",
+      "category_key": "sauces",
+      "subcategory": null,
+      "name": "Sốt Teriyaki",
+      "unit": "chai",
+      "reference_price_vnd": 4500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "s12",
+      "category_key": "sauces",
+      "subcategory": null,
+      "name": "Tương Đen",
+      "unit": "chai",
+      "reference_price_vnd": 3500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "s13",
+      "category_key": "sauces",
+      "subcategory": null,
+      "name": "Sriracha",
+      "unit": "chai",
+      "reference_price_vnd": 3500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "s14",
+      "category_key": "sauces",
+      "subcategory": null,
+      "name": "Sốt Mè",
+      "unit": "chai",
+      "reference_price_vnd": 5000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "s15",
+      "category_key": "sauces",
+      "subcategory": null,
+      "name": "Pesto",
+      "unit": "chai",
+      "reference_price_vnd": 4000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "s16",
+      "category_key": "sauces",
+      "subcategory": null,
+      "name": "Salsa",
+      "unit": "chai",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "s17",
+      "category_key": "sauces",
+      "subcategory": null,
+      "name": "Sốt Cay",
+      "unit": "chai",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "s18",
+      "category_key": "sauces",
+      "subcategory": null,
+      "name": "Sốt Ranch",
+      "unit": "chai",
+      "reference_price_vnd": 3500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "s19",
+      "category_key": "sauces",
+      "subcategory": null,
+      "name": "Worcestershire",
+      "unit": "chai",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "s20",
+      "category_key": "sauces",
+      "subcategory": null,
+      "name": "Nước Cốt Dừa",
+      "unit": "lon",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        2,
+        4
+      ]
+    },
+    {
+      "source_key": "sp1",
+      "category_key": "spices",
+      "subcategory": null,
+      "name": "Muối",
+      "unit": "kg",
+      "reference_price_vnd": 1000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "sp2",
+      "category_key": "spices",
+      "subcategory": null,
+      "name": "Tiêu Đen",
+      "unit": "gói",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "sp3",
+      "category_key": "spices",
+      "subcategory": null,
+      "name": "Thì Là Hạt",
+      "unit": "gói",
+      "reference_price_vnd": 2500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "sp4",
+      "category_key": "spices",
+      "subcategory": null,
+      "name": "Ớt Bột",
+      "unit": "gói",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "sp5",
+      "category_key": "spices",
+      "subcategory": null,
+      "name": "Nghệ",
+      "unit": "gói",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "sp6",
+      "category_key": "spices",
+      "subcategory": null,
+      "name": "Quế",
+      "unit": "gói",
+      "reference_price_vnd": 4000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "sp7",
+      "category_key": "spices",
+      "subcategory": null,
+      "name": "Oregano",
+      "unit": "gói",
+      "reference_price_vnd": 2500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "sp8",
+      "category_key": "spices",
+      "subcategory": null,
+      "name": "Húng Quế Khô",
+      "unit": "gói",
+      "reference_price_vnd": 2500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "sp9",
+      "category_key": "spices",
+      "subcategory": null,
+      "name": "Xạ Hương",
+      "unit": "gói",
+      "reference_price_vnd": 2500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "sp10",
+      "category_key": "spices",
+      "subcategory": null,
+      "name": "Hương Thảo",
+      "unit": "gói",
+      "reference_price_vnd": 2500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "sp11",
+      "category_key": "spices",
+      "subcategory": null,
+      "name": "Lá Nguyệt Quế",
+      "unit": "gói",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "sp12",
+      "category_key": "spices",
+      "subcategory": null,
+      "name": "Hạt Mùi",
+      "unit": "gói",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "sp13",
+      "category_key": "spices",
+      "subcategory": null,
+      "name": "Nhục Đậu Khấu",
+      "unit": "gói",
+      "reference_price_vnd": 5000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "sp14",
+      "category_key": "spices",
+      "subcategory": null,
+      "name": "Thảo Quả",
+      "unit": "gói",
+      "reference_price_vnd": 8000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "sp15",
+      "category_key": "spices",
+      "subcategory": null,
+      "name": "Đinh Hương",
+      "unit": "gói",
+      "reference_price_vnd": 4000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "sp16",
+      "category_key": "spices",
+      "subcategory": null,
+      "name": "Hoa Hồi",
+      "unit": "gói",
+      "reference_price_vnd": 4000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "sp17",
+      "category_key": "spices",
+      "subcategory": null,
+      "name": "Ớt Xay",
+      "unit": "gói",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "sp18",
+      "category_key": "spices",
+      "subcategory": null,
+      "name": "Bột Tỏi",
+      "unit": "gói",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "sp19",
+      "category_key": "spices",
+      "subcategory": null,
+      "name": "Bột Hành",
+      "unit": "gói",
+      "reference_price_vnd": 2500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "sp20",
+      "category_key": "spices",
+      "subcategory": null,
+      "name": "Bột Ngọt",
+      "unit": "gói",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "g1",
+      "category_key": "grains",
+      "subcategory": null,
+      "name": "Gạo",
+      "unit": "kg",
+      "reference_price_vnd": 1500,
+      "quick_quantities": [
+        5,
+        10
+      ]
+    },
+    {
+      "source_key": "g2",
+      "category_key": "grains",
+      "subcategory": null,
+      "name": "Nui",
+      "unit": "gói",
+      "reference_price_vnd": 1500,
+      "quick_quantities": [
+        2,
+        5
+      ]
+    },
+    {
+      "source_key": "g3",
+      "category_key": "grains",
+      "subcategory": null,
+      "name": "Bột Mì",
+      "unit": "kg",
+      "reference_price_vnd": 1000,
+      "quick_quantities": [
+        2,
+        5
+      ]
+    },
+    {
+      "source_key": "g4",
+      "category_key": "grains",
+      "subcategory": null,
+      "name": "Bánh Mì",
+      "unit": "cái",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        2,
+        4
+      ]
+    },
+    {
+      "source_key": "g5",
+      "category_key": "grains",
+      "subcategory": null,
+      "name": "Mì",
+      "unit": "gói",
+      "reference_price_vnd": 1500,
+      "quick_quantities": [
+        3,
+        6
+      ]
+    },
+    {
+      "source_key": "g6",
+      "category_key": "grains",
+      "subcategory": null,
+      "name": "Yến Mạch",
+      "unit": "kg",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "g7",
+      "category_key": "grains",
+      "subcategory": null,
+      "name": "Quinoa",
+      "unit": "kg",
+      "reference_price_vnd": 6000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "g8",
+      "category_key": "grains",
+      "subcategory": null,
+      "name": "Couscous",
+      "unit": "gói",
+      "reference_price_vnd": 2500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "g9",
+      "category_key": "grains",
+      "subcategory": null,
+      "name": "Bột Chiên",
+      "unit": "gói",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "g10",
+      "category_key": "grains",
+      "subcategory": null,
+      "name": "Bánh Tráng",
+      "unit": "gói",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        3
+      ]
+    },
+    {
+      "source_key": "g11",
+      "category_key": "grains",
+      "subcategory": null,
+      "name": "Bánh Pita",
+      "unit": "gói",
+      "reference_price_vnd": 2500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "g12",
+      "category_key": "grains",
+      "subcategory": null,
+      "name": "Bún",
+      "unit": "gói",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        2,
+        4
+      ]
+    },
+    {
+      "source_key": "g13",
+      "category_key": "grains",
+      "subcategory": null,
+      "name": "Mì Udon",
+      "unit": "gói",
+      "reference_price_vnd": 2500,
+      "quick_quantities": [
+        2,
+        4
+      ]
+    },
+    {
+      "source_key": "g14",
+      "category_key": "grains",
+      "subcategory": null,
+      "name": "Bột Bắp",
+      "unit": "gói",
+      "reference_price_vnd": 1500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "g15",
+      "category_key": "grains",
+      "subcategory": null,
+      "name": "Đường",
+      "unit": "kg",
+      "reference_price_vnd": 1000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "o1",
+      "category_key": "oils",
+      "subcategory": null,
+      "name": "Dầu Ô Liu",
+      "unit": "chai",
+      "reference_price_vnd": 8000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "o2",
+      "category_key": "oils",
+      "subcategory": null,
+      "name": "Dầu Ăn",
+      "unit": "chai",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "o3",
+      "category_key": "oils",
+      "subcategory": null,
+      "name": "Dầu Dừa",
+      "unit": "chai",
+      "reference_price_vnd": 5000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "o4",
+      "category_key": "oils",
+      "subcategory": null,
+      "name": "Dầu Mè",
+      "unit": "chai",
+      "reference_price_vnd": 5000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "o5",
+      "category_key": "oils",
+      "subcategory": null,
+      "name": "Dầu Canola",
+      "unit": "chai",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "o6",
+      "category_key": "oils",
+      "subcategory": null,
+      "name": "Bơ",
+      "unit": "gói",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "o7",
+      "category_key": "oils",
+      "subcategory": null,
+      "name": "Bơ Ghee",
+      "unit": "chai",
+      "reference_price_vnd": 6000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "o8",
+      "category_key": "oils",
+      "subcategory": null,
+      "name": "Dầu Nấm Truffle",
+      "unit": "chai",
+      "reference_price_vnd": 15000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "o9",
+      "category_key": "oils",
+      "subcategory": null,
+      "name": "Dầu Ớt",
+      "unit": "chai",
+      "reference_price_vnd": 4000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "o10",
+      "category_key": "oils",
+      "subcategory": null,
+      "name": "Dầu Bơ",
+      "unit": "chai",
+      "reference_price_vnd": 7000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "p1",
+      "category_key": "proteins",
+      "subcategory": null,
+      "name": "Gà",
+      "unit": "kg",
+      "reference_price_vnd": 6000,
+      "quick_quantities": [
+        2,
+        5
+      ]
+    },
+    {
+      "source_key": "p2",
+      "category_key": "proteins",
+      "subcategory": null,
+      "name": "Bò",
+      "unit": "kg",
+      "reference_price_vnd": 12000,
+      "quick_quantities": [
+        1,
+        3
+      ]
+    },
+    {
+      "source_key": "p3",
+      "category_key": "proteins",
+      "subcategory": null,
+      "name": "Heo",
+      "unit": "kg",
+      "reference_price_vnd": 8000,
+      "quick_quantities": [
+        1,
+        3
+      ]
+    },
+    {
+      "source_key": "p4",
+      "category_key": "proteins",
+      "subcategory": null,
+      "name": "Cá Hồi",
+      "unit": "kg",
+      "reference_price_vnd": 15000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "p5",
+      "category_key": "proteins",
+      "subcategory": null,
+      "name": "Tôm",
+      "unit": "kg",
+      "reference_price_vnd": 18000,
+      "quick_quantities": [
+        0.5,
+        1
+      ]
+    },
+    {
+      "source_key": "p6",
+      "category_key": "proteins",
+      "subcategory": null,
+      "name": "Trứng",
+      "unit": "tá",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        2,
+        5
+      ]
+    },
+    {
+      "source_key": "p7",
+      "category_key": "proteins",
+      "subcategory": null,
+      "name": "Đậu Hũ",
+      "unit": "gói",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        2,
+        4
+      ]
+    },
+    {
+      "source_key": "p8",
+      "category_key": "proteins",
+      "subcategory": null,
+      "name": "Thịt Xay",
+      "unit": "kg",
+      "reference_price_vnd": 8000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "p9",
+      "category_key": "proteins",
+      "subcategory": null,
+      "name": "Xúc Xích",
+      "unit": "gói",
+      "reference_price_vnd": 4000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "p10",
+      "category_key": "proteins",
+      "subcategory": null,
+      "name": "Thịt Xông Khói",
+      "unit": "gói",
+      "reference_price_vnd": 5000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "d1",
+      "category_key": "dairy",
+      "subcategory": null,
+      "name": "Sữa Tươi",
+      "unit": "lít",
+      "reference_price_vnd": 1500,
+      "quick_quantities": [
+        2,
+        5
+      ]
+    },
+    {
+      "source_key": "d2",
+      "category_key": "dairy",
+      "subcategory": null,
+      "name": "Phô Mai",
+      "unit": "gói",
+      "reference_price_vnd": 4000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "d3",
+      "category_key": "dairy",
+      "subcategory": null,
+      "name": "Kem Sữa",
+      "unit": "lít",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "d4",
+      "category_key": "dairy",
+      "subcategory": null,
+      "name": "Sữa Chua",
+      "unit": "gói",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        2,
+        4
+      ]
+    },
+    {
+      "source_key": "d5",
+      "category_key": "dairy",
+      "subcategory": null,
+      "name": "Mozzarella",
+      "unit": "gói",
+      "reference_price_vnd": 3500,
+      "quick_quantities": [
+        1,
+        3
+      ]
+    },
+    {
+      "source_key": "d6",
+      "category_key": "dairy",
+      "subcategory": null,
+      "name": "Parmesan",
+      "unit": "gói",
+      "reference_price_vnd": 6000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "d7",
+      "category_key": "dairy",
+      "subcategory": null,
+      "name": "Kem Chua",
+      "unit": "gói",
+      "reference_price_vnd": 2500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "d8",
+      "category_key": "dairy",
+      "subcategory": null,
+      "name": "Kem Tươi",
+      "unit": "lon",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "ga1",
+      "category_key": "gas",
+      "subcategory": null,
+      "name": "Bình Gas",
+      "unit": "bình",
+      "reference_price_vnd": 25000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "ga2",
+      "category_key": "gas",
+      "subcategory": null,
+      "name": "Gas Mini",
+      "unit": "lon",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        2,
+        4
+      ]
+    },
+    {
+      "source_key": "ga3",
+      "category_key": "gas",
+      "subcategory": null,
+      "name": "Than",
+      "unit": "bịch",
+      "reference_price_vnd": 8000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "ga4",
+      "category_key": "gas",
+      "subcategory": null,
+      "name": "Dầu Hỏa",
+      "unit": "chai",
+      "reference_price_vnd": 4000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "ga5",
+      "category_key": "gas",
+      "subcategory": null,
+      "name": "Bình Propane",
+      "unit": "bình",
+      "reference_price_vnd": 30000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "e1",
+      "category_key": "equipment",
+      "subcategory": null,
+      "name": "Găng Tay",
+      "unit": "hộp",
+      "reference_price_vnd": 8000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "e2",
+      "category_key": "equipment",
+      "subcategory": null,
+      "name": "Tạp Dề",
+      "unit": "cái",
+      "reference_price_vnd": 12000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "e3",
+      "category_key": "equipment",
+      "subcategory": null,
+      "name": "Giấy Bạc",
+      "unit": "cuộn",
+      "reference_price_vnd": 4000,
+      "quick_quantities": [
+        1,
+        3
+      ]
+    },
+    {
+      "source_key": "e4",
+      "category_key": "equipment",
+      "subcategory": null,
+      "name": "Màng Bọc",
+      "unit": "cuộn",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "e5",
+      "category_key": "equipment",
+      "subcategory": null,
+      "name": "Giấy Nướng",
+      "unit": "cuộn",
+      "reference_price_vnd": 3500,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "e6",
+      "category_key": "equipment",
+      "subcategory": null,
+      "name": "Túi Zip",
+      "unit": "hộp",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "e7",
+      "category_key": "equipment",
+      "subcategory": null,
+      "name": "Hộp Đựng",
+      "unit": "gói",
+      "reference_price_vnd": 5000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "e8",
+      "category_key": "equipment",
+      "subcategory": null,
+      "name": "Nhãn Dán",
+      "unit": "cuộn",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "e9",
+      "category_key": "equipment",
+      "subcategory": null,
+      "name": "Túi Rác",
+      "unit": "cuộn",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        3
+      ]
+    },
+    {
+      "source_key": "e10",
+      "category_key": "equipment",
+      "subcategory": null,
+      "name": "Khăn Giấy",
+      "unit": "gói",
+      "reference_price_vnd": 4000,
+      "quick_quantities": [
+        1,
+        3
+      ]
+    },
+    {
+      "source_key": "t1",
+      "category_key": "tissue",
+      "subcategory": null,
+      "name": "Giấy Vệ Sinh",
+      "unit": "gói",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        3
+      ]
+    },
+    {
+      "source_key": "t2",
+      "category_key": "tissue",
+      "subcategory": null,
+      "name": "Khăn Ăn",
+      "unit": "gói",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "t3",
+      "category_key": "tissue",
+      "subcategory": null,
+      "name": "Khăn Ướt",
+      "unit": "gói",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        3
+      ]
+    },
+    {
+      "source_key": "t4",
+      "category_key": "tissue",
+      "subcategory": null,
+      "name": "Nước Rửa Tay",
+      "unit": "chai",
+      "reference_price_vnd": 4000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "t5",
+      "category_key": "tissue",
+      "subcategory": null,
+      "name": "Nước Rửa Chén",
+      "unit": "chai",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "t6",
+      "category_key": "tissue",
+      "subcategory": null,
+      "name": "Nước Lau Sàn",
+      "unit": "chai",
+      "reference_price_vnd": 4000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "t7",
+      "category_key": "tissue",
+      "subcategory": null,
+      "name": "Javel",
+      "unit": "chai",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "t8",
+      "category_key": "tissue",
+      "subcategory": null,
+      "name": "Bàn Chải",
+      "unit": "cái",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "t9",
+      "category_key": "tissue",
+      "subcategory": null,
+      "name": "Miếng Rửa",
+      "unit": "gói",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        1,
+        3
+      ]
+    },
+    {
+      "source_key": "t10",
+      "category_key": "tissue",
+      "subcategory": null,
+      "name": "Cây Lau Nhà",
+      "unit": "cái",
+      "reference_price_vnd": 5000,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "tf1",
+      "category_key": "tofu",
+      "subcategory": null,
+      "name": "Đậu hũ trắng",
+      "unit": "gói",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        2,
+        5
+      ]
+    },
+    {
+      "source_key": "tf2",
+      "category_key": "tofu",
+      "subcategory": null,
+      "name": "Đậu hũ non",
+      "unit": "gói",
+      "reference_price_vnd": 2000,
+      "quick_quantities": [
+        2,
+        5
+      ]
+    },
+    {
+      "source_key": "tf3",
+      "category_key": "tofu",
+      "subcategory": null,
+      "name": "Đậu hũ chiên",
+      "unit": "gói",
+      "reference_price_vnd": 2500,
+      "quick_quantities": [
+        2,
+        5
+      ]
+    },
+    {
+      "source_key": "tf4",
+      "category_key": "tofu",
+      "subcategory": null,
+      "name": "Đậu bi",
+      "unit": "gói",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        2,
+        5
+      ]
+    },
+    {
+      "source_key": "tf5",
+      "category_key": "tofu",
+      "subcategory": null,
+      "name": "Mì căn",
+      "unit": "gói",
+      "reference_price_vnd": 3000,
+      "quick_quantities": [
+        2,
+        5
+      ]
+    },
+    {
+      "source_key": "tf6",
+      "category_key": "tofu",
+      "subcategory": null,
+      "name": "Sườn non chay",
+      "unit": "gói",
+      "reference_price_vnd": 4000,
+      "quick_quantities": [
+        1,
+        3
+      ]
+    },
+    {
+      "source_key": "v43",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Cải ngọt",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v44",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Cải bẹ xanh",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v45",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Cải bẹ trắng",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v46",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Cải bó xôi",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v47",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Mồng tơi",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v48",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Rau dền đỏ",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v49",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Rau dền xanh",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v50",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Tần ô",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v51",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Cải mầm",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v52",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Rau má",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v53",
+      "category_key": "vegetables",
+      "subcategory": "leafy-greens",
+      "name": "Diếp cá",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v54",
+      "category_key": "vegetables",
+      "subcategory": "herbs",
+      "name": "Ngò gai",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v55",
+      "category_key": "vegetables",
+      "subcategory": "herbs",
+      "name": "Tía tô",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v56",
+      "category_key": "vegetables",
+      "subcategory": "herbs",
+      "name": "Rau răm",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v57",
+      "category_key": "vegetables",
+      "subcategory": "herbs",
+      "name": "Kinh giới",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v58",
+      "category_key": "vegetables",
+      "subcategory": "herbs",
+      "name": "Lá lốt",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v59",
+      "category_key": "vegetables",
+      "subcategory": "herbs",
+      "name": "Bạc hà",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v60",
+      "category_key": "vegetables",
+      "subcategory": "herbs",
+      "name": "Lá chanh",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v61",
+      "category_key": "vegetables",
+      "subcategory": "herbs",
+      "name": "Quế",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v62",
+      "category_key": "vegetables",
+      "subcategory": "herbs",
+      "name": "Rau sam",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v63",
+      "category_key": "vegetables",
+      "subcategory": "root-vegetables",
+      "name": "Sắn",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v64",
+      "category_key": "vegetables",
+      "subcategory": "root-vegetables",
+      "name": "Nghệ",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v65",
+      "category_key": "vegetables",
+      "subcategory": "root-vegetables",
+      "name": "Củ sen",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v66",
+      "category_key": "vegetables",
+      "subcategory": "root-vegetables",
+      "name": "Su hào",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v67",
+      "category_key": "vegetables",
+      "subcategory": "root-vegetables",
+      "name": "Củ năng",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v68",
+      "category_key": "vegetables",
+      "subcategory": "root-vegetables",
+      "name": "Củ kiệu",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v69",
+      "category_key": "vegetables",
+      "subcategory": "fruit-vegetables",
+      "name": "Bí đỏ",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v70",
+      "category_key": "vegetables",
+      "subcategory": "fruit-vegetables",
+      "name": "Bí xanh",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v71",
+      "category_key": "vegetables",
+      "subcategory": "fruit-vegetables",
+      "name": "Mướp",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v72",
+      "category_key": "vegetables",
+      "subcategory": "fruit-vegetables",
+      "name": "Khổ qua",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v73",
+      "category_key": "vegetables",
+      "subcategory": "fruit-vegetables",
+      "name": "Đậu bắp",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v74",
+      "category_key": "vegetables",
+      "subcategory": "fruit-vegetables",
+      "name": "Su su",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v75",
+      "category_key": "vegetables",
+      "subcategory": "fruit-vegetables",
+      "name": "Bầu",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v76",
+      "category_key": "vegetables",
+      "subcategory": "fruit-vegetables",
+      "name": "Dưa hấu non",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v77",
+      "category_key": "vegetables",
+      "subcategory": "fruit-vegetables",
+      "name": "Cà pháo",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v78",
+      "category_key": "vegetables",
+      "subcategory": "fruit-vegetables",
+      "name": "Đậu rồng",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v79",
+      "category_key": "vegetables",
+      "subcategory": "beans-legumes",
+      "name": "Đậu nành",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v80",
+      "category_key": "vegetables",
+      "subcategory": "beans-legumes",
+      "name": "Đậu xanh",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v81",
+      "category_key": "vegetables",
+      "subcategory": "beans-legumes",
+      "name": "Đậu đen",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v82",
+      "category_key": "vegetables",
+      "subcategory": "beans-legumes",
+      "name": "Đậu đỏ",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v83",
+      "category_key": "vegetables",
+      "subcategory": "beans-legumes",
+      "name": "Đậu trắng",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v84",
+      "category_key": "vegetables",
+      "subcategory": "beans-legumes",
+      "name": "Đậu phộng",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v85",
+      "category_key": "vegetables",
+      "subcategory": "beans-legumes",
+      "name": "Hạt sen",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v86",
+      "category_key": "vegetables",
+      "subcategory": "beans-legumes",
+      "name": "Hạt điều",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v87",
+      "category_key": "vegetables",
+      "subcategory": "beans-legumes",
+      "name": "Mè đen",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v88",
+      "category_key": "vegetables",
+      "subcategory": "beans-legumes",
+      "name": "Mè trắng",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v89",
+      "category_key": "vegetables",
+      "subcategory": "beans-legumes",
+      "name": "Hạt chia",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v90",
+      "category_key": "vegetables",
+      "subcategory": "beans-legumes",
+      "name": "Hạt óc chó",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v91",
+      "category_key": "vegetables",
+      "subcategory": "beans-legumes",
+      "name": "Hạt hướng dương",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v92",
+      "category_key": "vegetables",
+      "subcategory": "tofu-products",
+      "name": "Đậu hũ trắng",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v93",
+      "category_key": "vegetables",
+      "subcategory": "tofu-products",
+      "name": "Đậu hũ non",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v94",
+      "category_key": "vegetables",
+      "subcategory": "tofu-products",
+      "name": "Đậu hũ chiên",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v95",
+      "category_key": "vegetables",
+      "subcategory": "tofu-products",
+      "name": "Đậu bi",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v96",
+      "category_key": "vegetables",
+      "subcategory": "tofu-products",
+      "name": "Mì căn",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v97",
+      "category_key": "vegetables",
+      "subcategory": "tofu-products",
+      "name": "Sườn non chay",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v98",
+      "category_key": "vegetables",
+      "subcategory": "mushrooms",
+      "name": "Nấm rơm",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v99",
+      "category_key": "vegetables",
+      "subcategory": "mushrooms",
+      "name": "Nấm hương",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v100",
+      "category_key": "vegetables",
+      "subcategory": "mushrooms",
+      "name": "Nấm bào ngư",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v101",
+      "category_key": "vegetables",
+      "subcategory": "mushrooms",
+      "name": "Nấm kim châm",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v102",
+      "category_key": "vegetables",
+      "subcategory": "mushrooms",
+      "name": "Nấm đùi gà",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v103",
+      "category_key": "vegetables",
+      "subcategory": "mushrooms",
+      "name": "Nấm mỡ",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v104",
+      "category_key": "vegetables",
+      "subcategory": "mushrooms",
+      "name": "Nấm đông cô",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v105",
+      "category_key": "vegetables",
+      "subcategory": "mushrooms",
+      "name": "Nấm tuyết",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v106",
+      "category_key": "vegetables",
+      "subcategory": "mushrooms",
+      "name": "Nấm tràm",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v107",
+      "category_key": "vegetables",
+      "subcategory": "mushrooms",
+      "name": "Nấm linh chi",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v108",
+      "category_key": "vegetables",
+      "subcategory": "mushrooms",
+      "name": "Nấm mèo đen",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v109",
+      "category_key": "vegetables",
+      "subcategory": "mushrooms",
+      "name": "Nấm mèo trắng",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v110",
+      "category_key": "vegetables",
+      "subcategory": "stems-shoots",
+      "name": "Măng tre",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v111",
+      "category_key": "vegetables",
+      "subcategory": "stems-shoots",
+      "name": "Măng tây",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v112",
+      "category_key": "vegetables",
+      "subcategory": "stems-shoots",
+      "name": "Thân chuối",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v113",
+      "category_key": "vegetables",
+      "subcategory": "stems-shoots",
+      "name": "Củ hủ dừa",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v114",
+      "category_key": "vegetables",
+      "subcategory": "stems-shoots",
+      "name": "Bạc hà (dọc mùng)",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v115",
+      "category_key": "vegetables",
+      "subcategory": "stems-shoots",
+      "name": "Ngó non",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v116",
+      "category_key": "vegetables",
+      "subcategory": "stems-shoots",
+      "name": "Thân sen",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v117",
+      "category_key": "vegetables",
+      "subcategory": "stems-shoots",
+      "name": "Ngò ôm",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v118",
+      "category_key": "vegetables",
+      "subcategory": "stems-shoots",
+      "name": "Bắp chuối",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v119",
+      "category_key": "vegetables",
+      "subcategory": "stems-shoots",
+      "name": "Mầm đậu nành",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v120",
+      "category_key": "vegetables",
+      "subcategory": "sea-vegetables",
+      "name": "Rong biển khô",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v121",
+      "category_key": "vegetables",
+      "subcategory": "sea-vegetables",
+      "name": "Tảo bẹ",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v122",
+      "category_key": "vegetables",
+      "subcategory": "sea-vegetables",
+      "name": "Wakame",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v123",
+      "category_key": "vegetables",
+      "subcategory": "sea-vegetables",
+      "name": "Rong nho",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v124",
+      "category_key": "vegetables",
+      "subcategory": "sea-vegetables",
+      "name": "Kombu",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v125",
+      "category_key": "vegetables",
+      "subcategory": "sea-vegetables",
+      "name": "Nori",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    },
+    {
+      "source_key": "v126",
+      "category_key": "vegetables",
+      "subcategory": "sea-vegetables",
+      "name": "Tảo xoắn",
+      "unit": "kg",
+      "reference_price_vnd": null,
+      "quick_quantities": [
+        1,
+        2
+      ]
+    }
+  ]
+}

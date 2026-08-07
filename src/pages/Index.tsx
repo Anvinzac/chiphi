@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { isDemoUser } from "@/hooks/useDemoAuth";
 import { isSandboxUser } from "@/hooks/useSandboxAuth";
 import { Link } from "react-router-dom";
-import { LayoutDashboard, LogOut } from "lucide-react";
+import { ClipboardList, LayoutDashboard } from "lucide-react";
 
 const Index = () => {
   const { signOut, user } = useAuth();
@@ -15,9 +15,9 @@ const Index = () => {
     <div className="min-h-screen flex flex-col">
       {isDemo && <DemoBanner />}
       {isSandbox && <DemoBanner variant="sandbox" />}
-      <DailyExpenseTable />
+      <DailyExpenseTable isDemo={isDemo} onSignOut={signOut} />
       {/* Bottom nav */}
-      <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-card px-4 py-2 flex items-center justify-between safe-area-bottom">
+      <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-card px-4 py-2 flex items-center justify-between safe-area-bottom z-30">
         <Link
           to="/admin"
           className="flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
@@ -26,16 +26,14 @@ const Index = () => {
           <LayoutDashboard className="h-4 w-4" />
           Admin
         </Link>
-        {!isDemo ? (
-          <button onClick={signOut} className="flex items-center gap-1.5 text-xs text-muted-foreground px-3 py-2 rounded-lg hover:bg-muted">
-            <LogOut className="h-4 w-4" />
-            Sign Out
-          </button>
-        ) : (
-          <Link to="/auth" className="flex items-center gap-1.5 text-xs text-primary font-medium px-3 py-2 rounded-lg hover:bg-muted">
-            Đăng nhập
-          </Link>
-        )}
+        <Link
+          to="/orders"
+          className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+          aria-label="Đặt hàng"
+        >
+          <ClipboardList className="h-4 w-4" />
+          Đặt hàng
+        </Link>
       </div>
     </div>
   );

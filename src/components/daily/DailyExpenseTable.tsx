@@ -14,6 +14,7 @@ import RangeDayPicker from "./RangeDayPicker";
 import MoneyLabel from "./MoneyLabel";
 import DaySection from "./DaySection";
 import WeekPager, { type WeekPage } from "./WeekPager";
+import BrandMenu from "@/components/BrandMenu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { VerifyData } from "@/types/expense";
 import { getMockGroupsForRange, isMockPaymentId } from "@/lib/mockRangeData";
@@ -21,6 +22,11 @@ import { lockBodyScroll } from "@/lib/focusWithoutScroll";
 import { formatDayMonth, formatDayMonthRange } from "@/lib/formatDateVi";
 
 type ViewMode = "range" | "daily";
+
+interface DailyExpenseTableProps {
+  isDemo?: boolean;
+  onSignOut?: () => void;
+}
 
 /** Accounting periods: … → Jul 3–Aug 4 → Aug 5–Sep 3 → … */
 const PERIOD_ZERO_START = new Date(2026, 7, 5); // Aug 5, 2026
@@ -88,7 +94,7 @@ interface QuickCategory {
   frequency: CategoryFrequency;
 }
 
-export default function DailyExpenseTable() {
+export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTableProps = {}) {
   const { user } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>("range");
   const [periodOffset, setPeriodOffset] = useState(() => getPeriodOffsetForDate(new Date()));
@@ -939,7 +945,7 @@ export default function DailyExpenseTable() {
         className="topbar-surface sticky top-0 z-30 shrink-0 px-4 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2"
         data-no-double-tap
       >
-        <span className="font-display text-xl text-primary justify-self-start">Mìsè</span>
+        <BrandMenu isDemo={isDemo} onSignOut={onSignOut} />
 
         <Popover open={rangePickerOpen} onOpenChange={setRangePickerOpen}>
           <div className="flex items-center gap-1.5 justify-self-center">

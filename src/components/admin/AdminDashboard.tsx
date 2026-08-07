@@ -5,14 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Plus, Trash2, ChevronDown, ChevronRight, Users, Tag, BarChart3, CalendarIcon, X } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronRight, Users, Tag, BarChart3, CalendarIcon, X, ShoppingBasket } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO, isWithinInterval } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from "recharts";
 import { toast } from "sonner";
 import type { DateRange } from "react-day-picker";
 import MoneyLabel from "@/components/daily/MoneyLabel";
+import OrderCatalogAdmin from "@/components/admin/OrderCatalogAdmin";
 
-type AdminTab = "summary" | "categories" | "subcategories" | "suppliers" | "items";
+type AdminTab = "summary" | "categories" | "subcategories" | "suppliers" | "items" | "orderCats" | "orderIngs";
 type CategoryFrequency = "daily" | "weekly" | "monthly";
 
 const CHART_COLORS = [
@@ -80,6 +81,8 @@ export default function AdminDashboard() {
     { key: "subcategories", label: "Sub-categories", icon: <Tag className="h-4 w-4" /> },
     { key: "suppliers", label: "Suppliers", icon: <Users className="h-4 w-4" /> },
     { key: "items", label: "Items", icon: <Tag className="h-4 w-4" /> },
+    { key: "orderCats", label: "Danh mục ĐH", icon: <ShoppingBasket className="h-4 w-4" /> },
+    { key: "orderIngs", label: "Nguyên liệu ĐH", icon: <ShoppingBasket className="h-4 w-4" /> },
   ];
 
   const today = new Date();
@@ -487,6 +490,13 @@ export default function AdminDashboard() {
             </table>
           </div>
         </div>
+      )}
+
+      {(activeTab === "orderCats" || activeTab === "orderIngs") && user && (
+        <OrderCatalogAdmin
+          userId={user.id}
+          mode={activeTab === "orderCats" ? "categories" : "ingredients"}
+        />
       )}
     </div>
   );

@@ -106,6 +106,86 @@ export type Database = {
           },
         ]
       }
+      order_categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+          source_key: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+          source_key?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          source_key?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      order_ingredients: {
+        Row: {
+          category_id: string
+          created_at: string
+          id: string
+          name: string
+          quick_quantities: Json
+          reference_price: number | null
+          source_key: string | null
+          subcategory: string | null
+          unit: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          id?: string
+          name: string
+          quick_quantities?: Json
+          reference_price?: number | null
+          source_key?: string | null
+          subcategory?: string | null
+          unit?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          quick_quantities?: Json
+          reference_price?: number | null
+          source_key?: string | null
+          subcategory?: string | null
+          unit?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_ingredients_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "order_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           created_at: string

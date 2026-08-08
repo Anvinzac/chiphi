@@ -95,6 +95,9 @@ export default function RangeDayPicker({
         <div className="grid grid-cols-7 gap-0.5">
           {gridDays.map(day => {
             const inRange = isInRange(day);
+            const dayKey = format(day, "yyyy-MM-dd");
+            const isFuture = dayKey > format(new Date(), "yyyy-MM-dd");
+            const selectable = inRange && !isFuture;
             const selectedDay = selected && isSameDay(day, selected);
             const today = isToday(day);
             const monthBreak =
@@ -106,19 +109,20 @@ export default function RangeDayPicker({
               <button
                 key={day.toISOString()}
                 type="button"
-                disabled={!inRange}
-                onClick={() => inRange && onSelect(day)}
+                disabled={!selectable}
+                onClick={() => selectable && onSelect(day)}
                 aria-label={format(day, "PPP", { locale: vi })}
                 aria-pressed={!!selectedDay}
                 className={[
                   "relative aspect-square rounded-xl text-sm tabular-nums transition-all",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   !inRange && "cursor-default text-transparent",
-                  inRange && !selectedDay && "text-foreground hover:bg-primary/10 active:scale-95",
+                  inRange && isFuture && "cursor-not-allowed text-muted-foreground/35",
+                  selectable && !selectedDay && "text-foreground hover:bg-primary/10 active:scale-95",
                   selectedDay &&
                     "bg-primary text-primary-foreground shadow-md font-semibold",
-                  inRange && today && !selectedDay && "ring-1 ring-primary/40 font-medium",
-                  monthBreak && !selectedDay && "bg-muted/50",
+                  selectable && today && !selectedDay && "ring-1 ring-primary/40 font-medium",
+                  monthBreak && !selectedDay && !isFuture && "bg-muted/50",
                 ]
                   .filter(Boolean)
                   .join(" ")}

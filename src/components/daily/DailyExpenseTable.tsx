@@ -20,6 +20,8 @@ import type { VerifyData } from "@/types/expense";
 import { getMockGroupsForRange, isMockPaymentId } from "@/lib/mockRangeData";
 import { lockBodyScroll } from "@/lib/focusWithoutScroll";
 import { formatDayMonth, formatDayMonthRange } from "@/lib/formatDateVi";
+import { applyDueExpenseSpans, createExpenseSpan } from "@/lib/applyExpenseSpans";
+import { SPAN_PRESETS, splitAmountAcrossPeriods, type SpanPresetKey } from "@/lib/expenseSpan";
 
 type ViewMode = "range" | "daily";
 
@@ -103,8 +105,20 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   const period = useMemo(() => getPeriodBounds(periodOffset), [periodOffset]);
   const periodStartStr = format(period.start, "yyyy-MM-dd");
   const periodEndStr = format(period.end, "yyyy-MM-dd");
-  // Range mode: new spend lands on the period's last day (works for past periods too)
-  const expenseDate = viewMode === "daily" ? selectedDate : periodEndStr;
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const periodIsPast = periodEndStr < todayStr;
+  const periodIsFuture = periodStartStr > todayStr;
+  // Range: past periods → last day of kỳ; current → today. Never write a future date.
+  const expenseDate =
+    viewMode === "daily"
+      ? selectedDate
+      : periodIsPast
+        ? periodEndStr
+        : todayStr;
+  const canAddExpense =
+    !periodIsFuture &&
+    expenseDate <= todayStr &&
+    (viewMode !== "daily" || selectedDate <= todayStr);
 
   // Reference data
   const [items, setItems] = useState<DbItem[]>([]);
@@ -137,6 +151,10 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   const [detailEntry, setDetailEntry] = useState<PaymentEntry | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [nameFilter, setNameFilter] = useState<string | null>(null);
+  const [spanEnabled, setSpanEnabled] = useState(false);
+  const [spanPreset, setSpanPreset] = useState<SpanPresetKey>("3m");
+  const [spanCustomPeriods, setSpanCustomPeriods] = useState("3");
+  const [dataTick, setDataTick] = useState(0);
 
   const nameRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
@@ -252,6 +270,18 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     setActivePaymentId(null);
 
     const loadPayments = async () => {
+      try {
+        const posted = await applyDueExpenseSpans(user.id, todayStr);
+        if (posted > 0) {
+          toast.message(`Đã ghi ${posted} kỳ chi tiêu chia sẵn`);
+        }
+      } catch (err: any) {
+        // Tables may not exist until migration is applied
+        if (!String(err?.message || "").includes("expense_spans")) {
+          console.warn("applyDueExpenseSpans", err);
+        }
+      }
+
       let query = supabase
         .from("payments")
         .select("id, date, total_amount, supplier_id, sub_payments(id, item_name, amount, category_id, supplier_id, notes)")
@@ -326,7 +356,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       }
     };
     loadPayments();
-  }, [user, selectedDate, suppliers, viewMode, periodStartStr, periodEndStr]);
+  }, [user, selectedDate, suppliers, viewMode, periodStartStr, periodEndStr, todayStr, dataTick]);
 
   // Lock page scroll while the add panel is open (stops iOS jump-to-bottom on focus)
   useEffect(() => {
@@ -549,12 +579,79 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
 
   const handleSave = useCallback(async () => {
     if (!user) return;
+    if (expenseDate > todayStr || periodIsFuture) {
+      toast.error("Không thể ghi chi tiêu trước ngày hôm nay");
+      return;
+    }
     // User types in thousands — multiply by 1000 to get real VND amount
     const entries = [...amountLines, { amount: amountValue, note: noteValue }]
       .map(l => ({ amount: (Number(l.amount) || 0) * 1000, note: l.note.trim() || null }))
       .filter(l => l.amount > 0);
     if (entries.length === 0) return;
     const amount = entries.reduce((s, l) => s + l.amount, 0);
+    const combinedNote = entries.map(l => l.note).filter(Boolean).join(" · ") || null;
+
+    const finishUi = () => {
+      setPhase("done");
+      setJustSaved(true);
+      setTimeout(() => {
+        collapseCard();
+        setTimeout(() => {
+          setNameValue("");
+          setAmountValue("");
+          setNoteValue("");
+          setAmountLines([]);
+          setSelectedCategoryId(null);
+          setMatch(null);
+          setVerifyData(null);
+          setSpanEnabled(false);
+          setSpanPreset("3m");
+          setSpanCustomPeriods("3");
+          setJustSaved(false);
+          setPhase("name");
+          pagerReadyRef.current = false;
+        }, 300);
+      }, 600);
+    };
+
+    if (spanEnabled) {
+      const periodCount =
+        spanPreset === "custom"
+          ? Math.min(120, Math.max(2, Math.floor(Number(spanCustomPeriods) || 0)))
+          : (SPAN_PRESETS.find(p => p.key === spanPreset)?.periods ?? 0);
+      if (periodCount < 2) {
+        toast.error("Chọn số kỳ từ 2 trở lên");
+        return;
+      }
+      try {
+        const result = await createExpenseSpan({
+          userId: user.id,
+          firstDate: expenseDate,
+          totalAmount: amount,
+          periodCount,
+          meta: {
+            item_name: nameValue.trim(),
+            item_id: match?.itemId || null,
+            category_id: match?.categoryId || null,
+            sub_category_id: match?.subCategoryId || null,
+            sub_sub_category_id: match?.subSubCategoryId || null,
+            supplier_id: match?.supplierId || null,
+            notes: combinedNote,
+            unit_price: match?.unitPrice,
+          },
+        });
+        if (!result) {
+          toast.error("Không chia được số tiền");
+          return;
+        }
+        toast.success(`Đã ghi kỳ 1/${result.periodCount}`);
+        setDataTick(t => t + 1);
+        finishUi();
+      } catch (err: any) {
+        toast.error(err.message || "Lưu chia kỳ thất bại — đã chạy migration chưa?");
+      }
+      return;
+    }
 
     let pid = activePaymentId;
     if (!pid) {
@@ -622,26 +719,12 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       }
     });
     setDayTotal(prev => prev + amount);
-
-    setPhase("done");
-    setJustSaved(true);
-    setTimeout(() => {
-      collapseCard();
-      // Reset form after the card has finished sliding out
-      setTimeout(() => {
-        setNameValue("");
-        setAmountValue("");
-        setNoteValue("");
-        setAmountLines([]);
-        setSelectedCategoryId(null);
-        setMatch(null);
-        setVerifyData(null);
-        setJustSaved(false);
-        setPhase("name");
-        pagerReadyRef.current = false;
-      }, 300);
-    }, 600);
-  }, [amountValue, noteValue, amountLines, nameValue, match, activePaymentId, user, expenseDate, viewMode, collapseCard]);
+    finishUi();
+  }, [
+    amountValue, noteValue, amountLines, nameValue, match, activePaymentId, user,
+    expenseDate, todayStr, periodIsFuture, viewMode, collapseCard,
+    spanEnabled, spanPreset, spanCustomPeriods,
+  ]);
 
   const handleNameKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === "Tab") {
@@ -663,7 +746,12 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   };
 
   const handleRangeDaySelect = (date: Date) => {
-    setSelectedDate(format(date, "yyyy-MM-dd"));
+    const key = format(date, "yyyy-MM-dd");
+    if (key > todayStr) {
+      toast.error("Không thể chọn ngày trong tương lai");
+      return;
+    }
+    setSelectedDate(key);
     setViewMode("daily");
     setRangePickerOpen(false);
   };
@@ -680,11 +768,15 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   };
 
   const expandCard = useCallback(() => {
+    if (!canAddExpense) {
+      toast.error("Không thể ghi chi tiêu trước ngày hôm nay");
+      return;
+    }
     setCardExpanded(true);
     // Blur any focused field so iOS doesn't zoom / scroll on open
     const active = document.activeElement;
     if (active instanceof HTMLElement) active.blur();
-  }, []);
+  }, [canAddExpense]);
 
   const handleMainDoubleActivate = useCallback((target: EventTarget | null) => {
     if (cardExpanded || cardClosing) return;
@@ -710,6 +802,10 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   }, [handleMainDoubleActivate]);
 
   const startNewPurchase = () => {
+    if (!canAddExpense) {
+      toast.error("Không thể ghi chi tiêu trước ngày hôm nay");
+      return;
+    }
     setActivePaymentId(null);
     setNameValue("");
     setAmountValue("");
@@ -756,7 +852,9 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     const current = new Date(selectedDate + "T00:00:00");
     const next = addDays(current, dx > 0 ? -1 : 1);
     if (next < period.start || next > period.end) return;
-    setSelectedDate(format(next, "yyyy-MM-dd"));
+    const nextKey = format(next, "yyyy-MM-dd");
+    if (nextKey > format(new Date(), "yyyy-MM-dd")) return;
+    setSelectedDate(nextKey);
   }, [selectedDate, viewMode, period.start, period.end]);
 
   const centerLabel = viewMode === "range"
@@ -1129,11 +1227,11 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       <button
         type="button"
         onClick={expandCard}
-        disabled={cardExpanded}
-        tabIndex={cardExpanded ? -1 : 0}
+        disabled={cardExpanded || !canAddExpense}
+        tabIndex={cardExpanded || !canAddExpense ? -1 : 0}
         aria-hidden={cardExpanded}
         className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-14 h-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg active:scale-95 transition-opacity duration-200 ease-out ${
-          cardExpanded
+          cardExpanded || !canAddExpense
             ? "opacity-0 pointer-events-none"
             : "opacity-100"
         }`}
@@ -1179,9 +1277,14 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                 phase === "amount" || phase === "done" ? "bg-primary" : "bg-muted"
               }`} />
             </div>
-            {viewMode === "range" && !justSaved && (
+            {viewMode === "range" && periodIsPast && !justSaved && (
               <p className="px-5 pb-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground/75">
                 Lưu vào ngày cuối kỳ · {formatDayMonth(period.end)}
+              </p>
+            )}
+            {viewMode === "range" && !periodIsPast && !periodIsFuture && !justSaved && (
+              <p className="px-5 pb-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground/75">
+                Lưu vào hôm nay · {formatDayMonth(new Date())}
               </p>
             )}
 
@@ -1196,10 +1299,20 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                     <p className="text-lg font-display">{nameValue}</p>
                     <MoneyLabel
                       amount={
-                        [...amountLines, { amount: amountValue }].reduce(
-                          (s, l) => s + (Number(l.amount) || 0) * 1000,
-                          0
-                        )
+                        (() => {
+                          const total =
+                            [...amountLines, { amount: amountValue }].reduce(
+                              (s, l) => s + (Number(l.amount) || 0) * 1000,
+                              0
+                            );
+                          if (!spanEnabled) return total;
+                          const n =
+                            spanPreset === "custom"
+                              ? Math.min(120, Math.max(2, Math.floor(Number(spanCustomPeriods) || 0)))
+                              : (SPAN_PRESETS.find(p => p.key === spanPreset)?.periods ?? 0);
+                          if (n < 2) return total;
+                          return splitAmountAcrossPeriods(total, n)[0];
+                        })()
                       }
                       className="text-2xl font-display"
                       smallClassName="text-[0.65em]"
@@ -1399,6 +1512,12 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                     onKeyDown={handleAmountKeyDown}
                     onSave={handleSave}
                     noteSuggestions={noteSuggestions}
+                    spanEnabled={spanEnabled}
+                    setSpanEnabled={setSpanEnabled}
+                    spanPreset={spanPreset}
+                    setSpanPreset={setSpanPreset}
+                    spanCustomPeriods={spanCustomPeriods}
+                    setSpanCustomPeriods={setSpanCustomPeriods}
                   />
                 </div>
               </div>

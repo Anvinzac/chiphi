@@ -195,13 +195,17 @@
   }
 
   .ingredient-chip-track {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.4rem;
-    justify-content: flex-start;
-    align-content: flex-start;
-    align-items: flex-start;
+    align-content: start;
     min-height: 7.5rem;
+  }
+
+  @media (min-width: 420px) {
+    .ingredient-chip-track {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
   }
 
   .category-rail {

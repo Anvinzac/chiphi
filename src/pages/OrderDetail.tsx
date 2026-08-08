@@ -11,6 +11,8 @@ import {
   orderShareUrl,
 } from "@/lib/orderShare";
 import { importOrderCatalogFromSeed } from "@/lib/importOrderCatalog";
+import { frequentIngredientDotClass } from "@/lib/frequentOrderIngredients";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import MoneyLabel from "@/components/daily/MoneyLabel";
@@ -59,11 +61,12 @@ function defaultQty(ing: CatalogIngredient): string {
 }
 
 export default function OrderDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { id: routeId } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const preferredCatKey = searchParams.get("cat") || "";
   const { user } = useAuth();
   const navigate = useNavigate();
+  const isNewSession = routeId === "new";
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState("draft");
   const [shareToken, setShareToken] = useState("");
@@ -82,14 +85,24 @@ export default function OrderDetail() {
   /** Which list slot shows the ingredient cloud: item index, or `ph-${n}` for empty slots. */
   const [expandedKey, setExpandedKey] = useState<string>("ph-0");
   const chipPagerRef = useRef<HTMLDivElement>(null);
+  /** Real DB id once the first ingredient was saved; null while UI-only draft. */
+  const [orderId, setOrderId] = useState<string | null>(isNewSession ? null : routeId || null);
+  const orderIdRef = useRef<string | null>(orderId);
+  const persistingRef = useRef(false);
+  const justCreatedIdRef = useRef<string | null>(null);
+  const draftTitleReadyRef = useRef(false);
 
-  const load = useCallback(async () => {
-    if (!user || !id) return;
+  useEffect(() => {
+    orderIdRef.current = orderId;
+  }, [orderId]);
+
+  const loadExisting = useCallback(async (existingId: string) => {
+    if (!user) return;
     setLoading(true);
     const { data: order, error } = await supabase
       .from("orders")
       .select("*")
-      .eq("id", id)
+      .eq("id", existingId)
       .eq("user_id", user.id)
       .maybeSingle();
     if (error || !order) {
@@ -100,10 +113,11 @@ export default function OrderDetail() {
     setTitle(order.title);
     setStatus(order.status);
     setShareToken(order.share_token);
+    setOrderId(order.id);
     const { data: rows } = await supabase
       .from("order_items")
       .select("*")
-      .eq("order_id", id)
+      .eq("order_id", existingId)
       .order("sort_order", { ascending: true });
     setItems(
       (rows || []).map((r, i) => ({
@@ -115,7 +129,31 @@ export default function OrderDetail() {
       })),
     );
     setLoading(false);
-  }, [user, id, navigate]);
+  }, [user, navigate]);
+
+  useEffect(() => {
+    if (!user || !routeId) return;
+    if (routeId === "new") {
+      draftTitleReadyRef.current = false;
+      setOrderId(null);
+      orderIdRef.current = null;
+      setItems([]);
+      setShareToken("");
+      setStatus("draft");
+      setTitle("");
+      setExpandedKey("ph-0");
+      setLoading(false);
+      return;
+    }
+    if (justCreatedIdRef.current === routeId) {
+      justCreatedIdRef.current = null;
+      setOrderId(routeId);
+      orderIdRef.current = routeId;
+      setLoading(false);
+      return;
+    }
+    void loadExisting(routeId);
+  }, [user, routeId, loadExisting]);
 
   const loadCatalog = useCallback(async () => {
     if (!user) return;
@@ -151,10 +189,6 @@ export default function OrderDetail() {
   }, [user, preferredCatKey]);
 
   useEffect(() => {
-    load();
-  }, [load]);
-
-  useEffect(() => {
     loadCatalog();
   }, [loadCatalog]);
 
@@ -165,6 +199,13 @@ export default function OrderDetail() {
 
   const lockedCat = catalogCats.find(c => c.id === lockedCatId);
   const lockedCatName = lockedCat?.name || "Danh mục";
+
+  useEffect(() => {
+    if (routeId !== "new" || draftTitleReadyRef.current) return;
+    if (!lockedCat?.name) return;
+    draftTitleReadyRef.current = true;
+    setTitle(`Đơn ${lockedCat.name} · ${format(new Date(), "d/M HH:mm")}`);
+  }, [routeId, lockedCat?.name]);
 
   const addedByName = useMemo(() => {
     const map = new Map<string, number>();
@@ -274,6 +315,108 @@ export default function OrderDetail() {
     });
   }, []);
 
+  const persistDraftRows = async (oid: string, rows: OrderItemDraft[]) => {
+    const cleaned = rows
+      .map((row, i) => ({
+        name: row.name.trim(),
+        quantity: Number(row.quantity) || 0,
+        unit: row.unit || "kg",
+        sort_order: i,
+      }))
+      .filter(row => row.name && row.quantity > 0);
+    await supabase.from("order_items").delete().eq("order_id", oid);
+    if (cleaned.length === 0) return;
+    const { error } = await supabase.from("order_items").insert(
+      cleaned.map(row => ({
+        order_id: oid,
+        name: row.name,
+        quantity: row.quantity,
+        unit: row.unit,
+        sort_order: row.sort_order,
+        status: "pending",
+      })),
+    );
+    if (error) throw error;
+  };
+
+  /** Create the order in DB on first real line; no-op if already persisted. */
+  const ensurePersisted = useCallback(
+    async (rows: OrderItemDraft[]) => {
+      if (!user) return null;
+      if (orderIdRef.current) return orderIdRef.current;
+      const cleaned = rows.filter(r => r.name.trim() && Number(r.quantity) > 0);
+      if (cleaned.length === 0) return null;
+      if (persistingRef.current) return orderIdRef.current;
+      persistingRef.current = true;
+      try {
+        const token = generateShareToken();
+        const { data, error } = await supabase
+          .from("orders")
+          .insert({
+            user_id: user.id,
+            title: title.trim() || `Đơn ${lockedCatName} · ${format(new Date(), "d/M HH:mm")}`,
+            status: "draft",
+            share_token: token,
+            supplier_pin_hash: await hashPin(pin || "1234"),
+          })
+          .select("id, share_token")
+          .single();
+        if (error) throw error;
+        await persistDraftRows(data.id, rows);
+        orderIdRef.current = data.id;
+        setOrderId(data.id);
+        setShareToken(data.share_token || token);
+        justCreatedIdRef.current = data.id;
+        const catQ = preferredCatKey ? `?cat=${encodeURIComponent(preferredCatKey)}` : "";
+        navigate(`/orders/${data.id}${catQ}`, { replace: true });
+        return data.id;
+      } catch (err: any) {
+        toast.error(err.message || "Không lưu được đơn");
+        return null;
+      } finally {
+        persistingRef.current = false;
+      }
+    },
+    [user, title, lockedCatName, pin, preferredCatKey, navigate],
+  );
+
+  /** If every line is gone, drop the DB row and return to a UI-only draft. */
+  const abandonEmptyOrder = useCallback(async () => {
+    const oid = orderIdRef.current;
+    if (!user || !oid) return;
+    try {
+      await supabase.from("order_items").delete().eq("order_id", oid);
+      await supabase.from("orders").delete().eq("id", oid).eq("user_id", user.id);
+    } catch {
+      /* best-effort */
+    }
+    orderIdRef.current = null;
+    setOrderId(null);
+    setShareToken("");
+    setStatus("draft");
+    const catQ = preferredCatKey ? `?cat=${encodeURIComponent(preferredCatKey)}` : "";
+    navigate(`/orders/new${catQ}`, { replace: true });
+  }, [user, preferredCatKey, navigate]);
+
+  const syncItemsSideEffects = useCallback(
+    (next: OrderItemDraft[]) => {
+      const hasLines = next.some(r => r.name.trim());
+      if (hasLines) {
+        const alreadyPersisted = !!orderIdRef.current;
+        void ensurePersisted(next).then(oid => {
+          if (oid && alreadyPersisted) {
+            void persistDraftRows(oid, next).catch(() => {
+              /* silent — explicit Lưu still available */
+            });
+          }
+        });
+      } else if (orderIdRef.current) {
+        void abandonEmptyOrder();
+      }
+    },
+    [ensurePersisted, abandonEmptyOrder],
+  );
+
   const pickIngredientForExpanded = (ing: CatalogIngredient) => {
     const key = ing.name.trim().toLowerCase();
     const entry: OrderItemDraft = {
@@ -289,18 +432,21 @@ export default function OrderDetail() {
       const idx = Number(expandedKey.slice(5));
       setItems(prev => {
         if (idx < 0 || idx >= prev.length) return prev;
+        let next: OrderItemDraft[];
         if (prev[idx].name.trim().toLowerCase() === key) {
-          return prev.filter((_, i) => i !== idx).map((row, i) => ({ ...row, sort_order: i }));
+          next = prev.filter((_, i) => i !== idx).map((row, i) => ({ ...row, sort_order: i }));
+        } else {
+          const withoutOtherDup = prev.filter(
+            (row, i) => i === idx || row.name.trim().toLowerCase() !== key,
+          );
+          const at = Math.min(idx, withoutOtherDup.length - 1);
+          next = withoutOtherDup.map((row, i) =>
+            i === at
+              ? { ...entry, id: prev[idx].id, sort_order: i }
+              : { ...row, sort_order: i },
+          );
         }
-        const withoutOtherDup = prev.filter(
-          (row, i) => i === idx || row.name.trim().toLowerCase() !== key,
-        );
-        const at = Math.min(idx, withoutOtherDup.length - 1);
-        const next = withoutOtherDup.map((row, i) =>
-          i === at
-            ? { ...entry, id: prev[idx].id, sort_order: i }
-            : { ...row, sort_order: i },
-        );
+        queueMicrotask(() => syncItemsSideEffects(next));
         return next;
       });
       return;
@@ -308,10 +454,13 @@ export default function OrderDetail() {
 
     setItems(prev => {
       const withoutDup = prev.filter(row => row.name.trim().toLowerCase() !== key);
-      return [...withoutDup, { ...entry, sort_order: withoutDup.length }];
+      const next = [...withoutDup, { ...entry, sort_order: withoutDup.length }];
+      queueMicrotask(() => {
+        syncItemsSideEffects(next);
+        expandSlot("ph-0");
+      });
+      return next;
     });
-    // Keep a fresh empty row at the bottom ready for the next pick
-    queueMicrotask(() => expandSlot("ph-0"));
   };
 
   const renderChipCloud = () => (
@@ -366,6 +515,7 @@ export default function OrderDetail() {
                       expandedKey.startsWith("item-") &&
                       items[Number(expandedKey.slice(5))]?.name.trim().toLowerCase() ===
                         ing.name.trim().toLowerCase();
+                    const dotClass = frequentIngredientDotClass(ing.name);
                     return (
                       <button
                         key={ing.id}
@@ -374,7 +524,7 @@ export default function OrderDetail() {
                           e.stopPropagation();
                           pickIngredientForExpanded(ing);
                         }}
-                        className={`inline-flex max-w-full items-center gap-1 rounded-lg border px-2.5 py-1.5 text-left text-xs transition-colors ${
+                        className={`inline-flex w-full min-w-0 items-center gap-1 rounded-lg border px-2.5 py-1.5 text-left text-xs transition-colors ${
                           isActiveRow || selected
                             ? "border-primary bg-primary/10 text-foreground"
                             : "border-border/70 bg-background text-foreground hover:border-primary/40"
@@ -383,7 +533,13 @@ export default function OrderDetail() {
                         {(isActiveRow || selected) && (
                           <Check className="h-3 w-3 text-primary shrink-0" />
                         )}
-                        <span className="truncate">{ing.name}</span>
+                        {dotClass && (
+                          <span
+                            className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`}
+                            aria-hidden="true"
+                          />
+                        )}
+                        <span className="min-w-0 flex-1 truncate">{ing.name}</span>
                         <span className="shrink-0 text-[10px] text-muted-foreground/55">
                           {ing.unit}
                         </span>
@@ -409,7 +565,11 @@ export default function OrderDetail() {
   };
 
   const removeRow = (index: number) => {
-    setItems(prev => prev.filter((_, i) => i !== index).map((row, i) => ({ ...row, sort_order: i })));
+    setItems(prev => {
+      const next = prev.filter((_, i) => i !== index).map((row, i) => ({ ...row, sort_order: i }));
+      queueMicrotask(() => syncItemsSideEffects(next));
+      return next;
+    });
   };
 
   const runImport = async () => {
@@ -427,7 +587,7 @@ export default function OrderDetail() {
   };
 
   const save = async (nextStatus?: string, pinOverride?: string) => {
-    if (!user || !id) return;
+    if (!user) return false;
     const cleaned = items
       .map((row, i) => ({
         ...row,
@@ -444,6 +604,12 @@ export default function OrderDetail() {
 
     setSaving(true);
     try {
+      let oid = orderIdRef.current;
+      if (!oid) {
+        oid = await ensurePersisted(items);
+        if (!oid) return false;
+      }
+
       const pinHash = await hashPin((pinOverride ?? pin) || "1234");
       const { error: orderErr } = await supabase
         .from("orders")
@@ -453,27 +619,14 @@ export default function OrderDetail() {
           supplier_pin_hash: pinHash,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", id)
+        .eq("id", oid)
         .eq("user_id", user.id);
       if (orderErr) throw orderErr;
 
-      await supabase.from("order_items").delete().eq("order_id", id);
-
-      const { error: itemsErr } = await supabase.from("order_items").insert(
-        cleaned.map(row => ({
-          order_id: id,
-          name: row.name,
-          quantity: row.quantity,
-          unit: row.unit || "kg",
-          sort_order: row.sort_order,
-          status: "pending",
-        })),
-      );
-      if (itemsErr) throw itemsErr;
+      await persistDraftRows(oid, items);
 
       if (nextStatus) setStatus(nextStatus);
       toast.success("Đã lưu");
-      await load();
       return true;
     } catch (err: any) {
       toast.error(err.message || "Lưu thất bại");
@@ -500,9 +653,10 @@ export default function OrderDetail() {
     }
     const ok = await save("shared", trimmed);
     if (!ok) return;
-    if (!shareToken) {
+    const oid = orderIdRef.current;
+    if (!shareToken && oid) {
       const token = generateShareToken();
-      await supabase.from("orders").update({ share_token: token }).eq("id", id!);
+      await supabase.from("orders").update({ share_token: token }).eq("id", oid);
       setShareToken(token);
     }
     setShareStep("qr");
@@ -590,27 +744,28 @@ export default function OrderDetail() {
                       expanded ? "bg-primary/5" : ""
                     }`}
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium leading-tight">{row.name}</p>
-                      <div
-                        className="mt-1 flex items-baseline gap-1.5"
-                        onClick={e => e.stopPropagation()}
-                        onPointerDown={e => e.stopPropagation()}
-                      >
-                        <Input
-                          value={row.quantity}
-                          onChange={e =>
-                            updateRow(index, { quantity: e.target.value.replace(/[^\d.]/g, "") })
-                          }
-                          placeholder="0"
-                          inputMode="decimal"
-                          className="h-7 w-16 border-0 bg-muted/40 px-2 text-sm tabular-nums shadow-none focus-visible:ring-1"
-                          aria-label={`Số lượng ${row.name}`}
-                        />
-                        <span className="text-xs text-muted-foreground/45">{row.unit}</span>
-                      </div>
+                    <p className="min-w-0 flex-1 truncate text-sm font-medium leading-tight">
+                      {row.name}
+                    </p>
+                    <div
+                      className="flex shrink-0 items-baseline justify-center gap-1"
+                      onClick={e => e.stopPropagation()}
+                      onPointerDown={e => e.stopPropagation()}
+                    >
+                      <Input
+                        value={row.quantity}
+                        onFocus={() => updateRow(index, { quantity: "" })}
+                        onChange={e =>
+                          updateRow(index, { quantity: e.target.value.replace(/[^\d.]/g, "") })
+                        }
+                        placeholder="0"
+                        inputMode="decimal"
+                        className="h-7 w-14 border-0 bg-muted/40 px-1.5 text-center text-sm tabular-nums shadow-none focus-visible:ring-1"
+                        aria-label={`Số lượng ${row.name}`}
+                      />
+                      <span className="text-xs text-muted-foreground/45">{row.unit}</span>
                     </div>
-                    <div className="shrink-0 text-right">
+                    <div className="w-[4.5rem] shrink-0 text-right">
                       {estimate != null ? (
                         <MoneyLabel
                           amount={estimate}
@@ -658,14 +813,19 @@ export default function OrderDetail() {
                       expanded ? "bg-primary/5" : ""
                     }`}
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-muted-foreground/35">Tên nguyên liệu</p>
-                      <div className="mt-1 flex items-baseline gap-1.5">
-                        <span className="text-sm tabular-nums text-muted-foreground/30">0</span>
-                        <span className="text-xs text-muted-foreground/25">đv</span>
-                      </div>
+                    <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground/35">
+                      Tên nguyên liệu
+                    </p>
+                    <div className="flex shrink-0 items-baseline justify-center gap-1">
+                      <span className="inline-flex h-7 w-14 items-center justify-center text-sm tabular-nums text-muted-foreground/30">
+                        0
+                      </span>
+                      <span className="text-xs text-muted-foreground/25">đv</span>
                     </div>
-                    <span className="shrink-0 text-[11px] text-muted-foreground/25">ước tính</span>
+                    <span className="w-[4.5rem] shrink-0 text-right text-[11px] text-muted-foreground/25">
+                      ước tính
+                    </span>
+                    <span className="inline-flex h-8 w-8 shrink-0" aria-hidden="true" />
                   </button>
                   {expanded && renderChipCloud()}
                 </div>

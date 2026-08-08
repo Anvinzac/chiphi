@@ -5,7 +5,6 @@ import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { generateShareToken, hashPin } from "@/lib/orderShare";
 import {
   importOrderCatalogFromSeed,
   ORDER_HUB_CATEGORIES,
@@ -55,7 +54,7 @@ export default function Orders() {
     const [ordersRes, catsRes] = await Promise.all([
       supabase
         .from("orders")
-        .select("id, title, status, created_at, updated_at")
+        .select("id, title, status, created_at, updated_at, order_items(id)")
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false }),
       supabase
@@ -65,7 +64,19 @@ export default function Orders() {
         .order("sort_order", { ascending: true }),
     ]);
     if (ordersRes.error) toast.error(ordersRes.error.message);
-    else setOrders((ordersRes.data as OrderRow[]) || []);
+    else {
+      const raw = (ordersRes.data as (OrderRow & { order_items?: { id: string }[] })[]) || [];
+      const emptyIds = raw.filter(o => !(o.order_items && o.order_items.length > 0)).map(o => o.id);
+      if (emptyIds.length > 0) {
+        // Drop bootstrapped empties — nothing useful to keep
+        await supabase.from("orders").delete().in("id", emptyIds).eq("user_id", user.id);
+      }
+      setOrders(
+        raw
+          .filter(o => o.order_items && o.order_items.length > 0)
+          .map(({ order_items: _items, ...order }) => order),
+      );
+    }
     if (catsRes.error) toast.error(catsRes.error.message);
     else setCategories((catsRes.data as OrderCategory[]) || []);
     setLoading(false);
@@ -102,27 +113,14 @@ export default function Orders() {
     }
   };
 
-  const startOrderForCategory = async (catKey: string, catName: string) => {
+  const startOrderForCategory = async (catKey: string, _catName: string) => {
     if (!user || creatingKey) return;
     setCreatingKey(catKey);
     try {
       await ensureCatalog();
-      const pin = "1234";
-      const { data, error } = await supabase
-        .from("orders")
-        .insert({
-          user_id: user.id,
-          title: `Đơn ${catName} · ${format(new Date(), "d/M HH:mm")}`,
-          status: "draft",
-          share_token: generateShareToken(),
-          supplier_pin_hash: await hashPin(pin),
-        })
-        .select("id")
-        .single();
-      if (error) throw error;
-      navigate(`/orders/${data.id}?cat=${encodeURIComponent(catKey)}`);
+      navigate(`/orders/new?cat=${encodeURIComponent(catKey)}`);
     } catch (err: any) {
-      toast.error(err.message || "Không tạo được đơn");
+      toast.error(err.message || "Không mở được đơn");
     } finally {
       setCreatingKey(null);
     }
@@ -179,7 +177,7 @@ export default function Orders() {
                   <p className="font-display text-lg text-foreground leading-tight">{cat.name}</p>
                   <p className="mt-1 text-[10px] text-muted-foreground">{cat.hint}</p>
                   {creatingKey === cat.key && (
-                    <p className="mt-2 text-[10px] text-primary">Đang tạo đơn…</p>
+                    <p className="mt-2 text-[10px] text-primary">Đang mở…</p>
                   )}
                 </button>
               ))}

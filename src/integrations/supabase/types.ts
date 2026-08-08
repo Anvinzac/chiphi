@@ -296,6 +296,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          order_count: number
           quick_quantities: Json
           reference_price: number | null
           source_key: string | null
@@ -309,6 +310,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          order_count?: number
           quick_quantities?: Json
           reference_price?: number | null
           source_key?: string | null
@@ -322,6 +324,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          order_count?: number
           quick_quantities?: Json
           reference_price?: number | null
           source_key?: string | null
@@ -466,110 +469,6 @@ export type Database = {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      expense_spans: {
-        Row: {
-          category_id: string | null
-          created_at: string
-          day_of_month: number
-          id: string
-          item_id: string | null
-          item_name: string
-          next_due_date: string
-          notes: string | null
-          period_count: number
-          posted_count: number
-          start_date: string
-          status: string
-          sub_category_id: string | null
-          sub_sub_category_id: string | null
-          supplier_id: string | null
-          total_amount: number
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          category_id?: string | null
-          created_at?: string
-          day_of_month: number
-          id?: string
-          item_id?: string | null
-          item_name: string
-          next_due_date: string
-          notes?: string | null
-          period_count: number
-          posted_count?: number
-          start_date: string
-          status?: string
-          sub_category_id?: string | null
-          sub_sub_category_id?: string | null
-          supplier_id?: string | null
-          total_amount: number
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          category_id?: string | null
-          created_at?: string
-          day_of_month?: number
-          id?: string
-          item_id?: string | null
-          item_name?: string
-          next_due_date?: string
-          notes?: string | null
-          period_count?: number
-          posted_count?: number
-          start_date?: string
-          status?: string
-          sub_category_id?: string | null
-          sub_sub_category_id?: string | null
-          supplier_id?: string | null
-          total_amount?: number
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      expense_span_installments: {
-        Row: {
-          amount: number
-          created_at: string
-          due_date: string
-          id: string
-          installment_index: number
-          payment_id: string | null
-          span_id: string
-          sub_payment_id: string | null
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          due_date: string
-          id?: string
-          installment_index: number
-          payment_id?: string | null
-          span_id: string
-          sub_payment_id?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          due_date?: string
-          id?: string
-          installment_index?: number
-          payment_id?: string | null
-          span_id?: string
-          sub_payment_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "expense_span_installments_span_id_fkey"
-            columns: ["span_id"]
-            isOneToOne: false
-            referencedRelation: "expense_spans"
             referencedColumns: ["id"]
           },
         ]

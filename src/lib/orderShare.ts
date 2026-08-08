@@ -83,7 +83,7 @@ function sha256Fallback(message: Uint8Array): Uint8Array {
 async function sha256Hex(data: Uint8Array): Promise<string> {
   const subtle = typeof crypto !== "undefined" ? crypto.subtle : undefined;
   if (subtle?.digest) {
-    return toHex(await subtle.digest("SHA-256", data));
+    return toHex(await subtle.digest("SHA-256", data.buffer as ArrayBuffer));
   }
   return toHex(sha256Fallback(data));
 }

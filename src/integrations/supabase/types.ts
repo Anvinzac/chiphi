@@ -38,6 +38,160 @@ export type Database = {
         }
         Relationships: []
       }
+      expense_span_installments: {
+        Row: {
+          amount: number
+          created_at: string
+          due_date: string
+          id: string
+          installment_index: number
+          payment_id: string | null
+          span_id: string
+          sub_payment_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          due_date: string
+          id?: string
+          installment_index: number
+          payment_id?: string | null
+          span_id: string
+          sub_payment_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          due_date?: string
+          id?: string
+          installment_index?: number
+          payment_id?: string | null
+          span_id?: string
+          sub_payment_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_span_installments_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_span_installments_span_id_fkey"
+            columns: ["span_id"]
+            isOneToOne: false
+            referencedRelation: "expense_spans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_span_installments_sub_payment_id_fkey"
+            columns: ["sub_payment_id"]
+            isOneToOne: false
+            referencedRelation: "sub_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expense_spans: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          day_of_month: number
+          id: string
+          item_id: string | null
+          item_name: string
+          next_due_date: string
+          notes: string | null
+          period_count: number
+          posted_count: number
+          start_date: string
+          status: string
+          sub_category_id: string | null
+          sub_sub_category_id: string | null
+          supplier_id: string | null
+          total_amount: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          day_of_month: number
+          id?: string
+          item_id?: string | null
+          item_name: string
+          next_due_date: string
+          notes?: string | null
+          period_count: number
+          posted_count?: number
+          start_date: string
+          status?: string
+          sub_category_id?: string | null
+          sub_sub_category_id?: string | null
+          supplier_id?: string | null
+          total_amount: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          day_of_month?: number
+          id?: string
+          item_id?: string | null
+          item_name?: string
+          next_due_date?: string
+          notes?: string | null
+          period_count?: number
+          posted_count?: number
+          start_date?: string
+          status?: string
+          sub_category_id?: string | null
+          sub_sub_category_id?: string | null
+          supplier_id?: string | null
+          total_amount?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_spans_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_spans_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_spans_sub_category_id_fkey"
+            columns: ["sub_category_id"]
+            isOneToOne: false
+            referencedRelation: "sub_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_spans_sub_sub_category_id_fkey"
+            columns: ["sub_sub_category_id"]
+            isOneToOne: false
+            referencedRelation: "sub_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_spans_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       items: {
         Row: {
           category_id: string | null

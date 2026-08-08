@@ -1,50 +1,7 @@
-/** Staples that get a color dot in the order chip cloud for faster scanning. */
-const FREQUENT_NAMES = [
-  // Rau
-  "Cà Rốt",
-  "Khoai Tây",
-  "Hành Tây",
-  "Tỏi",
-  "Gừng",
-  "Bắp Cải",
-  "Cải Thìa",
-  "Hành Lá",
-  "Ngò Rí",
-  "Xà Lách",
-  "Cà Chua",
-  "Nấm",
-  "Nấm rơm",
-  "Rau Muống",
-  "Bông Cải Xanh",
-  // Đậu hũ
-  "Đậu hũ trắng",
-  "Đậu hũ non",
-  "Đậu hũ chiên",
-  "Đậu bi",
-  // Gia vị
-  "Muối",
-  "Tiêu Đen",
-  "Ớt Bột",
-  "Bột Ngọt",
-  "Nghệ",
-  // Nước tương / sốt
-  "Nước Tương",
-  "Dầu Hào",
-  "Nước Mắm",
-  "Tương Ớt",
-  "Giấm",
-  // Khác
-  "Gạo",
-  "Bún",
-  "Mì",
-  "Đường",
-  "Dầu Ăn",
-  "Dầu Mè",
-] as const;
+/** Top-N ordered ingredients per category get a color locator dot. */
+export const TOP_FREQUENT_PER_CATEGORY = 5;
 
-const FREQUENT_KEYS = new Set(FREQUENT_NAMES.map(n => n.trim().toLowerCase()));
-
-/** Distinct dots — stable per name so staff learn “cà rốt = amber”, etc. */
+/** Distinct dots — stable per name so staff learn colors. */
 const DOT_CLASSES = [
   "bg-amber-500",
   "bg-emerald-500",
@@ -65,12 +22,42 @@ function hashName(name: string): number {
   return Math.abs(h);
 }
 
-export function isFrequentIngredient(name: string): boolean {
-  return FREQUENT_KEYS.has(name.trim().toLowerCase());
+export function ingredientDotClass(name: string): string {
+  return DOT_CLASSES[hashName(name) % DOT_CLASSES.length];
 }
 
-/** Tailwind bg class for the locator dot, or null if not frequent. */
-export function frequentIngredientDotClass(name: string): string | null {
-  if (!isFrequentIngredient(name)) return null;
-  return DOT_CLASSES[hashName(name) % DOT_CLASSES.length];
+type CountedIngredient = {
+  name: string;
+  category_id: string;
+  order_count?: number | null;
+};
+
+/**
+ * Names (lowercase) of the top `limit` ingredients by order_count within a category.
+ * Ties keep stable name order; zero-count items are excluded.
+ */
+export function topFrequentNamesForCategory(
+  ingredients: CountedIngredient[],
+  categoryId: string,
+  limit = TOP_FREQUENT_PER_CATEGORY,
+): Set<string> {
+  const ranked = ingredients
+    .filter(ing => ing.category_id === categoryId && (ing.order_count ?? 0) > 0)
+    .sort((a, b) => {
+      const diff = (b.order_count ?? 0) - (a.order_count ?? 0);
+      if (diff !== 0) return diff;
+      return a.name.localeCompare(b.name, "vi");
+    })
+    .slice(0, limit);
+
+  return new Set(ranked.map(ing => ing.name.trim().toLowerCase()));
+}
+
+/** Tailwind bg class for the locator dot, or null if not in the frequent set. */
+export function frequentIngredientDotClass(
+  name: string,
+  frequentNames: Set<string>,
+): string | null {
+  if (!frequentNames.has(name.trim().toLowerCase())) return null;
+  return ingredientDotClass(name);
 }

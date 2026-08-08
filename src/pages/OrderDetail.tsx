@@ -11,7 +11,10 @@ import {
   orderShareUrl,
 } from "@/lib/orderShare";
 import { importOrderCatalogFromSeed } from "@/lib/importOrderCatalog";
-import { frequentIngredientDotClass } from "@/lib/frequentOrderIngredients";
+import {
+  frequentIngredientDotClass,
+  topFrequentNamesForCategory,
+} from "@/lib/frequentOrderIngredients";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +44,7 @@ type CatalogIngredient = {
   subcategory: string | null;
   reference_price: number | null;
   quick_quantities: number[];
+  order_count?: number;
 };
 
 type CatalogCategory = {
@@ -165,7 +169,9 @@ export default function OrderDetail() {
         .order("sort_order", { ascending: true }),
       supabase
         .from("order_ingredients")
-        .select("id, name, unit, category_id, subcategory, reference_price, quick_quantities")
+        .select(
+          "id, name, unit, category_id, subcategory, reference_price, quick_quantities, order_count",
+        )
         .eq("user_id", user.id)
         .order("name", { ascending: true }),
     ]);
@@ -175,6 +181,7 @@ export default function OrderDetail() {
       setCatalog(
         (ings.data as any[]).map(r => ({
           ...r,
+          order_count: typeof r.order_count === "number" ? r.order_count : 0,
           quick_quantities: Array.isArray(r.quick_quantities) ? r.quick_quantities : [],
         })),
       );
@@ -199,6 +206,11 @@ export default function OrderDetail() {
 
   const lockedCat = catalogCats.find(c => c.id === lockedCatId);
   const lockedCatName = lockedCat?.name || "Danh mục";
+
+  const topFrequentNames = useMemo(
+    () => topFrequentNamesForCategory(catalog, lockedCatId),
+    [catalog, lockedCatId],
+  );
 
   useEffect(() => {
     if (routeId !== "new" || draftTitleReadyRef.current) return;
@@ -369,6 +381,7 @@ export default function OrderDetail() {
         justCreatedIdRef.current = data.id;
         const catQ = preferredCatKey ? `?cat=${encodeURIComponent(preferredCatKey)}` : "";
         navigate(`/orders/${data.id}${catQ}`, { replace: true });
+        void loadCatalog();
         return data.id;
       } catch (err: any) {
         toast.error(err.message || "Không lưu được đơn");
@@ -377,7 +390,7 @@ export default function OrderDetail() {
         persistingRef.current = false;
       }
     },
-    [user, title, lockedCatName, pin, preferredCatKey, navigate],
+    [user, title, lockedCatName, pin, preferredCatKey, navigate, loadCatalog],
   );
 
   /** If every line is gone, drop the DB row and return to a UI-only draft. */
@@ -405,16 +418,18 @@ export default function OrderDetail() {
         const alreadyPersisted = !!orderIdRef.current;
         void ensurePersisted(next).then(oid => {
           if (oid && alreadyPersisted) {
-            void persistDraftRows(oid, next).catch(() => {
-              /* silent — explicit Lưu still available */
-            });
+            void persistDraftRows(oid, next)
+              .then(() => loadCatalog())
+              .catch(() => {
+                /* silent — explicit Lưu still available */
+              });
           }
         });
       } else if (orderIdRef.current) {
         void abandonEmptyOrder();
       }
     },
-    [ensurePersisted, abandonEmptyOrder],
+    [ensurePersisted, abandonEmptyOrder, loadCatalog],
   );
 
   const pickIngredientForExpanded = (ing: CatalogIngredient) => {
@@ -515,7 +530,7 @@ export default function OrderDetail() {
                       expandedKey.startsWith("item-") &&
                       items[Number(expandedKey.slice(5))]?.name.trim().toLowerCase() ===
                         ing.name.trim().toLowerCase();
-                    const dotClass = frequentIngredientDotClass(ing.name);
+                    const dotClass = frequentIngredientDotClass(ing.name, topFrequentNames);
                     return (
                       <button
                         key={ing.id}

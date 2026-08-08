@@ -170,6 +170,40 @@
     align-content: flex-start;
   }
 
+  .ingredient-chip-pager {
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .ingredient-chip-pager::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ingredient-chip-page {
+    box-sizing: border-box;
+    flex: 0 0 100%;
+    width: 100%;
+    min-width: 0;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    padding: 0.15rem 0.15rem 0.35rem;
+  }
+
+  .ingredient-chip-track {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    justify-content: flex-start;
+    align-content: flex-start;
+    align-items: flex-start;
+    min-height: 7.5rem;
+  }
+
   .category-rail {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--primary) / 0.3) transparent;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Check, Copy, QrCode, Trash2 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
@@ -49,6 +49,7 @@ type CatalogCategory = {
 };
 
 const PLACEHOLDER_SLOTS = 4;
+const CHIP_PAGE_SIZE = 12;
 
 function defaultQty(ing: CatalogIngredient): string {
   if (Array.isArray(ing.quick_quantities) && ing.quick_quantities.length > 0) {
@@ -77,6 +78,10 @@ export default function OrderDetail() {
   const [lockedCatId, setLockedCatId] = useState<string>("");
   const [ingSearch, setIngSearch] = useState("");
   const [importing, setImporting] = useState(false);
+  const [chipPage, setChipPage] = useState(0);
+  /** Which list slot shows the ingredient cloud: item index, or `ph-${n}` for empty slots. */
+  const [expandedKey, setExpandedKey] = useState<string>("ph-0");
+  const chipPagerRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     if (!user || !id) return;
@@ -187,6 +192,39 @@ export default function OrderDetail() {
     return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b, "vi"));
   }, [activeIngredients]);
 
+  const ingredientPages = useMemo(() => {
+    const hasSubs =
+      groupedIngredients.length > 1 ||
+      groupedIngredients.some(([sub]) => Boolean(sub));
+
+    const chunk = (title: string, ings: CatalogIngredient[]) => {
+      const pages: { title: string; ings: CatalogIngredient[] }[] = [];
+      for (let i = 0; i < ings.length; i += CHIP_PAGE_SIZE) {
+        pages.push({ title, ings: ings.slice(i, i + CHIP_PAGE_SIZE) });
+      }
+      return pages;
+    };
+
+    if (hasSubs) {
+      return groupedIngredients.flatMap(([sub, ings]) => chunk(sub, ings));
+    }
+
+    const pages = chunk("", activeIngredients);
+    return pages.length > 0 ? pages : [{ title: "", ings: [] }];
+  }, [groupedIngredients, activeIngredients]);
+
+  useEffect(() => {
+    setChipPage(0);
+    chipPagerRef.current?.scrollTo({ left: 0, behavior: "auto" });
+  }, [lockedCatId, ingSearch]);
+
+  const settleChipPage = useCallback(() => {
+    const el = chipPagerRef.current;
+    if (!el || el.clientWidth <= 0) return;
+    const next = Math.round(el.scrollLeft / el.clientWidth);
+    setChipPage(Math.max(0, Math.min(next, ingredientPages.length - 1)));
+  }, [ingredientPages.length]);
+
   const priceByName = useMemo(() => {
     const map = new Map<string, number>();
     for (const ing of catalog) {
@@ -207,29 +245,164 @@ export default function OrderDetail() {
     return qty * price;
   };
 
-  const emptyPlaceholderCount = Math.max(0, PLACEHOLDER_SLOTS - items.length);
+  // Keep spare empty rows under the list; always at least one so you can add more
+  const emptyPlaceholderCount = Math.max(1, PLACEHOLDER_SLOTS - items.length);
 
-  const toggleIngredient = (ing: CatalogIngredient) => {
-    const key = ing.name.trim().toLowerCase();
-    const existingIdx = addedByName.get(key);
-    if (existingIdx != null) {
-      setItems(prev =>
-        prev.filter((_, i) => i !== existingIdx).map((row, i) => ({ ...row, sort_order: i })),
-      );
+  useEffect(() => {
+    // Keep expansion on a valid slot after items / placeholder count change
+    if (expandedKey.startsWith("item-")) {
+      const idx = Number(expandedKey.slice(5));
+      if (!Number.isFinite(idx) || idx < 0 || idx >= items.length) {
+        setExpandedKey(items.length === 0 ? "ph-0" : `item-${Math.max(0, items.length - 1)}`);
+      }
       return;
     }
-    setItems(prev => [
-      ...prev,
-      {
-        name: ing.name,
-        quantity: defaultQty(ing),
-        unit: ing.unit || "kg",
-        sort_order: prev.length,
-        catalog_id: ing.id,
-        reference_price: ing.reference_price,
-      },
-    ]);
+    if (expandedKey.startsWith("ph-")) {
+      const idx = Number(expandedKey.slice(3));
+      if (!Number.isFinite(idx) || idx < 0 || idx >= emptyPlaceholderCount) {
+        setExpandedKey("ph-0");
+      }
+    }
+  }, [items.length, expandedKey, emptyPlaceholderCount]);
+
+  const expandSlot = useCallback((key: string) => {
+    setExpandedKey(key);
+    setIngSearch("");
+    setChipPage(0);
+    requestAnimationFrame(() => {
+      chipPagerRef.current?.scrollTo({ left: 0, behavior: "auto" });
+    });
+  }, []);
+
+  const pickIngredientForExpanded = (ing: CatalogIngredient) => {
+    const key = ing.name.trim().toLowerCase();
+    const entry: OrderItemDraft = {
+      name: ing.name,
+      quantity: defaultQty(ing),
+      unit: ing.unit || "kg",
+      sort_order: 0,
+      catalog_id: ing.id,
+      reference_price: ing.reference_price,
+    };
+
+    if (expandedKey.startsWith("item-")) {
+      const idx = Number(expandedKey.slice(5));
+      setItems(prev => {
+        if (idx < 0 || idx >= prev.length) return prev;
+        if (prev[idx].name.trim().toLowerCase() === key) {
+          return prev.filter((_, i) => i !== idx).map((row, i) => ({ ...row, sort_order: i }));
+        }
+        const withoutOtherDup = prev.filter(
+          (row, i) => i === idx || row.name.trim().toLowerCase() !== key,
+        );
+        const at = Math.min(idx, withoutOtherDup.length - 1);
+        const next = withoutOtherDup.map((row, i) =>
+          i === at
+            ? { ...entry, id: prev[idx].id, sort_order: i }
+            : { ...row, sort_order: i },
+        );
+        return next;
+      });
+      return;
+    }
+
+    setItems(prev => {
+      const withoutDup = prev.filter(row => row.name.trim().toLowerCase() !== key);
+      return [...withoutDup, { ...entry, sort_order: withoutDup.length }];
+    });
+    // Keep a fresh empty row at the bottom ready for the next pick
+    queueMicrotask(() => expandSlot("ph-0"));
   };
+
+  const renderChipCloud = () => (
+    <div className="border-t border-border/50 px-3 py-2">
+      <div className="mb-2 flex items-center gap-2">
+        <Input
+          value={ingSearch}
+          onChange={e => setIngSearch(e.target.value)}
+          placeholder="Lọc…"
+          className="h-8 flex-1 text-xs"
+          onClick={e => e.stopPropagation()}
+        />
+      </div>
+      {ingredientPages.every(p => p.ings.length === 0) ? (
+        <p className="py-6 text-center text-xs text-muted-foreground">
+          Không có nguyên liệu trong danh mục này
+        </p>
+      ) : (
+        <>
+          {ingredientPages.length > 1 && (
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <p className="min-w-0 truncate text-[10px] text-muted-foreground">
+                {ingredientPages[chipPage]?.title
+                  ? ingredientPages[chipPage].title
+                  : `Trang ${chipPage + 1}/${ingredientPages.length}`}
+              </p>
+              <div className="flex items-center gap-1" aria-hidden="true">
+                {ingredientPages.map((_, i) => (
+                  <span
+                    key={i}
+                    className={`h-1 rounded-full transition-all ${
+                      i === chipPage ? "w-3.5 bg-primary/70" : "w-1 bg-border"
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+          <div
+            ref={chipPagerRef}
+            className="ingredient-chip-pager"
+            onScroll={settleChipPage}
+            onTouchEnd={settleChipPage}
+            aria-label="Danh sách nguyên liệu"
+          >
+            {ingredientPages.map((page, pageIdx) => (
+              <div key={page.title || `page-${pageIdx}`} className="ingredient-chip-page">
+                <div className="ingredient-chip-track">
+                  {page.ings.map(ing => {
+                    const selected = addedByName.has(ing.name.trim().toLowerCase());
+                    const isActiveRow =
+                      expandedKey.startsWith("item-") &&
+                      items[Number(expandedKey.slice(5))]?.name.trim().toLowerCase() ===
+                        ing.name.trim().toLowerCase();
+                    return (
+                      <button
+                        key={ing.id}
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation();
+                          pickIngredientForExpanded(ing);
+                        }}
+                        className={`inline-flex max-w-full items-center gap-1 rounded-lg border px-2.5 py-1.5 text-left text-xs transition-colors ${
+                          isActiveRow || selected
+                            ? "border-primary bg-primary/10 text-foreground"
+                            : "border-border/70 bg-background text-foreground hover:border-primary/40"
+                        }`}
+                      >
+                        {(isActiveRow || selected) && (
+                          <Check className="h-3 w-3 text-primary shrink-0" />
+                        )}
+                        <span className="truncate">{ing.name}</span>
+                        <span className="shrink-0 text-[10px] text-muted-foreground/55">
+                          {ing.unit}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+          {ingredientPages.length > 1 && (
+            <p className="mt-1.5 text-center text-[10px] text-muted-foreground/70">
+              Vuốt ngang để xem thêm
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
 
   const updateRow = (index: number, patch: Partial<OrderItemDraft>) => {
     setItems(prev => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
@@ -389,125 +562,115 @@ export default function OrderDetail() {
           </div>
         ) : (
           <>
-            {/* Expanded picker with ingredient cloud */}
-            <div className="rounded-2xl border border-primary/30 bg-card overflow-hidden shadow-sm">
-              <div className="flex items-center justify-between gap-2 bg-primary/5 px-3 py-2.5">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold truncate">{lockedCatName}</p>
-                  <p className="text-[11px] text-muted-foreground">Chọn nguyên liệu bên dưới</p>
-                </div>
-                <Input
-                  value={ingSearch}
-                  onChange={e => setIngSearch(e.target.value)}
-                  placeholder="Lọc…"
-                  className="h-8 max-w-[7.5rem] text-xs"
-                />
-              </div>
-
-              <div className="border-t border-border/50 px-3 py-2">
-                <div className="max-h-56 overflow-y-auto space-y-2.5 pb-1">
-                  {groupedIngredients.length === 0 && (
-                    <p className="py-6 text-center text-xs text-muted-foreground">
-                      Không có nguyên liệu trong danh mục này
-                    </p>
-                  )}
-                  {groupedIngredients.map(([sub, ings]) => (
-                    <div key={sub || "_"} className="space-y-1">
-                      {sub ? (
-                        <p className="px-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                          {sub}
-                        </p>
-                      ) : null}
-                      <div className="flex flex-wrap gap-1.5">
-                        {ings.map(ing => {
-                          const selected = addedByName.has(ing.name.trim().toLowerCase());
-                          return (
-                            <button
-                              key={ing.id}
-                              type="button"
-                              onClick={() => toggleIngredient(ing)}
-                              className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-left text-xs transition-colors ${
-                                selected
-                                  ? "border-primary bg-primary/10 text-foreground"
-                                  : "border-border/70 bg-background text-foreground hover:border-primary/40"
-                              }`}
-                            >
-                              {selected && <Check className="h-3 w-3 text-primary shrink-0" />}
-                              <span>{ing.name}</span>
-                              <span className="text-[10px] text-muted-foreground/55">{ing.unit}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Selected lines: name · qty + translucent unit · estimate */}
+            {/* Filled rows — tap to expand chip cloud here */}
             {items.map((row, index) => {
               const estimate = lineEstimate(row);
+              const key = `item-${index}`;
+              const expanded = expandedKey === key;
               return (
                 <div
-                  key={row.id || `${row.name}-${index}`}
-                  className="flex items-center gap-2 rounded-xl border border-border/50 bg-card px-3 py-2.5"
+                  key={row.id || key}
+                  className={`overflow-hidden rounded-2xl border transition-colors ${
+                    expanded
+                      ? "border-primary/30 bg-card shadow-sm"
+                      : "border-border/50 bg-card"
+                  }`}
                 >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium leading-tight">{row.name}</p>
-                    <div className="mt-1 flex items-baseline gap-1.5">
-                      <Input
-                        value={row.quantity}
-                        onChange={e =>
-                          updateRow(index, { quantity: e.target.value.replace(/[^\d.]/g, "") })
-                        }
-                        placeholder="0"
-                        inputMode="decimal"
-                        className="h-7 w-16 border-0 bg-muted/40 px-2 text-sm tabular-nums shadow-none focus-visible:ring-1"
-                        aria-label={`Số lượng ${row.name}`}
-                      />
-                      <span className="text-xs text-muted-foreground/45">{row.unit}</span>
-                    </div>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    {estimate != null ? (
-                      <MoneyLabel
-                        amount={estimate}
-                        className="text-sm font-display text-foreground/90"
-                        smallClassName="text-[0.7em]"
-                      />
-                    ) : (
-                      <span className="text-[11px] text-muted-foreground/40">—</span>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeRow(index)}
-                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    aria-label={`Xóa ${row.name}`}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => expandSlot(key)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        expandSlot(key);
+                      }
+                    }}
+                    className={`flex w-full cursor-pointer items-center gap-2 px-3 py-2.5 text-left ${
+                      expanded ? "bg-primary/5" : ""
+                    }`}
                   >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium leading-tight">{row.name}</p>
+                      <div
+                        className="mt-1 flex items-baseline gap-1.5"
+                        onClick={e => e.stopPropagation()}
+                        onPointerDown={e => e.stopPropagation()}
+                      >
+                        <Input
+                          value={row.quantity}
+                          onChange={e =>
+                            updateRow(index, { quantity: e.target.value.replace(/[^\d.]/g, "") })
+                          }
+                          placeholder="0"
+                          inputMode="decimal"
+                          className="h-7 w-16 border-0 bg-muted/40 px-2 text-sm tabular-nums shadow-none focus-visible:ring-1"
+                          aria-label={`Số lượng ${row.name}`}
+                        />
+                        <span className="text-xs text-muted-foreground/45">{row.unit}</span>
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      {estimate != null ? (
+                        <MoneyLabel
+                          amount={estimate}
+                          className="text-sm font-display text-foreground/90"
+                          smallClassName="text-[0.7em]"
+                        />
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground/40">—</span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={e => {
+                        e.stopPropagation();
+                        removeRow(index);
+                      }}
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      aria-label={`Xóa ${row.name}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {expanded && renderChipCloud()}
                 </div>
               );
             })}
 
-            {/* Empty placeholders — same layout, muted */}
-            {Array.from({ length: emptyPlaceholderCount }).map((_, i) => (
-              <div
-                key={`ph-${i}`}
-                className="flex items-center gap-2 rounded-xl border border-dashed border-border/60 bg-muted/15 px-3 py-2.5"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-muted-foreground/35">Tên nguyên liệu</p>
-                  <div className="mt-1 flex items-baseline gap-1.5">
-                    <span className="text-sm tabular-nums text-muted-foreground/30">0</span>
-                    <span className="text-xs text-muted-foreground/25">đv</span>
-                  </div>
+            {/* Empty placeholder rows — tap to expand picker */}
+            {Array.from({ length: emptyPlaceholderCount }).map((_, i) => {
+              const key = `ph-${i}`;
+              const expanded = expandedKey === key;
+              return (
+                <div
+                  key={key}
+                  className={`overflow-hidden rounded-2xl border transition-colors ${
+                    expanded
+                      ? "border-primary/30 bg-card shadow-sm"
+                      : "border-dashed border-border/60 bg-muted/15"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => expandSlot(key)}
+                    className={`flex w-full items-center gap-2 px-3 py-2.5 text-left ${
+                      expanded ? "bg-primary/5" : ""
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-muted-foreground/35">Tên nguyên liệu</p>
+                      <div className="mt-1 flex items-baseline gap-1.5">
+                        <span className="text-sm tabular-nums text-muted-foreground/30">0</span>
+                        <span className="text-xs text-muted-foreground/25">đv</span>
+                      </div>
+                    </div>
+                    <span className="shrink-0 text-[11px] text-muted-foreground/25">ước tính</span>
+                  </button>
+                  {expanded && renderChipCloud()}
                 </div>
-                <span className="shrink-0 text-[11px] text-muted-foreground/25">ước tính</span>
-              </div>
-            ))}
+              );
+            })}
           </>
         )}
       </div>

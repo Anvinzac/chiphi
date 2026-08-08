@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Check, Copy, QrCode, Trash2 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ import {
 import { importOrderCatalogFromSeed } from "@/lib/importOrderCatalog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import MoneyLabel from "@/components/daily/MoneyLabel";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,7 @@ type OrderItemDraft = {
   unit: string;
   sort_order: number;
   catalog_id?: string;
+  reference_price?: number | null;
 };
 
 type CatalogIngredient = {
@@ -43,9 +45,10 @@ type CatalogCategory = {
   id: string;
   name: string;
   sort_order: number;
+  source_key?: string | null;
 };
 
-const UNITS = ["kg", "g", "lít", "ml", "bó", "hộp", "chai", "cái", "bao", "gói", "bịch", "lon", "cuộn", "bình", "tá"];
+const PLACEHOLDER_SLOTS = 4;
 
 function defaultQty(ing: CatalogIngredient): string {
   if (Array.isArray(ing.quick_quantities) && ing.quick_quantities.length > 0) {
@@ -56,6 +59,8 @@ function defaultQty(ing: CatalogIngredient): string {
 
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const preferredCatKey = searchParams.get("cat") || "";
   const { user } = useAuth();
   const navigate = useNavigate();
   const [title, setTitle] = useState("");
@@ -66,9 +71,10 @@ export default function OrderDetail() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [shareStep, setShareStep] = useState<"pin" | "qr">("pin");
   const [catalog, setCatalog] = useState<CatalogIngredient[]>([]);
   const [catalogCats, setCatalogCats] = useState<CatalogCategory[]>([]);
-  const [activeCatId, setActiveCatId] = useState<string>("");
+  const [lockedCatId, setLockedCatId] = useState<string>("");
   const [ingSearch, setIngSearch] = useState("");
   const [importing, setImporting] = useState(false);
 
@@ -111,7 +117,7 @@ export default function OrderDetail() {
     const [cats, ings] = await Promise.all([
       supabase
         .from("order_categories")
-        .select("id, name, sort_order")
+        .select("id, name, sort_order, source_key")
         .eq("user_id", user.id)
         .order("sort_order", { ascending: true }),
       supabase
@@ -132,11 +138,12 @@ export default function OrderDetail() {
     } else {
       setCatalog([]);
     }
-    setActiveCatId(prev => {
-      if (prev && nextCats.some(c => c.id === prev)) return prev;
-      return nextCats[0]?.id || "";
-    });
-  }, [user]);
+
+    const preferred = preferredCatKey
+      ? nextCats.find(c => c.source_key === preferredCatKey)
+      : null;
+    setLockedCatId(preferred?.id || nextCats[0]?.id || "");
+  }, [user, preferredCatKey]);
 
   useEffect(() => {
     load();
@@ -151,29 +158,24 @@ export default function OrderDetail() {
     [shareToken],
   );
 
+  const lockedCat = catalogCats.find(c => c.id === lockedCatId);
+  const lockedCatName = lockedCat?.name || "Danh mục";
+
   const addedByName = useMemo(() => {
     const map = new Map<string, number>();
     items.forEach((row, i) => map.set(row.name.trim().toLowerCase(), i));
     return map;
   }, [items]);
 
-  const countsByCat = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const ing of catalog) {
-      map.set(ing.category_id, (map.get(ing.category_id) || 0) + 1);
-    }
-    return map;
-  }, [catalog]);
-
   const activeIngredients = useMemo(() => {
-    if (!activeCatId) return [];
+    if (!lockedCatId) return [];
     const q = ingSearch.trim().toLowerCase();
     return catalog.filter(ing => {
-      if (ing.category_id !== activeCatId) return false;
+      if (ing.category_id !== lockedCatId) return false;
       if (q && !ing.name.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [catalog, activeCatId, ingSearch]);
+  }, [catalog, lockedCatId, ingSearch]);
 
   const groupedIngredients = useMemo(() => {
     const groups = new Map<string, CatalogIngredient[]>();
@@ -185,12 +187,27 @@ export default function OrderDetail() {
     return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b, "vi"));
   }, [activeIngredients]);
 
-  const unitOptions = useMemo(() => {
-    const set = new Set(UNITS);
-    for (const ing of catalog) if (ing.unit) set.add(ing.unit);
-    for (const row of items) if (row.unit) set.add(row.unit);
-    return Array.from(set);
-  }, [catalog, items]);
+  const priceByName = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const ing of catalog) {
+      if (ing.reference_price != null && Number(ing.reference_price) > 0) {
+        map.set(ing.name.trim().toLowerCase(), Number(ing.reference_price));
+      }
+    }
+    return map;
+  }, [catalog]);
+
+  const lineEstimate = (row: OrderItemDraft) => {
+    const qty = Number(row.quantity) || 0;
+    const price =
+      row.reference_price != null && Number(row.reference_price) > 0
+        ? Number(row.reference_price)
+        : priceByName.get(row.name.trim().toLowerCase());
+    if (!price || qty <= 0) return null;
+    return qty * price;
+  };
+
+  const emptyPlaceholderCount = Math.max(0, PLACEHOLDER_SLOTS - items.length);
 
   const toggleIngredient = (ing: CatalogIngredient) => {
     const key = ing.name.trim().toLowerCase();
@@ -209,6 +226,7 @@ export default function OrderDetail() {
         unit: ing.unit || "kg",
         sort_order: prev.length,
         catalog_id: ing.id,
+        reference_price: ing.reference_price,
       },
     ]);
   };
@@ -235,7 +253,7 @@ export default function OrderDetail() {
     }
   };
 
-  const save = async (nextStatus?: string) => {
+  const save = async (nextStatus?: string, pinOverride?: string) => {
     if (!user || !id) return;
     const cleaned = items
       .map((row, i) => ({
@@ -253,7 +271,7 @@ export default function OrderDetail() {
 
     setSaving(true);
     try {
-      const pinHash = await hashPin(pin || "1234");
+      const pinHash = await hashPin((pinOverride ?? pin) || "1234");
       const { error: orderErr } = await supabase
         .from("orders")
         .update({
@@ -292,15 +310,29 @@ export default function OrderDetail() {
     }
   };
 
-  const share = async () => {
-    const ok = await save("shared");
+  const openShareFlow = () => {
+    if (items.filter(r => r.name.trim() && Number(r.quantity) > 0).length === 0) {
+      toast.error("Chọn ít nhất một nguyên liệu");
+      return;
+    }
+    setShareStep("pin");
+    setShareOpen(true);
+  };
+
+  const confirmPinAndShare = async () => {
+    const trimmed = (pin || "").trim();
+    if (trimmed.length < 4) {
+      toast.error("PIN cần ít nhất 4 số");
+      return;
+    }
+    const ok = await save("shared", trimmed);
     if (!ok) return;
     if (!shareToken) {
       const token = generateShareToken();
       await supabase.from("orders").update({ share_token: token }).eq("id", id!);
       setShareToken(token);
     }
-    setShareOpen(true);
+    setShareStep("qr");
   };
 
   const copyLink = async () => {
@@ -320,8 +352,6 @@ export default function OrderDetail() {
     );
   }
 
-  const activeCatName = catalogCats.find(c => c.id === activeCatId)?.name;
-
   return (
     <div className="min-h-screen bg-background pb-28">
       <div className="sticky top-0 z-10 border-b border-border/60 bg-background/95 px-4 py-3 backdrop-blur-sm">
@@ -333,186 +363,153 @@ export default function OrderDetail() {
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
-          <Input
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            className="h-9 border-0 bg-transparent px-0 font-display text-lg shadow-none focus-visible:ring-0"
-            aria-label="Tiêu đề đơn"
-          />
+          <div className="min-w-0 flex-1">
+            <Input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              className="h-8 border-0 bg-transparent px-0 font-display text-lg shadow-none focus-visible:ring-0"
+              aria-label="Tiêu đề đơn"
+            />
+            <p className="text-[11px] text-muted-foreground truncate">
+              Danh mục: <span className="font-medium text-foreground/80">{lockedCatName}</span>
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-lg space-y-5 px-4 py-4">
-        <div className="rounded-xl border border-border/60 bg-card p-3 space-y-2">
-          <label className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-            PIN nhà cung cấp
-          </label>
-          <Input
-            type="text"
-            inputMode="numeric"
-            value={pin}
-            onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, 8))}
-            placeholder="1234"
-            className="h-10"
-            maxLength={8}
-          />
-        </div>
-
-        {/* Category-first catalog picker */}
-        <section className="space-y-3">
-          <div>
-            <h2 className="text-sm font-semibold">Chọn theo danh mục</h2>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              Bấm danh mục → chọn nguyên liệu. Đổi danh mục bằng cách bấm ô khác.
-              Sửa tên danh mục trong Admin → Danh mục ĐH.
+      <div className="mx-auto max-w-lg space-y-2 px-4 py-4">
+        {catalogCats.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border px-4 py-5 text-center space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Chưa có danh mục / nguyên liệu. Nhập từ pantry để bắt đầu.
             </p>
+            <Button type="button" size="sm" disabled={importing} onClick={runImport}>
+              {importing ? "Đang nhập…" : "Nhập từ pantry"}
+            </Button>
           </div>
-
-          {catalogCats.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border px-4 py-5 text-center space-y-3">
-              <p className="text-xs text-muted-foreground">
-                Chưa có danh mục / nguyên liệu. Nhập từ pantry để bắt đầu.
-              </p>
-              <Button type="button" size="sm" disabled={importing} onClick={runImport}>
-                {importing ? "Đang nhập…" : "Nhập từ pantry"}
-              </Button>
-            </div>
-          ) : (
-            <>
-              <div className="flex flex-wrap gap-1.5">
-                {catalogCats.map(cat => {
-                  const active = cat.id === activeCatId;
-                  const count = countsByCat.get(cat.id) || 0;
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => {
-                        setActiveCatId(cat.id);
-                        setIngSearch("");
-                      }}
-                      className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                        active
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {cat.name}
-                      <span className={`ml-1 opacity-70 ${active ? "opacity-80" : ""}`}>
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {activeCatId && (
-                <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
-                  <div className="flex items-center justify-between gap-2 border-b border-border/50 px-3 py-2">
-                    <p className="text-xs font-semibold text-foreground">{activeCatName}</p>
-                    <Input
-                      value={ingSearch}
-                      onChange={e => setIngSearch(e.target.value)}
-                      placeholder="Lọc nhanh…"
-                      className="h-8 max-w-[9rem] text-xs"
-                    />
-                  </div>
-
-                  <div className="max-h-64 overflow-y-auto p-2 space-y-3">
-                    {groupedIngredients.length === 0 && (
-                      <p className="py-6 text-center text-xs text-muted-foreground">
-                        Không có nguyên liệu trong danh mục này
-                      </p>
-                    )}
-                    {groupedIngredients.map(([sub, ings]) => (
-                      <div key={sub || "_"} className="space-y-1">
-                        {sub ? (
-                          <p className="px-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                            {sub}
-                          </p>
-                        ) : null}
-                        <div className="flex flex-wrap gap-1.5">
-                          {ings.map(ing => {
-                            const selected = addedByName.has(ing.name.trim().toLowerCase());
-                            return (
-                              <button
-                                key={ing.id}
-                                type="button"
-                                onClick={() => toggleIngredient(ing)}
-                                className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-left text-xs transition-colors ${
-                                  selected
-                                    ? "border-primary bg-primary/10 text-foreground"
-                                    : "border-border/70 bg-background text-foreground hover:border-primary/40"
-                                }`}
-                              >
-                                {selected && <Check className="h-3 w-3 text-primary shrink-0" />}
-                                <span>{ing.name}</span>
-                                <span className="text-[10px] text-muted-foreground">{ing.unit}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </section>
-
-        {/* Current order lines */}
-        <section className="space-y-2">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-sm font-semibold">Đơn đang soạn</h2>
-            <span className="text-[11px] text-muted-foreground">{items.length} dòng</span>
-          </div>
-
-          {items.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
-              Chưa chọn gì — bấm nguyên liệu ở danh mục phía trên
-            </p>
-          ) : (
-            items.map((row, index) => (
-              <div
-                key={row.id || `${row.name}-${index}`}
-                className="grid grid-cols-[1fr_4.5rem_5rem_auto] gap-1.5 rounded-xl border border-border/50 bg-card p-2"
-              >
-                <div className="flex h-9 items-center px-1 text-sm font-medium truncate" title={row.name}>
-                  {row.name}
+        ) : (
+          <>
+            {/* Expanded picker with ingredient cloud */}
+            <div className="rounded-2xl border border-primary/30 bg-card overflow-hidden shadow-sm">
+              <div className="flex items-center justify-between gap-2 bg-primary/5 px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate">{lockedCatName}</p>
+                  <p className="text-[11px] text-muted-foreground">Chọn nguyên liệu bên dưới</p>
                 </div>
                 <Input
-                  value={row.quantity}
-                  onChange={e => updateRow(index, { quantity: e.target.value.replace(/[^\d.]/g, "") })}
-                  placeholder="SL"
-                  inputMode="decimal"
-                  className="h-9 text-sm"
+                  value={ingSearch}
+                  onChange={e => setIngSearch(e.target.value)}
+                  placeholder="Lọc…"
+                  className="h-8 max-w-[7.5rem] text-xs"
                 />
-                <select
-                  value={row.unit}
-                  onChange={e => updateRow(index, { unit: e.target.value })}
-                  className="h-9 rounded-md border border-input bg-background px-2 text-xs"
-                  aria-label="Đơn vị"
-                >
-                  {!unitOptions.includes(row.unit) && row.unit && (
-                    <option value={row.unit}>{row.unit}</option>
-                  )}
-                  {unitOptions.map(u => (
-                    <option key={u} value={u}>{u}</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => removeRow(index)}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                  aria-label="Xóa dòng"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
               </div>
-            ))
-          )}
-        </section>
+
+              <div className="border-t border-border/50 px-3 py-2">
+                <div className="max-h-56 overflow-y-auto space-y-2.5 pb-1">
+                  {groupedIngredients.length === 0 && (
+                    <p className="py-6 text-center text-xs text-muted-foreground">
+                      Không có nguyên liệu trong danh mục này
+                    </p>
+                  )}
+                  {groupedIngredients.map(([sub, ings]) => (
+                    <div key={sub || "_"} className="space-y-1">
+                      {sub ? (
+                        <p className="px-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                          {sub}
+                        </p>
+                      ) : null}
+                      <div className="flex flex-wrap gap-1.5">
+                        {ings.map(ing => {
+                          const selected = addedByName.has(ing.name.trim().toLowerCase());
+                          return (
+                            <button
+                              key={ing.id}
+                              type="button"
+                              onClick={() => toggleIngredient(ing)}
+                              className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-left text-xs transition-colors ${
+                                selected
+                                  ? "border-primary bg-primary/10 text-foreground"
+                                  : "border-border/70 bg-background text-foreground hover:border-primary/40"
+                              }`}
+                            >
+                              {selected && <Check className="h-3 w-3 text-primary shrink-0" />}
+                              <span>{ing.name}</span>
+                              <span className="text-[10px] text-muted-foreground/55">{ing.unit}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Selected lines: name · qty + translucent unit · estimate */}
+            {items.map((row, index) => {
+              const estimate = lineEstimate(row);
+              return (
+                <div
+                  key={row.id || `${row.name}-${index}`}
+                  className="flex items-center gap-2 rounded-xl border border-border/50 bg-card px-3 py-2.5"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium leading-tight">{row.name}</p>
+                    <div className="mt-1 flex items-baseline gap-1.5">
+                      <Input
+                        value={row.quantity}
+                        onChange={e =>
+                          updateRow(index, { quantity: e.target.value.replace(/[^\d.]/g, "") })
+                        }
+                        placeholder="0"
+                        inputMode="decimal"
+                        className="h-7 w-16 border-0 bg-muted/40 px-2 text-sm tabular-nums shadow-none focus-visible:ring-1"
+                        aria-label={`Số lượng ${row.name}`}
+                      />
+                      <span className="text-xs text-muted-foreground/45">{row.unit}</span>
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    {estimate != null ? (
+                      <MoneyLabel
+                        amount={estimate}
+                        className="text-sm font-display text-foreground/90"
+                        smallClassName="text-[0.7em]"
+                      />
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground/40">—</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeRow(index)}
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    aria-label={`Xóa ${row.name}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              );
+            })}
+
+            {/* Empty placeholders — same layout, muted */}
+            {Array.from({ length: emptyPlaceholderCount }).map((_, i) => (
+              <div
+                key={`ph-${i}`}
+                className="flex items-center gap-2 rounded-xl border border-dashed border-border/60 bg-muted/15 px-3 py-2.5"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-muted-foreground/35">Tên nguyên liệu</p>
+                  <div className="mt-1 flex items-baseline gap-1.5">
+                    <span className="text-sm tabular-nums text-muted-foreground/30">0</span>
+                    <span className="text-xs text-muted-foreground/25">đv</span>
+                  </div>
+                </div>
+                <span className="shrink-0 text-[11px] text-muted-foreground/25">ước tính</span>
+              </div>
+            ))}
+          </>
+        )}
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-card/95 px-4 py-3 backdrop-blur-sm safe-area-bottom">
@@ -530,7 +527,7 @@ export default function OrderDetail() {
             type="button"
             className="flex-1 gap-1.5"
             disabled={saving}
-            onClick={share}
+            onClick={openShareFlow}
           >
             <QrCode className="h-4 w-4" />
             Link & QR
@@ -538,28 +535,63 @@ export default function OrderDetail() {
         </div>
       </div>
 
-      <Dialog open={shareOpen} onOpenChange={setShareOpen}>
+      <Dialog
+        open={shareOpen}
+        onOpenChange={open => {
+          setShareOpen(open);
+          if (!open) setShareStep("pin");
+        }}
+      >
         <DialogContent className="max-w-[92vw] rounded-xl sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle className="font-display">Gửi nhà cung cấp</DialogTitle>
+            <DialogTitle className="font-display">
+              {shareStep === "pin" ? "Đặt PIN nhà cung cấp" : "Gửi nhà cung cấp"}
+            </DialogTitle>
           </DialogHeader>
-          <div className="flex flex-col items-center gap-4 py-2">
-            {shareUrl && (
-              <div className="rounded-xl bg-white p-3 shadow-sm">
-                <QRCodeSVG value={shareUrl} size={180} level="M" />
-              </div>
-            )}
-            <p className="w-full break-all rounded-lg bg-muted/50 px-3 py-2 text-center text-[11px] text-muted-foreground">
-              {shareUrl}
-            </p>
-            <p className="text-center text-xs text-muted-foreground">
-              PIN: <span className="font-semibold text-foreground">{pin || "1234"}</span>
-            </p>
-            <Button type="button" onClick={copyLink} className="w-full gap-2">
-              <Copy className="h-4 w-4" />
-              Copy link
-            </Button>
-          </div>
+
+          {shareStep === "pin" ? (
+            <div className="space-y-4 py-1">
+              <p className="text-xs text-muted-foreground">
+                Người nhận cần PIN này để mở và cập nhật đơn. Mặc định 1234.
+              </p>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={pin}
+                onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                placeholder="1234"
+                className="h-11 text-center text-lg tracking-[0.35em]"
+                maxLength={8}
+                autoFocus
+              />
+              <Button
+                type="button"
+                className="w-full"
+                disabled={saving}
+                onClick={confirmPinAndShare}
+              >
+                {saving ? "Đang tạo…" : "Tạo link & QR"}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-4 py-2">
+              {shareUrl && (
+                <div className="rounded-xl bg-white p-3 shadow-sm">
+                  <QRCodeSVG value={shareUrl} size={180} level="M" />
+                </div>
+              )}
+              <p className="w-full break-all rounded-lg bg-muted/50 px-3 py-2 text-center text-[11px] text-muted-foreground">
+                {shareUrl}
+              </p>
+              <p className="text-center text-xs text-muted-foreground">
+                PIN: <span className="font-semibold text-foreground">{pin || "1234"}</span>
+              </p>
+              <Button type="button" onClick={copyLink} className="w-full gap-2">
+                <Copy className="h-4 w-4" />
+                Copy link
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

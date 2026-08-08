@@ -1,65 +1,40 @@
 {
   "categories": [
     {
-      "key": "vegetables",
-      "nameVi": "Rau củ",
+      "key": "rau",
+      "nameVi": "Rau",
+      "adminMatch": "Rau",
       "sort_order": 0
     },
     {
-      "key": "proteins",
-      "nameVi": "Đạm",
+      "key": "dau-hu",
+      "nameVi": "Đậu hũ",
+      "adminMatch": "Đậu hũ",
       "sort_order": 1
     },
     {
-      "key": "tofu",
-      "nameVi": "Đậu hũ",
+      "key": "gia-vi",
+      "nameVi": "Gia vị",
+      "adminMatch": "Nguyên vật liệu",
       "sort_order": 2
     },
     {
-      "key": "dairy",
-      "nameVi": "Sữa / phô mai",
+      "key": "nuoc-tuong",
+      "nameVi": "Nước tương",
+      "adminMatch": "Nước tương",
       "sort_order": 3
     },
     {
-      "key": "grains",
-      "nameVi": "Tinh bột",
+      "key": "khac",
+      "nameVi": "Khác",
+      "adminMatch": "Khác",
       "sort_order": 4
-    },
-    {
-      "key": "oils",
-      "nameVi": "Dầu",
-      "sort_order": 5
-    },
-    {
-      "key": "sauces",
-      "nameVi": "Gia vị nước",
-      "sort_order": 6
-    },
-    {
-      "key": "spices",
-      "nameVi": "Gia vị khô",
-      "sort_order": 7
-    },
-    {
-      "key": "equipment",
-      "nameVi": "Dụng cụ",
-      "sort_order": 8
-    },
-    {
-      "key": "tissue",
-      "nameVi": "Giấy / bao bì",
-      "sort_order": 9
-    },
-    {
-      "key": "gas",
-      "nameVi": "Gas / nhiên liệu",
-      "sort_order": 10
     }
   ],
   "ingredients": [
     {
       "source_key": "v1",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "root-vegetables",
       "name": "Cà Rốt",
       "unit": "kg",
@@ -71,7 +46,7 @@
     },
     {
       "source_key": "v2",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "root-vegetables",
       "name": "Khoai Tây",
       "unit": "kg",
@@ -83,7 +58,7 @@
     },
     {
       "source_key": "v3",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Hành Tây",
       "unit": "kg",
@@ -95,7 +70,7 @@
     },
     {
       "source_key": "v4",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "root-vegetables",
       "name": "Tỏi",
       "unit": "kg",
@@ -107,7 +82,7 @@
     },
     {
       "source_key": "v20",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "root-vegetables",
       "name": "Gừng",
       "unit": "kg",
@@ -119,7 +94,7 @@
     },
     {
       "source_key": "v21",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "root-vegetables",
       "name": "Củ Dền",
       "unit": "kg",
@@ -131,7 +106,7 @@
     },
     {
       "source_key": "v22",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "root-vegetables",
       "name": "Củ Cải",
       "unit": "kg",
@@ -143,7 +118,7 @@
     },
     {
       "source_key": "v23",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "root-vegetables",
       "name": "Củ Cải Trắng",
       "unit": "kg",
@@ -155,7 +130,7 @@
     },
     {
       "source_key": "v24",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "root-vegetables",
       "name": "Khoai Lang",
       "unit": "kg",
@@ -167,7 +142,7 @@
     },
     {
       "source_key": "v25",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "root-vegetables",
       "name": "Khoai Môn",
       "unit": "kg",
@@ -179,7 +154,7 @@
     },
     {
       "source_key": "v6",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Xà Lách",
       "unit": "cái",
@@ -191,7 +166,7 @@
     },
     {
       "source_key": "v10",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Rau Bina",
       "unit": "bịch",
@@ -203,7 +178,7 @@
     },
     {
       "source_key": "v16",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Bắp Cải",
       "unit": "cái",
@@ -215,7 +190,7 @@
     },
     {
       "source_key": "v26",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Cải Thìa",
       "unit": "kg",
@@ -227,7 +202,7 @@
     },
     {
       "source_key": "v27",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Cải Xoăn",
       "unit": "bịch",
@@ -239,7 +214,7 @@
     },
     {
       "source_key": "v28",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Cải Cầu Vồng",
       "unit": "bịch",
@@ -251,7 +226,7 @@
     },
     {
       "source_key": "v29",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Rau Rocket",
       "unit": "bịch",
@@ -263,7 +238,7 @@
     },
     {
       "source_key": "v30",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Rau Càng Cua",
       "unit": "bịch",
@@ -275,7 +250,7 @@
     },
     {
       "source_key": "v13",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "herbs",
       "name": "Cần Tây",
       "unit": "cái",
@@ -287,7 +262,7 @@
     },
     {
       "source_key": "v31",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "herbs",
       "name": "Hành Lá",
       "unit": "kg",
@@ -299,7 +274,7 @@
     },
     {
       "source_key": "v32",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "herbs",
       "name": "Ngò Rí",
       "unit": "bịch",
@@ -311,7 +286,7 @@
     },
     {
       "source_key": "v33",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "herbs",
       "name": "Húng Lủi",
       "unit": "bịch",
@@ -323,7 +298,7 @@
     },
     {
       "source_key": "v34",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "herbs",
       "name": "Húng Quế",
       "unit": "bịch",
@@ -335,7 +310,7 @@
     },
     {
       "source_key": "v35",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "herbs",
       "name": "Thì Là",
       "unit": "bịch",
@@ -347,7 +322,7 @@
     },
     {
       "source_key": "v36",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "herbs",
       "name": "Mùi Tây",
       "unit": "bịch",
@@ -359,7 +334,7 @@
     },
     {
       "source_key": "v37",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "herbs",
       "name": "Sả",
       "unit": "kg",
@@ -371,7 +346,7 @@
     },
     {
       "source_key": "v38",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "herbs",
       "name": "Hẹ",
       "unit": "bịch",
@@ -383,7 +358,7 @@
     },
     {
       "source_key": "v39",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Rau Muống",
       "unit": "kg",
@@ -395,7 +370,7 @@
     },
     {
       "source_key": "v5",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "fruit-vegetables",
       "name": "Cà Chua",
       "unit": "kg",
@@ -407,7 +382,7 @@
     },
     {
       "source_key": "v7",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "fruit-vegetables",
       "name": "Dưa Leo",
       "unit": "cái",
@@ -419,7 +394,7 @@
     },
     {
       "source_key": "v8",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "fruit-vegetables",
       "name": "Ớt Chuông",
       "unit": "cái",
@@ -431,7 +406,7 @@
     },
     {
       "source_key": "v9",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Bông Cải Xanh",
       "unit": "cái",
@@ -443,7 +418,7 @@
     },
     {
       "source_key": "v11",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "mushrooms",
       "name": "Nấm",
       "unit": "gói",
@@ -455,7 +430,7 @@
     },
     {
       "source_key": "v12",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "fruit-vegetables",
       "name": "Bắp Ngô",
       "unit": "cái",
@@ -467,7 +442,7 @@
     },
     {
       "source_key": "v14",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "fruit-vegetables",
       "name": "Bí Ngòi",
       "unit": "cái",
@@ -479,7 +454,7 @@
     },
     {
       "source_key": "v15",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "fruit-vegetables",
       "name": "Cà Tím",
       "unit": "cái",
@@ -491,7 +466,7 @@
     },
     {
       "source_key": "v17",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "beans-legumes",
       "name": "Đậu Que",
       "unit": "kg",
@@ -503,7 +478,7 @@
     },
     {
       "source_key": "v18",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "beans-legumes",
       "name": "Đậu Hà Lan",
       "unit": "kg",
@@ -515,7 +490,7 @@
     },
     {
       "source_key": "v19",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Ớt",
       "unit": "kg",
@@ -527,7 +502,7 @@
     },
     {
       "source_key": "v40",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "stems-shoots",
       "name": "Súp Lơ",
       "unit": "cái",
@@ -539,7 +514,7 @@
     },
     {
       "source_key": "v41",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "stems-shoots",
       "name": "Măng",
       "unit": "lon",
@@ -551,7 +526,7 @@
     },
     {
       "source_key": "v42",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "stems-shoots",
       "name": "Giá Đỗ",
       "unit": "kg",
@@ -563,7 +538,7 @@
     },
     {
       "source_key": "s1",
-      "category_key": "sauces",
+      "category_key": "nuoc-tuong",
       "subcategory": null,
       "name": "Nước Tương",
       "unit": "chai",
@@ -575,7 +550,7 @@
     },
     {
       "source_key": "s2",
-      "category_key": "sauces",
+      "category_key": "nuoc-tuong",
       "subcategory": null,
       "name": "Dầu Hào",
       "unit": "chai",
@@ -587,7 +562,7 @@
     },
     {
       "source_key": "s3",
-      "category_key": "sauces",
+      "category_key": "nuoc-tuong",
       "subcategory": null,
       "name": "Nước Mắm",
       "unit": "chai",
@@ -599,7 +574,7 @@
     },
     {
       "source_key": "s4",
-      "category_key": "sauces",
+      "category_key": "nuoc-tuong",
       "subcategory": null,
       "name": "Sốt Cà",
       "unit": "lon",
@@ -611,7 +586,7 @@
     },
     {
       "source_key": "s5",
-      "category_key": "sauces",
+      "category_key": "nuoc-tuong",
       "subcategory": null,
       "name": "Tương Ớt",
       "unit": "chai",
@@ -623,7 +598,7 @@
     },
     {
       "source_key": "s6",
-      "category_key": "sauces",
+      "category_key": "nuoc-tuong",
       "subcategory": null,
       "name": "Giấm",
       "unit": "chai",
@@ -635,7 +610,7 @@
     },
     {
       "source_key": "s7",
-      "category_key": "sauces",
+      "category_key": "nuoc-tuong",
       "subcategory": null,
       "name": "Mù Tạt",
       "unit": "chai",
@@ -647,7 +622,7 @@
     },
     {
       "source_key": "s8",
-      "category_key": "sauces",
+      "category_key": "nuoc-tuong",
       "subcategory": null,
       "name": "Sốt Mayo",
       "unit": "chai",
@@ -659,7 +634,7 @@
     },
     {
       "source_key": "s9",
-      "category_key": "sauces",
+      "category_key": "nuoc-tuong",
       "subcategory": null,
       "name": "Tương Cà",
       "unit": "chai",
@@ -671,7 +646,7 @@
     },
     {
       "source_key": "s10",
-      "category_key": "sauces",
+      "category_key": "nuoc-tuong",
       "subcategory": null,
       "name": "Sốt BBQ",
       "unit": "chai",
@@ -683,7 +658,7 @@
     },
     {
       "source_key": "s11",
-      "category_key": "sauces",
+      "category_key": "nuoc-tuong",
       "subcategory": null,
       "name": "Sốt Teriyaki",
       "unit": "chai",
@@ -695,7 +670,7 @@
     },
     {
       "source_key": "s12",
-      "category_key": "sauces",
+      "category_key": "nuoc-tuong",
       "subcategory": null,
       "name": "Tương Đen",
       "unit": "chai",
@@ -707,7 +682,7 @@
     },
     {
       "source_key": "s13",
-      "category_key": "sauces",
+      "category_key": "nuoc-tuong",
       "subcategory": null,
       "name": "Sriracha",
       "unit": "chai",
@@ -719,7 +694,7 @@
     },
     {
       "source_key": "s14",
-      "category_key": "sauces",
+      "category_key": "nuoc-tuong",
       "subcategory": null,
       "name": "Sốt Mè",
       "unit": "chai",
@@ -731,7 +706,7 @@
     },
     {
       "source_key": "s15",
-      "category_key": "sauces",
+      "category_key": "nuoc-tuong",
       "subcategory": null,
       "name": "Pesto",
       "unit": "chai",
@@ -743,7 +718,7 @@
     },
     {
       "source_key": "s16",
-      "category_key": "sauces",
+      "category_key": "nuoc-tuong",
       "subcategory": null,
       "name": "Salsa",
       "unit": "chai",
@@ -755,7 +730,7 @@
     },
     {
       "source_key": "s17",
-      "category_key": "sauces",
+      "category_key": "nuoc-tuong",
       "subcategory": null,
       "name": "Sốt Cay",
       "unit": "chai",
@@ -767,7 +742,7 @@
     },
     {
       "source_key": "s18",
-      "category_key": "sauces",
+      "category_key": "nuoc-tuong",
       "subcategory": null,
       "name": "Sốt Ranch",
       "unit": "chai",
@@ -779,7 +754,7 @@
     },
     {
       "source_key": "s19",
-      "category_key": "sauces",
+      "category_key": "nuoc-tuong",
       "subcategory": null,
       "name": "Worcestershire",
       "unit": "chai",
@@ -791,7 +766,7 @@
     },
     {
       "source_key": "s20",
-      "category_key": "sauces",
+      "category_key": "nuoc-tuong",
       "subcategory": null,
       "name": "Nước Cốt Dừa",
       "unit": "lon",
@@ -803,7 +778,7 @@
     },
     {
       "source_key": "sp1",
-      "category_key": "spices",
+      "category_key": "gia-vi",
       "subcategory": null,
       "name": "Muối",
       "unit": "kg",
@@ -815,7 +790,7 @@
     },
     {
       "source_key": "sp2",
-      "category_key": "spices",
+      "category_key": "gia-vi",
       "subcategory": null,
       "name": "Tiêu Đen",
       "unit": "gói",
@@ -827,7 +802,7 @@
     },
     {
       "source_key": "sp3",
-      "category_key": "spices",
+      "category_key": "gia-vi",
       "subcategory": null,
       "name": "Thì Là Hạt",
       "unit": "gói",
@@ -839,7 +814,7 @@
     },
     {
       "source_key": "sp4",
-      "category_key": "spices",
+      "category_key": "gia-vi",
       "subcategory": null,
       "name": "Ớt Bột",
       "unit": "gói",
@@ -851,7 +826,7 @@
     },
     {
       "source_key": "sp5",
-      "category_key": "spices",
+      "category_key": "gia-vi",
       "subcategory": null,
       "name": "Nghệ",
       "unit": "gói",
@@ -863,7 +838,7 @@
     },
     {
       "source_key": "sp6",
-      "category_key": "spices",
+      "category_key": "gia-vi",
       "subcategory": null,
       "name": "Quế",
       "unit": "gói",
@@ -875,7 +850,7 @@
     },
     {
       "source_key": "sp7",
-      "category_key": "spices",
+      "category_key": "gia-vi",
       "subcategory": null,
       "name": "Oregano",
       "unit": "gói",
@@ -887,7 +862,7 @@
     },
     {
       "source_key": "sp8",
-      "category_key": "spices",
+      "category_key": "gia-vi",
       "subcategory": null,
       "name": "Húng Quế Khô",
       "unit": "gói",
@@ -899,7 +874,7 @@
     },
     {
       "source_key": "sp9",
-      "category_key": "spices",
+      "category_key": "gia-vi",
       "subcategory": null,
       "name": "Xạ Hương",
       "unit": "gói",
@@ -911,7 +886,7 @@
     },
     {
       "source_key": "sp10",
-      "category_key": "spices",
+      "category_key": "gia-vi",
       "subcategory": null,
       "name": "Hương Thảo",
       "unit": "gói",
@@ -923,7 +898,7 @@
     },
     {
       "source_key": "sp11",
-      "category_key": "spices",
+      "category_key": "gia-vi",
       "subcategory": null,
       "name": "Lá Nguyệt Quế",
       "unit": "gói",
@@ -935,7 +910,7 @@
     },
     {
       "source_key": "sp12",
-      "category_key": "spices",
+      "category_key": "gia-vi",
       "subcategory": null,
       "name": "Hạt Mùi",
       "unit": "gói",
@@ -947,7 +922,7 @@
     },
     {
       "source_key": "sp13",
-      "category_key": "spices",
+      "category_key": "gia-vi",
       "subcategory": null,
       "name": "Nhục Đậu Khấu",
       "unit": "gói",
@@ -959,7 +934,7 @@
     },
     {
       "source_key": "sp14",
-      "category_key": "spices",
+      "category_key": "gia-vi",
       "subcategory": null,
       "name": "Thảo Quả",
       "unit": "gói",
@@ -971,7 +946,7 @@
     },
     {
       "source_key": "sp15",
-      "category_key": "spices",
+      "category_key": "gia-vi",
       "subcategory": null,
       "name": "Đinh Hương",
       "unit": "gói",
@@ -983,7 +958,7 @@
     },
     {
       "source_key": "sp16",
-      "category_key": "spices",
+      "category_key": "gia-vi",
       "subcategory": null,
       "name": "Hoa Hồi",
       "unit": "gói",
@@ -995,7 +970,7 @@
     },
     {
       "source_key": "sp17",
-      "category_key": "spices",
+      "category_key": "gia-vi",
       "subcategory": null,
       "name": "Ớt Xay",
       "unit": "gói",
@@ -1007,7 +982,7 @@
     },
     {
       "source_key": "sp18",
-      "category_key": "spices",
+      "category_key": "gia-vi",
       "subcategory": null,
       "name": "Bột Tỏi",
       "unit": "gói",
@@ -1019,7 +994,7 @@
     },
     {
       "source_key": "sp19",
-      "category_key": "spices",
+      "category_key": "gia-vi",
       "subcategory": null,
       "name": "Bột Hành",
       "unit": "gói",
@@ -1031,7 +1006,7 @@
     },
     {
       "source_key": "sp20",
-      "category_key": "spices",
+      "category_key": "gia-vi",
       "subcategory": null,
       "name": "Bột Ngọt",
       "unit": "gói",
@@ -1043,7 +1018,7 @@
     },
     {
       "source_key": "g1",
-      "category_key": "grains",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Gạo",
       "unit": "kg",
@@ -1055,7 +1030,7 @@
     },
     {
       "source_key": "g2",
-      "category_key": "grains",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Nui",
       "unit": "gói",
@@ -1067,7 +1042,7 @@
     },
     {
       "source_key": "g3",
-      "category_key": "grains",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Bột Mì",
       "unit": "kg",
@@ -1079,7 +1054,7 @@
     },
     {
       "source_key": "g4",
-      "category_key": "grains",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Bánh Mì",
       "unit": "cái",
@@ -1091,7 +1066,7 @@
     },
     {
       "source_key": "g5",
-      "category_key": "grains",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Mì",
       "unit": "gói",
@@ -1103,7 +1078,7 @@
     },
     {
       "source_key": "g6",
-      "category_key": "grains",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Yến Mạch",
       "unit": "kg",
@@ -1115,7 +1090,7 @@
     },
     {
       "source_key": "g7",
-      "category_key": "grains",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Quinoa",
       "unit": "kg",
@@ -1127,7 +1102,7 @@
     },
     {
       "source_key": "g8",
-      "category_key": "grains",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Couscous",
       "unit": "gói",
@@ -1139,7 +1114,7 @@
     },
     {
       "source_key": "g9",
-      "category_key": "grains",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Bột Chiên",
       "unit": "gói",
@@ -1151,7 +1126,7 @@
     },
     {
       "source_key": "g10",
-      "category_key": "grains",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Bánh Tráng",
       "unit": "gói",
@@ -1163,7 +1138,7 @@
     },
     {
       "source_key": "g11",
-      "category_key": "grains",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Bánh Pita",
       "unit": "gói",
@@ -1175,7 +1150,7 @@
     },
     {
       "source_key": "g12",
-      "category_key": "grains",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Bún",
       "unit": "gói",
@@ -1187,7 +1162,7 @@
     },
     {
       "source_key": "g13",
-      "category_key": "grains",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Mì Udon",
       "unit": "gói",
@@ -1199,7 +1174,7 @@
     },
     {
       "source_key": "g14",
-      "category_key": "grains",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Bột Bắp",
       "unit": "gói",
@@ -1211,7 +1186,7 @@
     },
     {
       "source_key": "g15",
-      "category_key": "grains",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Đường",
       "unit": "kg",
@@ -1223,7 +1198,7 @@
     },
     {
       "source_key": "o1",
-      "category_key": "oils",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Dầu Ô Liu",
       "unit": "chai",
@@ -1235,7 +1210,7 @@
     },
     {
       "source_key": "o2",
-      "category_key": "oils",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Dầu Ăn",
       "unit": "chai",
@@ -1247,7 +1222,7 @@
     },
     {
       "source_key": "o3",
-      "category_key": "oils",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Dầu Dừa",
       "unit": "chai",
@@ -1259,7 +1234,7 @@
     },
     {
       "source_key": "o4",
-      "category_key": "oils",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Dầu Mè",
       "unit": "chai",
@@ -1271,7 +1246,7 @@
     },
     {
       "source_key": "o5",
-      "category_key": "oils",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Dầu Canola",
       "unit": "chai",
@@ -1283,7 +1258,7 @@
     },
     {
       "source_key": "o6",
-      "category_key": "oils",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Bơ",
       "unit": "gói",
@@ -1295,7 +1270,7 @@
     },
     {
       "source_key": "o7",
-      "category_key": "oils",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Bơ Ghee",
       "unit": "chai",
@@ -1307,7 +1282,7 @@
     },
     {
       "source_key": "o8",
-      "category_key": "oils",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Dầu Nấm Truffle",
       "unit": "chai",
@@ -1319,7 +1294,7 @@
     },
     {
       "source_key": "o9",
-      "category_key": "oils",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Dầu Ớt",
       "unit": "chai",
@@ -1331,7 +1306,7 @@
     },
     {
       "source_key": "o10",
-      "category_key": "oils",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Dầu Bơ",
       "unit": "chai",
@@ -1343,7 +1318,7 @@
     },
     {
       "source_key": "p1",
-      "category_key": "proteins",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Gà",
       "unit": "kg",
@@ -1355,7 +1330,7 @@
     },
     {
       "source_key": "p2",
-      "category_key": "proteins",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Bò",
       "unit": "kg",
@@ -1367,7 +1342,7 @@
     },
     {
       "source_key": "p3",
-      "category_key": "proteins",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Heo",
       "unit": "kg",
@@ -1379,7 +1354,7 @@
     },
     {
       "source_key": "p4",
-      "category_key": "proteins",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Cá Hồi",
       "unit": "kg",
@@ -1391,7 +1366,7 @@
     },
     {
       "source_key": "p5",
-      "category_key": "proteins",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Tôm",
       "unit": "kg",
@@ -1403,7 +1378,7 @@
     },
     {
       "source_key": "p6",
-      "category_key": "proteins",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Trứng",
       "unit": "tá",
@@ -1415,7 +1390,7 @@
     },
     {
       "source_key": "p7",
-      "category_key": "proteins",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Đậu Hũ",
       "unit": "gói",
@@ -1427,7 +1402,7 @@
     },
     {
       "source_key": "p8",
-      "category_key": "proteins",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Thịt Xay",
       "unit": "kg",
@@ -1439,7 +1414,7 @@
     },
     {
       "source_key": "p9",
-      "category_key": "proteins",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Xúc Xích",
       "unit": "gói",
@@ -1451,7 +1426,7 @@
     },
     {
       "source_key": "p10",
-      "category_key": "proteins",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Thịt Xông Khói",
       "unit": "gói",
@@ -1463,7 +1438,7 @@
     },
     {
       "source_key": "d1",
-      "category_key": "dairy",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Sữa Tươi",
       "unit": "lít",
@@ -1475,7 +1450,7 @@
     },
     {
       "source_key": "d2",
-      "category_key": "dairy",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Phô Mai",
       "unit": "gói",
@@ -1487,7 +1462,7 @@
     },
     {
       "source_key": "d3",
-      "category_key": "dairy",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Kem Sữa",
       "unit": "lít",
@@ -1499,7 +1474,7 @@
     },
     {
       "source_key": "d4",
-      "category_key": "dairy",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Sữa Chua",
       "unit": "gói",
@@ -1511,7 +1486,7 @@
     },
     {
       "source_key": "d5",
-      "category_key": "dairy",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Mozzarella",
       "unit": "gói",
@@ -1523,7 +1498,7 @@
     },
     {
       "source_key": "d6",
-      "category_key": "dairy",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Parmesan",
       "unit": "gói",
@@ -1535,7 +1510,7 @@
     },
     {
       "source_key": "d7",
-      "category_key": "dairy",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Kem Chua",
       "unit": "gói",
@@ -1547,7 +1522,7 @@
     },
     {
       "source_key": "d8",
-      "category_key": "dairy",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Kem Tươi",
       "unit": "lon",
@@ -1559,7 +1534,7 @@
     },
     {
       "source_key": "ga1",
-      "category_key": "gas",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Bình Gas",
       "unit": "bình",
@@ -1571,7 +1546,7 @@
     },
     {
       "source_key": "ga2",
-      "category_key": "gas",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Gas Mini",
       "unit": "lon",
@@ -1583,7 +1558,7 @@
     },
     {
       "source_key": "ga3",
-      "category_key": "gas",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Than",
       "unit": "bịch",
@@ -1595,7 +1570,7 @@
     },
     {
       "source_key": "ga4",
-      "category_key": "gas",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Dầu Hỏa",
       "unit": "chai",
@@ -1607,7 +1582,7 @@
     },
     {
       "source_key": "ga5",
-      "category_key": "gas",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Bình Propane",
       "unit": "bình",
@@ -1619,7 +1594,7 @@
     },
     {
       "source_key": "e1",
-      "category_key": "equipment",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Găng Tay",
       "unit": "hộp",
@@ -1631,7 +1606,7 @@
     },
     {
       "source_key": "e2",
-      "category_key": "equipment",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Tạp Dề",
       "unit": "cái",
@@ -1643,7 +1618,7 @@
     },
     {
       "source_key": "e3",
-      "category_key": "equipment",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Giấy Bạc",
       "unit": "cuộn",
@@ -1655,7 +1630,7 @@
     },
     {
       "source_key": "e4",
-      "category_key": "equipment",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Màng Bọc",
       "unit": "cuộn",
@@ -1667,7 +1642,7 @@
     },
     {
       "source_key": "e5",
-      "category_key": "equipment",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Giấy Nướng",
       "unit": "cuộn",
@@ -1679,7 +1654,7 @@
     },
     {
       "source_key": "e6",
-      "category_key": "equipment",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Túi Zip",
       "unit": "hộp",
@@ -1691,7 +1666,7 @@
     },
     {
       "source_key": "e7",
-      "category_key": "equipment",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Hộp Đựng",
       "unit": "gói",
@@ -1703,7 +1678,7 @@
     },
     {
       "source_key": "e8",
-      "category_key": "equipment",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Nhãn Dán",
       "unit": "cuộn",
@@ -1715,7 +1690,7 @@
     },
     {
       "source_key": "e9",
-      "category_key": "equipment",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Túi Rác",
       "unit": "cuộn",
@@ -1727,7 +1702,7 @@
     },
     {
       "source_key": "e10",
-      "category_key": "equipment",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Khăn Giấy",
       "unit": "gói",
@@ -1739,7 +1714,7 @@
     },
     {
       "source_key": "t1",
-      "category_key": "tissue",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Giấy Vệ Sinh",
       "unit": "gói",
@@ -1751,7 +1726,7 @@
     },
     {
       "source_key": "t2",
-      "category_key": "tissue",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Khăn Ăn",
       "unit": "gói",
@@ -1763,7 +1738,7 @@
     },
     {
       "source_key": "t3",
-      "category_key": "tissue",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Khăn Ướt",
       "unit": "gói",
@@ -1775,7 +1750,7 @@
     },
     {
       "source_key": "t4",
-      "category_key": "tissue",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Nước Rửa Tay",
       "unit": "chai",
@@ -1787,7 +1762,7 @@
     },
     {
       "source_key": "t5",
-      "category_key": "tissue",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Nước Rửa Chén",
       "unit": "chai",
@@ -1799,7 +1774,7 @@
     },
     {
       "source_key": "t6",
-      "category_key": "tissue",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Nước Lau Sàn",
       "unit": "chai",
@@ -1811,7 +1786,7 @@
     },
     {
       "source_key": "t7",
-      "category_key": "tissue",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Javel",
       "unit": "chai",
@@ -1823,7 +1798,7 @@
     },
     {
       "source_key": "t8",
-      "category_key": "tissue",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Bàn Chải",
       "unit": "cái",
@@ -1835,7 +1810,7 @@
     },
     {
       "source_key": "t9",
-      "category_key": "tissue",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Miếng Rửa",
       "unit": "gói",
@@ -1847,7 +1822,7 @@
     },
     {
       "source_key": "t10",
-      "category_key": "tissue",
+      "category_key": "khac",
       "subcategory": null,
       "name": "Cây Lau Nhà",
       "unit": "cái",
@@ -1859,7 +1834,7 @@
     },
     {
       "source_key": "tf1",
-      "category_key": "tofu",
+      "category_key": "dau-hu",
       "subcategory": null,
       "name": "Đậu hũ trắng",
       "unit": "gói",
@@ -1871,7 +1846,7 @@
     },
     {
       "source_key": "tf2",
-      "category_key": "tofu",
+      "category_key": "dau-hu",
       "subcategory": null,
       "name": "Đậu hũ non",
       "unit": "gói",
@@ -1883,7 +1858,7 @@
     },
     {
       "source_key": "tf3",
-      "category_key": "tofu",
+      "category_key": "dau-hu",
       "subcategory": null,
       "name": "Đậu hũ chiên",
       "unit": "gói",
@@ -1895,7 +1870,7 @@
     },
     {
       "source_key": "tf4",
-      "category_key": "tofu",
+      "category_key": "dau-hu",
       "subcategory": null,
       "name": "Đậu bi",
       "unit": "gói",
@@ -1907,7 +1882,7 @@
     },
     {
       "source_key": "tf5",
-      "category_key": "tofu",
+      "category_key": "dau-hu",
       "subcategory": null,
       "name": "Mì căn",
       "unit": "gói",
@@ -1919,7 +1894,7 @@
     },
     {
       "source_key": "tf6",
-      "category_key": "tofu",
+      "category_key": "dau-hu",
       "subcategory": null,
       "name": "Sườn non chay",
       "unit": "gói",
@@ -1931,7 +1906,7 @@
     },
     {
       "source_key": "v43",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Cải ngọt",
       "unit": "kg",
@@ -1943,7 +1918,7 @@
     },
     {
       "source_key": "v44",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Cải bẹ xanh",
       "unit": "kg",
@@ -1955,7 +1930,7 @@
     },
     {
       "source_key": "v45",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Cải bẹ trắng",
       "unit": "kg",
@@ -1967,7 +1942,7 @@
     },
     {
       "source_key": "v46",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Cải bó xôi",
       "unit": "kg",
@@ -1979,7 +1954,7 @@
     },
     {
       "source_key": "v47",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Mồng tơi",
       "unit": "kg",
@@ -1991,7 +1966,7 @@
     },
     {
       "source_key": "v48",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Rau dền đỏ",
       "unit": "kg",
@@ -2003,7 +1978,7 @@
     },
     {
       "source_key": "v49",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Rau dền xanh",
       "unit": "kg",
@@ -2015,7 +1990,7 @@
     },
     {
       "source_key": "v50",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Tần ô",
       "unit": "kg",
@@ -2027,7 +2002,7 @@
     },
     {
       "source_key": "v51",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Cải mầm",
       "unit": "kg",
@@ -2039,7 +2014,7 @@
     },
     {
       "source_key": "v52",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Rau má",
       "unit": "kg",
@@ -2051,7 +2026,7 @@
     },
     {
       "source_key": "v53",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "leafy-greens",
       "name": "Diếp cá",
       "unit": "kg",
@@ -2063,7 +2038,7 @@
     },
     {
       "source_key": "v54",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "herbs",
       "name": "Ngò gai",
       "unit": "kg",
@@ -2075,7 +2050,7 @@
     },
     {
       "source_key": "v55",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "herbs",
       "name": "Tía tô",
       "unit": "kg",
@@ -2087,7 +2062,7 @@
     },
     {
       "source_key": "v56",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "herbs",
       "name": "Rau răm",
       "unit": "kg",
@@ -2099,7 +2074,7 @@
     },
     {
       "source_key": "v57",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "herbs",
       "name": "Kinh giới",
       "unit": "kg",
@@ -2111,7 +2086,7 @@
     },
     {
       "source_key": "v58",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "herbs",
       "name": "Lá lốt",
       "unit": "kg",
@@ -2123,7 +2098,7 @@
     },
     {
       "source_key": "v59",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "herbs",
       "name": "Bạc hà",
       "unit": "kg",
@@ -2135,7 +2110,7 @@
     },
     {
       "source_key": "v60",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "herbs",
       "name": "Lá chanh",
       "unit": "kg",
@@ -2147,7 +2122,7 @@
     },
     {
       "source_key": "v61",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "herbs",
       "name": "Quế",
       "unit": "kg",
@@ -2159,7 +2134,7 @@
     },
     {
       "source_key": "v62",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "herbs",
       "name": "Rau sam",
       "unit": "kg",
@@ -2171,7 +2146,7 @@
     },
     {
       "source_key": "v63",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "root-vegetables",
       "name": "Sắn",
       "unit": "kg",
@@ -2183,7 +2158,7 @@
     },
     {
       "source_key": "v64",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "root-vegetables",
       "name": "Nghệ",
       "unit": "kg",
@@ -2195,7 +2170,7 @@
     },
     {
       "source_key": "v65",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "root-vegetables",
       "name": "Củ sen",
       "unit": "kg",
@@ -2207,7 +2182,7 @@
     },
     {
       "source_key": "v66",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "root-vegetables",
       "name": "Su hào",
       "unit": "kg",
@@ -2219,7 +2194,7 @@
     },
     {
       "source_key": "v67",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "root-vegetables",
       "name": "Củ năng",
       "unit": "kg",
@@ -2231,7 +2206,7 @@
     },
     {
       "source_key": "v68",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "root-vegetables",
       "name": "Củ kiệu",
       "unit": "kg",
@@ -2243,7 +2218,7 @@
     },
     {
       "source_key": "v69",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "fruit-vegetables",
       "name": "Bí đỏ",
       "unit": "kg",
@@ -2255,7 +2230,7 @@
     },
     {
       "source_key": "v70",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "fruit-vegetables",
       "name": "Bí xanh",
       "unit": "kg",
@@ -2267,7 +2242,7 @@
     },
     {
       "source_key": "v71",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "fruit-vegetables",
       "name": "Mướp",
       "unit": "kg",
@@ -2279,7 +2254,7 @@
     },
     {
       "source_key": "v72",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "fruit-vegetables",
       "name": "Khổ qua",
       "unit": "kg",
@@ -2291,7 +2266,7 @@
     },
     {
       "source_key": "v73",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "fruit-vegetables",
       "name": "Đậu bắp",
       "unit": "kg",
@@ -2303,7 +2278,7 @@
     },
     {
       "source_key": "v74",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "fruit-vegetables",
       "name": "Su su",
       "unit": "kg",
@@ -2315,7 +2290,7 @@
     },
     {
       "source_key": "v75",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "fruit-vegetables",
       "name": "Bầu",
       "unit": "kg",
@@ -2327,7 +2302,7 @@
     },
     {
       "source_key": "v76",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "fruit-vegetables",
       "name": "Dưa hấu non",
       "unit": "kg",
@@ -2339,7 +2314,7 @@
     },
     {
       "source_key": "v77",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "fruit-vegetables",
       "name": "Cà pháo",
       "unit": "kg",
@@ -2351,7 +2326,7 @@
     },
     {
       "source_key": "v78",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "fruit-vegetables",
       "name": "Đậu rồng",
       "unit": "kg",
@@ -2363,7 +2338,7 @@
     },
     {
       "source_key": "v79",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "beans-legumes",
       "name": "Đậu nành",
       "unit": "kg",
@@ -2375,7 +2350,7 @@
     },
     {
       "source_key": "v80",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "beans-legumes",
       "name": "Đậu xanh",
       "unit": "kg",
@@ -2387,7 +2362,7 @@
     },
     {
       "source_key": "v81",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "beans-legumes",
       "name": "Đậu đen",
       "unit": "kg",
@@ -2399,7 +2374,7 @@
     },
     {
       "source_key": "v82",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "beans-legumes",
       "name": "Đậu đỏ",
       "unit": "kg",
@@ -2411,7 +2386,7 @@
     },
     {
       "source_key": "v83",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "beans-legumes",
       "name": "Đậu trắng",
       "unit": "kg",
@@ -2423,7 +2398,7 @@
     },
     {
       "source_key": "v84",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "beans-legumes",
       "name": "Đậu phộng",
       "unit": "kg",
@@ -2435,7 +2410,7 @@
     },
     {
       "source_key": "v85",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "beans-legumes",
       "name": "Hạt sen",
       "unit": "kg",
@@ -2447,7 +2422,7 @@
     },
     {
       "source_key": "v86",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "beans-legumes",
       "name": "Hạt điều",
       "unit": "kg",
@@ -2459,7 +2434,7 @@
     },
     {
       "source_key": "v87",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "beans-legumes",
       "name": "Mè đen",
       "unit": "kg",
@@ -2471,7 +2446,7 @@
     },
     {
       "source_key": "v88",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "beans-legumes",
       "name": "Mè trắng",
       "unit": "kg",
@@ -2483,7 +2458,7 @@
     },
     {
       "source_key": "v89",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "beans-legumes",
       "name": "Hạt chia",
       "unit": "kg",
@@ -2495,7 +2470,7 @@
     },
     {
       "source_key": "v90",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "beans-legumes",
       "name": "Hạt óc chó",
       "unit": "kg",
@@ -2507,7 +2482,7 @@
     },
     {
       "source_key": "v91",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "beans-legumes",
       "name": "Hạt hướng dương",
       "unit": "kg",
@@ -2519,7 +2494,7 @@
     },
     {
       "source_key": "v92",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "tofu-products",
       "name": "Đậu hũ trắng",
       "unit": "kg",
@@ -2531,7 +2506,7 @@
     },
     {
       "source_key": "v93",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "tofu-products",
       "name": "Đậu hũ non",
       "unit": "kg",
@@ -2543,7 +2518,7 @@
     },
     {
       "source_key": "v94",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "tofu-products",
       "name": "Đậu hũ chiên",
       "unit": "kg",
@@ -2555,7 +2530,7 @@
     },
     {
       "source_key": "v95",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "tofu-products",
       "name": "Đậu bi",
       "unit": "kg",
@@ -2567,7 +2542,7 @@
     },
     {
       "source_key": "v96",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "tofu-products",
       "name": "Mì căn",
       "unit": "kg",
@@ -2579,7 +2554,7 @@
     },
     {
       "source_key": "v97",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "tofu-products",
       "name": "Sườn non chay",
       "unit": "kg",
@@ -2591,7 +2566,7 @@
     },
     {
       "source_key": "v98",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "mushrooms",
       "name": "Nấm rơm",
       "unit": "kg",
@@ -2603,7 +2578,7 @@
     },
     {
       "source_key": "v99",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "mushrooms",
       "name": "Nấm hương",
       "unit": "kg",
@@ -2615,7 +2590,7 @@
     },
     {
       "source_key": "v100",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "mushrooms",
       "name": "Nấm bào ngư",
       "unit": "kg",
@@ -2627,7 +2602,7 @@
     },
     {
       "source_key": "v101",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "mushrooms",
       "name": "Nấm kim châm",
       "unit": "kg",
@@ -2639,7 +2614,7 @@
     },
     {
       "source_key": "v102",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "mushrooms",
       "name": "Nấm đùi gà",
       "unit": "kg",
@@ -2651,7 +2626,7 @@
     },
     {
       "source_key": "v103",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "mushrooms",
       "name": "Nấm mỡ",
       "unit": "kg",
@@ -2663,7 +2638,7 @@
     },
     {
       "source_key": "v104",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "mushrooms",
       "name": "Nấm đông cô",
       "unit": "kg",
@@ -2675,7 +2650,7 @@
     },
     {
       "source_key": "v105",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "mushrooms",
       "name": "Nấm tuyết",
       "unit": "kg",
@@ -2687,7 +2662,7 @@
     },
     {
       "source_key": "v106",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "mushrooms",
       "name": "Nấm tràm",
       "unit": "kg",
@@ -2699,7 +2674,7 @@
     },
     {
       "source_key": "v107",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "mushrooms",
       "name": "Nấm linh chi",
       "unit": "kg",
@@ -2711,7 +2686,7 @@
     },
     {
       "source_key": "v108",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "mushrooms",
       "name": "Nấm mèo đen",
       "unit": "kg",
@@ -2723,7 +2698,7 @@
     },
     {
       "source_key": "v109",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "mushrooms",
       "name": "Nấm mèo trắng",
       "unit": "kg",
@@ -2735,7 +2710,7 @@
     },
     {
       "source_key": "v110",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "stems-shoots",
       "name": "Măng tre",
       "unit": "kg",
@@ -2747,7 +2722,7 @@
     },
     {
       "source_key": "v111",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "stems-shoots",
       "name": "Măng tây",
       "unit": "kg",
@@ -2759,7 +2734,7 @@
     },
     {
       "source_key": "v112",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "stems-shoots",
       "name": "Thân chuối",
       "unit": "kg",
@@ -2771,7 +2746,7 @@
     },
     {
       "source_key": "v113",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "stems-shoots",
       "name": "Củ hủ dừa",
       "unit": "kg",
@@ -2783,7 +2758,7 @@
     },
     {
       "source_key": "v114",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "stems-shoots",
       "name": "Bạc hà (dọc mùng)",
       "unit": "kg",
@@ -2795,7 +2770,7 @@
     },
     {
       "source_key": "v115",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "stems-shoots",
       "name": "Ngó non",
       "unit": "kg",
@@ -2807,7 +2782,7 @@
     },
     {
       "source_key": "v116",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "stems-shoots",
       "name": "Thân sen",
       "unit": "kg",
@@ -2819,7 +2794,7 @@
     },
     {
       "source_key": "v117",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "stems-shoots",
       "name": "Ngò ôm",
       "unit": "kg",
@@ -2831,7 +2806,7 @@
     },
     {
       "source_key": "v118",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "stems-shoots",
       "name": "Bắp chuối",
       "unit": "kg",
@@ -2843,7 +2818,7 @@
     },
     {
       "source_key": "v119",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "stems-shoots",
       "name": "Mầm đậu nành",
       "unit": "kg",
@@ -2855,7 +2830,7 @@
     },
     {
       "source_key": "v120",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "sea-vegetables",
       "name": "Rong biển khô",
       "unit": "kg",
@@ -2867,7 +2842,7 @@
     },
     {
       "source_key": "v121",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "sea-vegetables",
       "name": "Tảo bẹ",
       "unit": "kg",
@@ -2879,7 +2854,7 @@
     },
     {
       "source_key": "v122",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "sea-vegetables",
       "name": "Wakame",
       "unit": "kg",
@@ -2891,7 +2866,7 @@
     },
     {
       "source_key": "v123",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "sea-vegetables",
       "name": "Rong nho",
       "unit": "kg",
@@ -2903,7 +2878,7 @@
     },
     {
       "source_key": "v124",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "sea-vegetables",
       "name": "Kombu",
       "unit": "kg",
@@ -2915,7 +2890,7 @@
     },
     {
       "source_key": "v125",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "sea-vegetables",
       "name": "Nori",
       "unit": "kg",
@@ -2927,7 +2902,7 @@
     },
     {
       "source_key": "v126",
-      "category_key": "vegetables",
+      "category_key": "rau",
       "subcategory": "sea-vegetables",
       "name": "Tảo xoắn",
       "unit": "kg",

@@ -296,6 +296,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          order_count: number
           quick_quantities: Json
           reference_price: number | null
           source_key: string | null
@@ -309,6 +310,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          order_count?: number
           quick_quantities?: Json
           reference_price?: number | null
           source_key?: string | null
@@ -322,6 +324,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          order_count?: number
           quick_quantities?: Json
           reference_price?: number | null
           source_key?: string | null

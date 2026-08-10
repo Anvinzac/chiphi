@@ -1038,19 +1038,21 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       onTouchEnd={handleTouchEnd}
       onClick={handleMainClick}
     >
-      {/* Top bar: brand | centered range switcher | total */}
+      {/* Top bar: brand | range | total — same gap on both sides of the date control */}
       <div
-        className="topbar-surface sticky top-0 z-30 shrink-0 px-4 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2"
+        className="topbar-surface sticky top-0 z-30 flex shrink-0 items-center gap-3 px-4 py-3"
         data-no-double-tap
       >
-        <BrandMenu isDemo={isDemo} onSignOut={onSignOut} />
+        <div className="shrink-0">
+          <BrandMenu isDemo={isDemo} onSignOut={onSignOut} />
+        </div>
 
         <Popover open={rangePickerOpen} onOpenChange={setRangePickerOpen}>
-          <div className="flex items-center gap-1.5 justify-self-center">
+          <div className="flex h-9 min-w-0 flex-1 items-stretch overflow-hidden rounded-full border border-border/50 bg-muted/45 shadow-[inset_0_1px_0_rgb(255_255_255/0.4)]">
             <button
               type="button"
               onClick={() => shiftPeriod(-1)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted/55 text-muted-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.45)] transition-all hover:bg-muted hover:text-foreground active:scale-95"
+              className="inline-flex w-[15%] shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground active:scale-95"
               aria-label="Previous period"
             >
               <ChevronLeft className="h-4 w-4" strokeWidth={2.25} />
@@ -1058,13 +1060,13 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className="px-1.5 py-0.5 text-center transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 rounded-md"
+                className="flex w-[70%] min-w-0 flex-col items-center justify-center px-1 text-center transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-inset"
                 aria-label="Open day picker for this period"
               >
                 <span className="block text-[10px] uppercase tracking-[0.18em] text-muted-foreground/80">
                   {viewMode === "range" ? "Theo kỳ" : "Theo ngày"}
                 </span>
-                <span className="block text-sm font-display tabular-nums leading-tight text-foreground/90">
+                <span className="block max-w-full truncate text-sm font-display tabular-nums leading-tight text-foreground/90">
                   {centerLabel}
                 </span>
               </button>
@@ -1072,7 +1074,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
             <button
               type="button"
               onClick={() => shiftPeriod(1)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted/55 text-muted-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.45)] transition-all hover:bg-muted hover:text-foreground active:scale-95"
+              className="inline-flex w-[15%] shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground active:scale-95"
               aria-label="Next period"
             >
               <ChevronRight className="h-4 w-4" strokeWidth={2.25} />
@@ -1093,7 +1095,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
           </PopoverContent>
         </Popover>
 
-        <div className="justify-self-end text-right">
+        <div className="shrink-0 text-right">
           <span className="text-[10px] uppercase tracking-widest text-muted-foreground block">
             {nameFilter ? "Lọc" : "Tổng"}
           </span>

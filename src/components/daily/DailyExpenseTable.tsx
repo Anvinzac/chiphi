@@ -508,7 +508,9 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     }
 
     setSelectedCategoryId(categoryId);
-    setNameValue(categoryName);
+    // Keep whatever was typed as the line name; only fall back to the category label when empty
+    const itemLabel = nameValueRef.current.trim() || categoryName;
+    setNameValue(itemLabel);
     setMatch({
       itemId: "",
       categoryName,
@@ -522,7 +524,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       supplierId: null,
     });
     setVerifyData({
-      itemName: categoryName,
+      itemName: itemLabel,
       categoryName,
       subCategoryName: "",
       supplierName: "",

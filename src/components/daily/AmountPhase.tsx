@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, Pencil, Plus, X } from "lucide-react";
 import type { VerifyData } from "@/types/expense";
 import { focusWithoutScroll } from "@/lib/focusWithoutScroll";
@@ -72,8 +72,65 @@ export default function AmountPhase({
 }: AmountPhaseProps) {
   const [editingField, setEditingField] = useState<EditableField>(null);
   const [editValue, setEditValue] = useState("");
+  const [amountActive, setAmountActive] = useState(true);
   const editInputRef = useRef<HTMLInputElement>(null);
   const noteRef = useRef<HTMLInputElement>(null);
+  const customSpanRef = useRef<HTMLInputElement>(null);
+  const formScrollRef = useRef<HTMLDivElement>(null);
+  const spanSectionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!spanEnabled || spanPreset !== "custom") return;
+    const id = window.setTimeout(() => {
+      focusWithoutScroll(customSpanRef.current);
+      customSpanRef.current?.select();
+    }, 30);
+    return () => window.clearTimeout(id);
+  }, [spanEnabled, spanPreset]);
+
+  useEffect(() => {
+    if (!spanEnabled) return;
+    const id = window.setTimeout(() => {
+      const scroller = formScrollRef.current;
+      const section = spanSectionRef.current;
+      if (!scroller || !section) return;
+      const sectionBottom = section.offsetTop + section.offsetHeight;
+      const visibleBottom = scroller.scrollTop + scroller.clientHeight;
+      if (sectionBottom > visibleBottom - 12) {
+        scroller.scrollTo({
+          top: Math.max(0, sectionBottom - scroller.clientHeight + 16),
+          behavior: "smooth",
+        });
+      }
+    }, 80);
+    return () => window.clearTimeout(id);
+  }, [spanEnabled]);
+
+  const activateAmount = () => {
+    setAmountActive(true);
+    if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+      focusWithoutScroll(amountRef.current);
+    }
+  };
+
+  const appendDigit = (digit: string) => {
+    setAmountActive(true);
+    setAmountValue(`${amountValue}${digit}`.replace(/^0+(?=\d)/, ""));
+  };
+
+  const appendDecimal = () => {
+    setAmountActive(true);
+    if (!amountValue.includes(".")) setAmountValue(amountValue ? `${amountValue}.` : "0.");
+  };
+
+  const removeLastDigit = () => {
+    setAmountActive(true);
+    setAmountValue(amountValue.slice(0, -1));
+  };
+  const clearAmount = () => {
+    setAmountActive(true);
+    setAmountValue("");
+  };
 
   const openEdit = (field: EditableField) => {
     if (!field) return;
@@ -82,6 +139,7 @@ export default function AmountPhase({
       : String(verifyData?.[field as keyof VerifyData] ?? "");
     setEditValue(current);
     setEditingField(field);
+    setAmountActive(false);
     setTimeout(() => focusWithoutScroll(editInputRef.current), 50);
   };
 
@@ -100,17 +158,6 @@ export default function AmountPhase({
     });
     setEditingField(null);
   };
-
-  const appendDigit = (digit: string) => {
-    setAmountValue(`${amountValue}${digit}`.replace(/^0+(?=\d)/, ""));
-  };
-
-  const appendDecimal = () => {
-    if (!amountValue.includes(".")) setAmountValue(amountValue ? `${amountValue}.` : "0.");
-  };
-
-  const removeLastDigit = () => setAmountValue(amountValue.slice(0, -1));
-  const clearAmount = () => setAmountValue("");
 
   // Long-press backspace clears the whole amount
   const holdRef = useRef<number | null>(null);
@@ -179,6 +226,37 @@ export default function AmountPhase({
   ];
   const fields = allFields.filter(f => f.value !== "");
 
+  const amountDisplay = amountValue ? Number(amountValue).toLocaleString("vi-VN") : "0";
+  const amountLen = amountDisplay.length;
+  const amountSizeClass =
+    amountLen >= 13
+      ? "text-lg"
+      : amountLen >= 11
+        ? "text-xl"
+        : amountLen >= 9
+          ? "text-2xl"
+          : amountLen >= 7
+            ? "text-3xl"
+            : "text-4xl";
+  const zeroSizeClass =
+    amountLen >= 13
+      ? "text-sm"
+      : amountLen >= 11
+        ? "text-base"
+        : amountLen >= 9
+          ? "text-lg"
+          : amountLen >= 7
+            ? "text-xl"
+            : "text-2xl";
+  const noteWidthClass =
+    amountLen >= 11
+      ? "w-[4.75rem]"
+      : amountLen >= 9
+        ? "w-[min(28%,6.5rem)]"
+        : amountLen >= 7
+          ? "w-[min(34%,8.5rem)]"
+          : "w-[min(42%,11.5rem)]";
+
   const keys = [
     [
       { label: "1", action: () => appendDigit("1") },
@@ -202,11 +280,11 @@ export default function AmountPhase({
   ];
 
   return (
-    <div className="flex-1 flex flex-col px-5 pt-2 pb-2 min-h-0 overflow-hidden">
-      <div className="flex items-center justify-between mb-2 shrink-0">
+    <div className="flex h-full min-h-0 flex-1 flex-col px-5 pt-2 pb-2">
+      <div className="flex shrink-0 items-center justify-between mb-2">
         <button
           onClick={onBack}
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors min-h-11"
+          className="flex min-h-11 items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
           aria-label="Quay lại"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
@@ -215,164 +293,197 @@ export default function AmountPhase({
         <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Số tiền</span>
       </div>
 
-      <div className="flex items-end justify-between gap-4 mb-2 shrink-0">
-        <div className="min-w-0 flex-1">
-          <input
-            ref={amountRef}
-            type="text"
-            inputMode="decimal"
-            value={amountValue}
-            onChange={(e) => setAmountValue(e.target.value.replace(/[^\d.]/g, ""))}
-            onKeyDown={onKeyDown}
-            className="sr-only text-base"
-            aria-label="Số tiền"
-            onFocus={() => {
-              window.scrollTo(0, 0);
-              requestAnimationFrame(() => window.scrollTo(0, 0));
-            }}
-          />
-          <div className="flex items-start gap-2">
-            <button
-              type="button"
-              className="flex min-w-0 flex-1 items-baseline text-left cursor-text whitespace-nowrap"
-              onClick={() => {
-                // Only focus the hidden field for hardware/desktop keyboards — avoid iOS zoom
-                if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
-                  focusWithoutScroll(amountRef.current);
-                }
-              }}
-              aria-label="Nhập số tiền"
-            >
-              <span className="text-4xl font-display tabular-nums text-foreground leading-none">
-                {amountValue ? Number(amountValue).toLocaleString("vi-VN") : <span className="text-muted-foreground/25">0</span>}
-              </span>
-              <span className="text-2xl font-display text-muted-foreground/35 ml-1">.000</span>
-            </button>
-            <ClearFieldButton
-              visible={amountValue.length > 0}
-              onClear={clearAmount}
-              label="Xóa số tiền"
-              className="mt-1"
-            />
-          </div>
-          <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
-            nghìn ₫
-          </p>
-        </div>
-
-        <div className="amount-note group w-[min(42%,11.5rem)] shrink-0 self-stretch flex flex-col justify-end">
-          <label
-            htmlFor="expense-note"
-            className="mb-1 block text-right text-[9px] uppercase tracking-[0.18em] text-muted-foreground/65 transition-colors group-focus-within:text-primary/80"
-          >
-            Ghi chú
-          </label>
-          <div className="flex items-center gap-1.5">
-            <ClearFieldButton
-              visible={noteValue.length > 0}
-              onClear={() => {
-                setNoteValue("");
-                focusWithoutScroll(noteRef.current);
-              }}
-              label="Xóa ghi chú"
-              size="sm"
-            />
+      {/* Scrollable form — keeps meta/span chips above the fixed keypad */}
+      <div
+        ref={formScrollRef}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain no-scrollbar"
+      >
+        <div className="mb-2 flex items-end justify-between gap-3">
+          <div className="min-w-0 flex-1">
             <input
-              ref={noteRef}
-              id="expense-note"
+              ref={amountRef}
               type="text"
-              value={noteValue}
-              onChange={(e) => setNoteValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  onSave();
-                }
-              }}
-              placeholder="Tùy chọn"
-              maxLength={80}
-              className="w-full min-w-0 bg-transparent text-right text-base font-medium leading-tight text-foreground placeholder:font-normal placeholder:text-muted-foreground/30 outline-none border-b border-border/45 pb-1.5 transition-[border-color,box-shadow] duration-200 caret-primary focus:border-primary/55 focus:shadow-[0_1px_0_0_hsl(var(--primary)/0.35)]"
-              aria-label="Ghi chú thêm (tùy chọn)"
-              autoComplete="off"
-              enterKeyHint="done"
+              inputMode="decimal"
+              value={amountValue}
+              onChange={e => setAmountValue(e.target.value.replace(/[^\d.]/g, ""))}
+              onKeyDown={onKeyDown}
+              className="sr-only text-base"
+              aria-label="Số tiền"
               onFocus={() => {
+                setAmountActive(true);
                 window.scrollTo(0, 0);
                 requestAnimationFrame(() => window.scrollTo(0, 0));
               }}
             />
-          </div>
-        </div>
-      </div>
-
-      {noteSuggestions.length > 0 && (
-        <div className="-mt-1 mb-2 flex gap-1.5 overflow-x-auto pb-1 shrink-0 no-scrollbar">
-          {noteSuggestions.map((s) => {
-            const active = noteValue.trim().toLowerCase() === s.toLowerCase();
-            return (
+            <div className="relative min-w-0">
               <button
-                key={s}
                 type="button"
-                onClick={() => setNoteValue(active ? "" : s)}
-                className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] transition-all active:scale-95 ${
-                  active
-                    ? "border-primary/50 bg-primary/15 text-primary font-medium"
-                    : "border-border/60 bg-muted text-muted-foreground hover:border-primary/30"
+                className={`flex w-full min-w-0 cursor-text items-baseline whitespace-nowrap text-left ${
+                  amountValue.length > 0 ? "pr-9" : ""
                 }`}
-                aria-pressed={active}
-                aria-label={`Ghi chú ${s}`}
+                onClick={activateAmount}
+                aria-label="Nhập số tiền"
+                aria-pressed={amountActive}
               >
-                {s}
+                <span
+                  className={`shrink-0 font-display tabular-nums leading-none text-foreground ${amountSizeClass}`}
+                >
+                  {amountValue ? (
+                    amountDisplay
+                  ) : (
+                    <span className="text-muted-foreground/25">0</span>
+                  )}
+                </span>
+                {amountActive && (
+                  <span
+                    className={`amount-caret shrink-0 ${amountSizeClass}`}
+                    aria-hidden="true"
+                  />
+                )}
+                <span
+                  className={`ml-0.5 shrink-0 font-display leading-none text-muted-foreground/35 ${zeroSizeClass}`}
+                >
+                  .000
+                </span>
               </button>
-            );
-          })}
-        </div>
-      )}
-
-      {hasMeta && (
-        <div className="flex flex-wrap gap-1.5 mb-2 shrink-0">
-          {fields.map(({ key, label, value }) => editingField === key ? (
-            <div key={key} className="flex items-center gap-1 bg-primary/10 border border-primary/30 rounded-xl px-2.5 py-1 text-xs">
-              <span className="text-[10px] text-muted-foreground">{label}:</span>
-              <input
-                ref={editInputRef}
-                className="bg-transparent outline-none w-24 text-foreground font-medium text-base caret-primary"
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") { commitEdit(); focusWithoutScroll(amountRef.current); }
-                  if (e.key === "Escape") { setEditingField(null); focusWithoutScroll(amountRef.current); }
-                }}
-                onBlur={commitEdit}
-                aria-label={`Sửa ${label}`}
-              />
               <ClearFieldButton
-                visible={editValue.length > 0}
-                size="sm"
-                label={`Xóa ${label}`}
+                visible={amountValue.length > 0}
+                onClear={clearAmount}
+                label="Xóa số tiền"
+                className="absolute right-0 top-1/2 -translate-y-1/2"
+              />
+            </div>
+            <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
+              nghìn ₫
+            </p>
+          </div>
+
+          <div
+            className={`amount-note group flex shrink-0 flex-col justify-end self-stretch transition-[width] duration-200 ${noteWidthClass}`}
+          >
+            <label
+              htmlFor="expense-note"
+              className="mb-1 block text-right text-[9px] uppercase tracking-[0.18em] text-muted-foreground/65 transition-colors group-focus-within:text-primary/80"
+            >
+              Ghi chú
+            </label>
+            <div className="flex items-center gap-1.5">
+              <ClearFieldButton
+                visible={noteValue.length > 0}
                 onClear={() => {
-                  setEditValue("");
-                  focusWithoutScroll(editInputRef.current);
+                  setNoteValue("");
+                  focusWithoutScroll(noteRef.current);
+                }}
+                label="Xóa ghi chú"
+                size="sm"
+              />
+              <input
+                ref={noteRef}
+                id="expense-note"
+                type="text"
+                value={noteValue}
+                onChange={e => setNoteValue(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    onSave();
+                  }
+                }}
+                placeholder="Tùy chọn"
+                maxLength={80}
+                className="w-full min-w-0 border-b border-border/45 bg-transparent pb-1.5 text-right text-base font-medium leading-tight text-foreground caret-primary outline-none transition-[border-color,box-shadow] duration-200 placeholder:font-normal placeholder:text-muted-foreground/30 focus:border-primary/55 focus:shadow-[0_1px_0_0_hsl(var(--primary)/0.35)]"
+                aria-label="Ghi chú thêm (tùy chọn)"
+                autoComplete="off"
+                enterKeyHint="done"
+                onFocus={() => {
+                  setAmountActive(false);
+                  window.scrollTo(0, 0);
+                  requestAnimationFrame(() => window.scrollTo(0, 0));
                 }}
               />
             </div>
-          ) : (
-            <button
-              key={key}
-              type="button"
-              onClick={() => openEdit(key)}
-              className="group flex items-center gap-1 px-2.5 py-1 rounded-xl bg-muted border border-border/60 text-[11px] text-foreground hover:border-primary/30 active:scale-95 transition-all"
-              aria-label={`Sửa ${label}`}
-            >
-              <span className="text-[10px] text-muted-foreground">{label}</span>
-              <span className="font-medium">{value}</span>
-              <Pencil className="h-2.5 w-2.5 text-muted-foreground/50 group-hover:text-primary/70" />
-            </button>
-          ))}
+          </div>
         </div>
-      )}
 
-      <div className="mt-auto flex min-h-0 flex-1 flex-col justify-end gap-1.5 pt-1">
-        <div className="mb-0.5 space-y-1.5">
+        {noteSuggestions.length > 0 && (
+          <div className="-mt-1 mb-2 flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+            {noteSuggestions.map(s => {
+              const active = noteValue.trim().toLowerCase() === s.toLowerCase();
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setNoteValue(active ? "" : s)}
+                  className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] transition-all active:scale-95 ${
+                    active
+                      ? "border-primary/50 bg-primary/15 font-medium text-primary"
+                      : "border-border/60 bg-muted text-muted-foreground hover:border-primary/30"
+                  }`}
+                  aria-pressed={active}
+                  aria-label={`Ghi chú ${s}`}
+                >
+                  {s}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {hasMeta && (
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {fields.map(({ key, label, value }) =>
+              editingField === key ? (
+                <div
+                  key={key}
+                  className="flex items-center gap-1 rounded-xl border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs"
+                >
+                  <span className="text-[10px] text-muted-foreground">{label}:</span>
+                  <input
+                    ref={editInputRef}
+                    className="w-24 bg-transparent text-base font-medium text-foreground caret-primary outline-none"
+                    value={editValue}
+                    onChange={e => setEditValue(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") {
+                        commitEdit();
+                        activateAmount();
+                      }
+                      if (e.key === "Escape") {
+                        setEditingField(null);
+                        activateAmount();
+                      }
+                    }}
+                    onBlur={commitEdit}
+                    aria-label={`Sửa ${label}`}
+                  />
+                  <ClearFieldButton
+                    visible={editValue.length > 0}
+                    size="sm"
+                    label={`Xóa ${label}`}
+                    onClear={() => {
+                      setEditValue("");
+                      focusWithoutScroll(editInputRef.current);
+                    }}
+                  />
+                </div>
+              ) : (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => openEdit(key)}
+                  className="group flex items-center gap-1 rounded-xl border border-border/60 bg-muted px-2.5 py-1 text-[11px] text-foreground transition-all hover:border-primary/30 active:scale-95"
+                  aria-label={`Sửa ${label}`}
+                >
+                  <span className="text-[10px] text-muted-foreground">{label}</span>
+                  <span className="font-medium">{value}</span>
+                  <Pencil className="h-2.5 w-2.5 text-muted-foreground/50 group-hover:text-primary/70" />
+                </button>
+              ),
+            )}
+          </div>
+        )}
+
+        <div ref={spanSectionRef} className="mb-2 space-y-1.5">
           <button
             type="button"
             onClick={() => setSpanEnabled(!spanEnabled)}
@@ -391,13 +502,13 @@ export default function AmountPhase({
 
           {spanEnabled && (
             <div className="space-y-1.5 rounded-xl border border-border/50 bg-card/80 px-2.5 py-2">
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-nowrap items-center gap-1 overflow-x-auto no-scrollbar">
                 {SPAN_PRESETS.map(p => (
                   <button
                     key={p.key}
                     type="button"
                     onClick={() => setSpanPreset(p.key)}
-                    className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                    className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium leading-none transition-colors ${
                       spanPreset === p.key
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted text-muted-foreground hover:text-foreground"
@@ -406,39 +517,54 @@ export default function AmountPhase({
                     {p.label}
                   </button>
                 ))}
-                <button
-                  type="button"
-                  onClick={() => setSpanPreset("custom")}
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                    spanPreset === "custom"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  Tuỳ chỉnh
-                </button>
+                {spanPreset === "custom" ? (
+                  <label className="inline-flex min-w-[5.5rem] flex-1 items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-[11px] font-medium leading-none text-primary-foreground">
+                    <input
+                      ref={customSpanRef}
+                      type="text"
+                      inputMode="numeric"
+                      value={spanCustomPeriods}
+                      onChange={e =>
+                        setSpanCustomPeriods(e.target.value.replace(/\D/g, "").slice(0, 3))
+                      }
+                      onFocus={e => {
+                        setAmountActive(false);
+                        e.currentTarget.select();
+                      }}
+                      placeholder="…"
+                      aria-label="Số kỳ tuỳ chỉnh"
+                      className="span-chip-input w-full min-w-[2ch] max-w-[3.5ch] bg-transparent text-center tabular-nums text-primary-foreground caret-primary-foreground outline-none placeholder:text-primary-foreground/45"
+                    />
+                    <span className="shrink-0 opacity-85">kỳ</span>
+                  </label>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSpanPreset("custom");
+                      if (!spanCustomPeriods.trim()) setSpanCustomPeriods("3");
+                    }}
+                    className="min-w-[5.5rem] flex-1 rounded-full bg-muted px-2.5 py-1 text-left text-[11px] font-medium leading-none text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    Tuỳ chỉnh
+                  </button>
+                )}
               </div>
-              {spanPreset === "custom" && (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={spanCustomPeriods}
-                    onChange={e => setSpanCustomPeriods(e.target.value.replace(/\D/g, "").slice(0, 3))}
-                    placeholder="Số kỳ"
-                    className="h-8 w-20 rounded-lg border border-input bg-background px-2 text-sm"
-                    aria-label="Số kỳ tuỳ chỉnh"
-                  />
-                  <span className="text-[10px] text-muted-foreground">kỳ (2–120)</span>
-                </div>
-              )}
               {spanPreview ? (
                 <p className="text-[10px] leading-relaxed text-muted-foreground">
                   Tổng{" "}
-                  <MoneyLabel amount={spanPreview.total} className="inline text-[11px] font-display text-foreground" smallClassName="text-[0.7em]" />
+                  <MoneyLabel
+                    amount={spanPreview.total}
+                    className="inline text-[11px] font-display text-foreground"
+                    smallClassName="text-[0.7em]"
+                  />
                   {" · "}ghi kỳ này{" "}
-                  <MoneyLabel amount={spanPreview.first} className="inline text-[11px] font-display text-foreground" smallClassName="text-[0.7em]" />
-                  {" "}(1/{spanPreview.periods}). Các kỳ sau tự thêm cùng ngày hàng tháng.
+                  <MoneyLabel
+                    amount={spanPreview.first}
+                    className="inline text-[11px] font-display text-foreground"
+                    smallClassName="text-[0.7em]"
+                  />{" "}
+                  (1/{spanPreview.periods}). Các kỳ sau tự thêm cùng ngày hàng tháng.
                 </p>
               ) : (
                 <p className="text-[10px] text-muted-foreground">
@@ -450,7 +576,7 @@ export default function AmountPhase({
         </div>
 
         {lines.length > 0 && (
-          <div className="mb-1 max-h-24 space-y-1 overflow-y-auto no-scrollbar">
+          <div className="mb-2 max-h-24 space-y-1 overflow-y-auto no-scrollbar">
             {lines.map((l, i) => (
               <div
                 key={i}
@@ -474,6 +600,10 @@ export default function AmountPhase({
             ))}
           </div>
         )}
+      </div>
+
+      {/* Fixed keypad — never covers chips above */}
+      <div className="mt-1.5 flex shrink-0 flex-col gap-1.5">
         {keys.map((row, ri) => (
           <div key={ri} className="grid grid-cols-3 gap-1.5">
             {row.map(({ label, action, muted }) => (
@@ -499,7 +629,7 @@ export default function AmountPhase({
                 onPointerUp={endHold}
                 onPointerLeave={endHold}
                 onPointerCancel={endHold}
-                onContextMenu={(e) => e.preventDefault()}
+                onContextMenu={e => e.preventDefault()}
                 className="keypad-key rounded-2xl border border-border/60 bg-background text-xl font-medium text-muted-foreground shadow-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 aria-label="Xóa số cuối (giữ để xóa hết)"
               >
@@ -522,10 +652,10 @@ export default function AmountPhase({
             type="button"
             onClick={onSave}
             disabled={!canSave || (spanEnabled && spanPeriodCount < 2)}
-            className="keypad-key col-span-2 rounded-2xl bg-primary text-primary-foreground font-semibold shadow-warm disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="keypad-key col-span-2 rounded-2xl bg-primary font-semibold text-primary-foreground shadow-warm disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Lưu"
           >
-            <Check className="inline-block h-5 w-5 mr-1.5 -mt-0.5" />
+            <Check className="mr-1.5 -mt-0.5 inline-block h-5 w-5" />
             Lưu
           </button>
         </div>

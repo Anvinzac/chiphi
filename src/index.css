@@ -353,8 +353,47 @@
     animation: expenseScrimExit 0.28s ease-in forwards;
   }
 
+  /* Chip inputs stay visually matching other chips (panel rule forces 16px otherwise) */
+  .expense-add-panel input.span-chip-input {
+    font-size: 11px !important;
+    line-height: 1.25;
+    height: 1.25em;
+    padding: 0;
+  }
+
   .amount-note input::placeholder {
     font-style: italic;
+  }
+
+  .amount-caret {
+    display: inline-block;
+    width: 0.08em;
+    min-width: 2px;
+    height: 0.88em;
+    margin-left: 0.06em;
+    margin-right: 0.02em;
+    background: hsl(var(--primary));
+    border-radius: 1px;
+    animation: amountCaretBlink 1.05s step-end infinite;
+    vertical-align: -0.08em;
+  }
+
+  @keyframes amountCaretBlink {
+    0%,
+    45% {
+      opacity: 1;
+    }
+    46%,
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .amount-caret {
+      animation: none;
+      opacity: 1;
+    }
   }
 
   .keypad-key {

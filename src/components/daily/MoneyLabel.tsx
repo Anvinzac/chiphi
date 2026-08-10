@@ -8,6 +8,8 @@ interface MoneyLabelProps {
   suffix?: string;
   suffixClassName?: string;
   locale?: string;
+  /** When amount is 0, render this instead (e.g. "0.000.000") to reserve layout width. */
+  zeroDisplay?: string;
 }
 
 export default function MoneyLabel({
@@ -18,8 +20,10 @@ export default function MoneyLabel({
   suffix = "₫",
   suffixClassName,
   locale = "vi-VN",
+  zeroDisplay,
 }: MoneyLabelProps) {
-  const formatted = amount.toLocaleString(locale);
+  const formatted =
+    amount === 0 && zeroDisplay ? zeroDisplay : amount.toLocaleString(locale);
   const lastDot = formatted.lastIndexOf(".");
 
   const main = lastDot !== -1 ? formatted.slice(0, lastDot) : formatted;

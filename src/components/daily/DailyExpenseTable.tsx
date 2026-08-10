@@ -1097,13 +1097,14 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
           </PopoverContent>
         </Popover>
 
-        <div className="shrink-0 text-right">
-          <span className="text-[10px] uppercase tracking-widest text-muted-foreground block">
+        <div className="min-w-[6.75rem] shrink-0 text-right tabular-nums">
+          <span className="block text-[10px] uppercase tracking-widest text-muted-foreground">
             {nameFilter ? "Lọc" : "Tổng"}
           </span>
           <MoneyLabel
             amount={displayTotal}
-            className="text-lg font-display block leading-tight"
+            zeroDisplay="0.000.000"
+            className="block text-lg font-display leading-tight"
             smallClassName="text-[0.65em]"
           />
         </div>

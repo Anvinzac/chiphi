@@ -140,10 +140,11 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
   const [itemFrequency, setItemFrequency] = useState<Record<string, number>>({});
 
-  // Day data - grouped by payment
+  // Day data - grouped by payment (stale-while-revalidate via paymentsCacheRef)
   const [paymentGroups, setPaymentGroups] = useState<PaymentGroupData[]>([]);
   const [dayTotal, setDayTotal] = useState(0);
   const [activePaymentId, setActivePaymentId] = useState<string | null>(null);
+  const [paymentsReady, setPaymentsReady] = useState(false);
 
   // Input state
   const [phase, setPhase] = useState<InputPhase>("name");
@@ -177,6 +178,46 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   const cardRef = useRef<HTMLDivElement>(null);
   const pagerRef = useRef<HTMLDivElement>(null);
   const pagerReadyRef = useRef(false);
+  const suppliersRef = useRef(suppliers);
+  suppliersRef.current = suppliers;
+  const paymentsCacheRef = useRef(
+    new Map<string, { groups: PaymentGroupData[]; total: number }>(),
+  );
+  const paymentsKeyRef = useRef("");
+  const paymentsLoadIdRef = useRef(0);
+  const paymentsHydratedKeyRef = useRef<string | null>(null);
+
+  const paymentsKey =
+    viewMode === "daily"
+      ? `daily:${selectedDate}`
+      : `range:${periodStartStr}:${periodEndStr}`;
+  paymentsKeyRef.current = paymentsKey;
+
+  // Keep cache in sync with optimistic local edits for the visible period
+  useEffect(() => {
+    if (paymentsHydratedKeyRef.current !== paymentsKey) return;
+    paymentsCacheRef.current.set(paymentsKey, {
+      groups: paymentGroups,
+      total: dayTotal,
+    });
+  }, [paymentGroups, dayTotal, paymentsKey]);
+
+  // Relabel supplier names once catalog loads (payments no longer wait on suppliers)
+  useEffect(() => {
+    if (suppliers.length === 0) return;
+    setPaymentGroups(prev => {
+      let changed = false;
+      const next = prev.map(g => {
+        const supplierId = g.entries.find(e => e.supplier_id)?.supplier_id;
+        if (!supplierId) return g;
+        const name = suppliers.find(s => s.id === supplierId)?.name || null;
+        if (name === g.supplierName) return g;
+        changed = true;
+        return { ...g, supplierName: name };
+      });
+      return changed ? next : prev;
+    });
+  }, [suppliers]);
   const pagerSyncingRef = useRef(false);
   const lastTapRef = useRef(0);
   const nameValueRef = useRef(nameValue);
@@ -278,17 +319,48 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     load();
   }, [user]);
 
-  // Load data for selected date or range - grouped by payment
+  // Load data for selected date or range — show cache immediately, refresh in background
   useEffect(() => {
     if (!user) return;
-    setPaymentGroups([]);
-    setDayTotal(0);
-    setActivePaymentId(null);
+
+    const loadId = ++paymentsLoadIdRef.current;
+    const key = paymentsKey;
+    const cached = paymentsCacheRef.current.get(key);
+    if (cached) {
+      paymentsHydratedKeyRef.current = key;
+      setPaymentGroups(cached.groups);
+      setDayTotal(cached.total);
+      setPaymentsReady(true);
+      if (cached.groups.length > 0) {
+        if (viewMode === "range") {
+          const endPayments = cached.groups.filter(
+            g => g.date === periodEndStr && !isMockPaymentId(g.paymentId),
+          );
+          setActivePaymentId(
+            endPayments.length > 0
+              ? endPayments[endPayments.length - 1].paymentId
+              : null,
+          );
+        } else {
+          const lastReal = [...cached.groups].reverse().find(g => !isMockPaymentId(g.paymentId));
+          setActivePaymentId(lastReal?.paymentId ?? null);
+        }
+      } else {
+        setActivePaymentId(null);
+      }
+    } else if (paymentsHydratedKeyRef.current !== key) {
+      // Uncached period only — avoid wiping the list on same-key refreshes
+      paymentsHydratedKeyRef.current = null;
+      setPaymentGroups([]);
+      setDayTotal(0);
+      setActivePaymentId(null);
+      setPaymentsReady(false);
+    }
 
     const loadPayments = async () => {
       try {
         const posted = await applyDueExpenseSpans(user.id, todayStr);
-        if (posted > 0) {
+        if (posted > 0 && loadId === paymentsLoadIdRef.current) {
           toast.message(`Đã ghi ${posted} kỳ chi tiêu chia sẵn`);
         }
       } catch (err: any) {
@@ -297,6 +369,8 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
           console.warn("applyDueExpenseSpans", err);
         }
       }
+
+      if (loadId !== paymentsLoadIdRef.current) return;
 
       let query = supabase
         .from("payments")
@@ -311,7 +385,9 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       }
 
       const { data: payments } = await query;
+      if (loadId !== paymentsLoadIdRef.current) return;
 
+      const supplierList = suppliersRef.current;
       let groups: PaymentGroupData[] = [];
       let total = 0;
 
@@ -323,7 +399,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
 
           const supplierId = p.supplier_id || (subs.length > 0 ? subs[0].supplier_id : null);
           const supplierName = supplierId
-            ? suppliers.find(s => s.id === supplierId)?.name || null
+            ? supplierList.find(s => s.id === supplierId)?.name || null
             : null;
 
           return {
@@ -355,8 +431,11 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
         groups.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
       }
 
+      paymentsHydratedKeyRef.current = key;
+      paymentsCacheRef.current.set(key, { groups, total });
       setPaymentGroups(groups);
       setDayTotal(total);
+      setPaymentsReady(true);
       if (groups.length > 0) {
         if (viewMode === "range") {
           const endPayments = groups.filter(g => g.date === periodEndStr && !isMockPaymentId(g.paymentId));
@@ -372,7 +451,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       }
     };
     loadPayments();
-  }, [user, selectedDate, suppliers, viewMode, periodStartStr, periodEndStr, todayStr, dataTick]);
+  }, [user, selectedDate, viewMode, periodStartStr, periodEndStr, todayStr, dataTick, paymentsKey]);
 
   // Lock page scroll while the add panel is open (stops iOS jump-to-bottom on focus)
   useEffect(() => {
@@ -1184,7 +1263,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
           </div>
         )}
 
-        {paymentGroups.length === 0 && (
+        {paymentsReady && paymentGroups.length === 0 && (
           <div className="text-center pt-12 text-muted-foreground text-sm">
             <p>Chưa có chi tiêu nào</p>
             {!cardExpanded && (

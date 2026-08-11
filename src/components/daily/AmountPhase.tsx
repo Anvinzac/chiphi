@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, Pencil, Plus, X } from "lucide-react";
 import type { VerifyData } from "@/types/expense";
 import { focusWithoutScroll } from "@/lib/focusWithoutScroll";
@@ -35,6 +35,7 @@ interface AmountPhaseProps {
   onBack: () => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
   onSave: () => void;
+  saving?: boolean;
   noteSuggestions?: string[];
   spanEnabled: boolean;
   setSpanEnabled: (v: boolean) => void;
@@ -45,6 +46,19 @@ interface AmountPhaseProps {
 }
 
 type EditableField = "supplierName" | "categoryName" | "subCategoryName" | "unitPrice" | null;
+
+/** Match typed note query against full name or word initials (e.g. "ct" → "Cải thìa"). */
+function matchesNoteQuery(name: string, query: string): boolean {
+  const n = name.toLowerCase().trim();
+  const q = query.toLowerCase().trim();
+  if (!q) return false;
+  if (n.startsWith(q) || n.includes(q)) return true;
+  const initials = n
+    .split(/\s+/)
+    .map(w => w.charAt(0))
+    .join("");
+  return initials.startsWith(q);
+}
 
 export default function AmountPhase({
   nameValue,
@@ -62,6 +76,7 @@ export default function AmountPhase({
   onBack,
   onKeyDown,
   onSave,
+  saving = false,
   noteSuggestions = [],
   spanEnabled,
   setSpanEnabled,
@@ -78,6 +93,9 @@ export default function AmountPhase({
   const customSpanRef = useRef<HTMLInputElement>(null);
   const formScrollRef = useRef<HTMLDivElement>(null);
   const spanSectionRef = useRef<HTMLDivElement>(null);
+  const amountTrackRef = useRef<HTMLButtonElement>(null);
+  const amountMeasureRef = useRef<HTMLSpanElement>(null);
+  const [amountFontPx, setAmountFontPx] = useState(36);
 
   useEffect(() => {
     if (!spanEnabled || spanPreset !== "custom") return;
@@ -182,7 +200,7 @@ export default function AmountPhase({
   };
 
   const currentValid = !!amountValue.trim() && Number(amountValue) > 0;
-  const canSave = currentValid || lines.length > 0;
+  const canSave = !saving && (currentValid || lines.length > 0);
 
   const spanPeriodCount = useMemo(() => {
     if (!spanEnabled) return 0;
@@ -227,35 +245,36 @@ export default function AmountPhase({
   const fields = allFields.filter(f => f.value !== "");
 
   const amountDisplay = amountValue ? Number(amountValue).toLocaleString("vi-VN") : "0";
-  const amountLen = amountDisplay.length;
-  const amountSizeClass =
-    amountLen >= 13
-      ? "text-lg"
-      : amountLen >= 11
-        ? "text-xl"
-        : amountLen >= 9
-          ? "text-2xl"
-          : amountLen >= 7
-            ? "text-3xl"
-            : "text-4xl";
-  const zeroSizeClass =
-    amountLen >= 13
-      ? "text-sm"
-      : amountLen >= 11
-        ? "text-base"
-        : amountLen >= 9
-          ? "text-lg"
-          : amountLen >= 7
-            ? "text-xl"
-            : "text-2xl";
-  const noteWidthClass =
-    amountLen >= 11
-      ? "w-[4.75rem]"
-      : amountLen >= 9
-        ? "w-[min(28%,6.5rem)]"
-        : amountLen >= 7
-          ? "w-[min(34%,8.5rem)]"
-          : "w-[min(42%,11.5rem)]";
+
+  const noteQuery = noteValue.trim();
+  const filteredNoteSuggestions = useMemo(() => {
+    if (!noteQuery) return [];
+    return noteSuggestions.filter(s => matchesNoteQuery(s, noteQuery));
+  }, [noteSuggestions, noteQuery]);
+  const showNoteSuggestions = filteredNoteSuggestions.length > 0;
+
+  useLayoutEffect(() => {
+    const track = amountTrackRef.current;
+    const measure = amountMeasureRef.current;
+    if (!track || !measure) return;
+
+    const fit = () => {
+      const max = 36;
+      const min = 14;
+      let size = max;
+      measure.style.fontSize = `${size}px`;
+      while (size > min && measure.scrollWidth > track.clientWidth) {
+        size -= 1;
+        measure.style.fontSize = `${size}px`;
+      }
+      setAmountFontPx(size);
+    };
+
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(track);
+    return () => ro.disconnect();
+  }, [amountDisplay, amountActive]);
 
   const keys = [
     [
@@ -315,52 +334,43 @@ export default function AmountPhase({
                 requestAnimationFrame(() => window.scrollTo(0, 0));
               }}
             />
-            <div className="relative min-w-0">
+            <div className="flex items-center gap-1.5">
               <button
+                ref={amountTrackRef}
                 type="button"
-                className={`flex w-full min-w-0 cursor-text items-baseline whitespace-nowrap text-left ${
-                  amountValue.length > 0 ? "pr-9" : ""
-                }`}
+                className="min-w-0 flex-1 cursor-text overflow-hidden text-left"
                 onClick={activateAmount}
                 aria-label="Nhập số tiền"
                 aria-pressed={amountActive}
               >
                 <span
-                  className={`shrink-0 font-display tabular-nums leading-none text-foreground ${amountSizeClass}`}
+                  ref={amountMeasureRef}
+                  className="inline-flex max-w-none items-baseline whitespace-nowrap font-display tabular-nums leading-none text-foreground"
+                  style={{ fontSize: amountFontPx }}
                 >
                   {amountValue ? (
                     amountDisplay
                   ) : (
                     <span className="text-muted-foreground/25">0</span>
                   )}
-                </span>
-                {amountActive && (
-                  <span
-                    className={`amount-caret shrink-0 ${amountSizeClass}`}
-                    aria-hidden="true"
-                  />
-                )}
-                <span
-                  className={`ml-0.5 shrink-0 font-display leading-none text-muted-foreground/35 ${zeroSizeClass}`}
-                >
-                  .000
+                  {amountActive && <span className="amount-caret" aria-hidden="true" />}
+                  <span className="ml-0.5 text-[0.65em] text-muted-foreground/35">.000</span>
                 </span>
               </button>
-              <ClearFieldButton
-                visible={amountValue.length > 0}
-                onClear={clearAmount}
-                label="Xóa số tiền"
-                className="absolute right-0 top-1/2 -translate-y-1/2"
-              />
+              <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center">
+                <ClearFieldButton
+                  visible={amountValue.length > 0}
+                  onClear={clearAmount}
+                  label="Xóa số tiền"
+                />
+              </div>
             </div>
             <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
               nghìn ₫
             </p>
           </div>
 
-          <div
-            className={`amount-note group flex shrink-0 flex-col justify-end self-stretch transition-[width] duration-200 ${noteWidthClass}`}
-          >
+          <div className="amount-note group flex w-[min(42%,11.5rem)] shrink-0 flex-col justify-end self-stretch">
             <label
               htmlFor="expense-note"
               className="mb-1 block text-right text-[9px] uppercase tracking-[0.18em] text-muted-foreground/65 transition-colors group-focus-within:text-primary/80"
@@ -386,7 +396,7 @@ export default function AmountPhase({
                 onKeyDown={e => {
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    onSave();
+                    if (!saving) onSave();
                   }
                 }}
                 placeholder="Tùy chọn"
@@ -405,29 +415,35 @@ export default function AmountPhase({
           </div>
         </div>
 
-        {noteSuggestions.length > 0 && (
-          <div className="-mt-1 mb-2 flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-            {noteSuggestions.map(s => {
-              const active = noteValue.trim().toLowerCase() === s.toLowerCase();
-              return (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setNoteValue(active ? "" : s)}
-                  className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] transition-all active:scale-95 ${
-                    active
-                      ? "border-primary/50 bg-primary/15 font-medium text-primary"
-                      : "border-border/60 bg-muted text-muted-foreground hover:border-primary/30"
-                  }`}
-                  aria-pressed={active}
-                  aria-label={`Ghi chú ${s}`}
-                >
-                  {s}
-                </button>
-              );
-            })}
+        <div
+          className={`note-suggest-strip ${showNoteSuggestions ? "note-suggest-strip--open" : ""}`}
+          aria-hidden={!showNoteSuggestions}
+        >
+          <div className="note-suggest-strip__inner">
+            <div className="note-suggest-strip__row no-scrollbar" role="list" aria-label="Gợi ý phân loại">
+              {filteredNoteSuggestions.map(s => {
+                const active = noteValue.trim().toLowerCase() === s.toLowerCase();
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    role="listitem"
+                    onClick={() => setNoteValue(active ? "" : s)}
+                    className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] transition-colors active:scale-95 ${
+                      active
+                        ? "border-primary/50 bg-primary/15 font-medium text-primary"
+                        : "border-border/60 bg-muted text-muted-foreground hover:border-primary/30"
+                    }`}
+                    aria-pressed={active}
+                    aria-label={`Ghi chú ${s}`}
+                  >
+                    {s}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        )}
+        </div>
 
         {hasMeta && (
           <div className="mb-2 flex flex-wrap gap-1.5">
@@ -518,7 +534,7 @@ export default function AmountPhase({
                   </button>
                 ))}
                 {spanPreset === "custom" ? (
-                  <label className="inline-flex min-w-[5.5rem] flex-1 items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-[11px] font-medium leading-none text-primary-foreground">
+                  <label className="inline-flex w-full max-w-[9rem] min-w-[5.5rem] flex-1 basis-0 items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-[11px] font-medium leading-none text-primary-foreground">
                     <input
                       ref={customSpanRef}
                       type="text"
@@ -544,7 +560,7 @@ export default function AmountPhase({
                       setSpanPreset("custom");
                       if (!spanCustomPeriods.trim()) setSpanCustomPeriods("3");
                     }}
-                    className="min-w-[5.5rem] flex-1 rounded-full bg-muted px-2.5 py-1 text-left text-[11px] font-medium leading-none text-muted-foreground transition-colors hover:text-foreground"
+                    className="w-full max-w-[9rem] min-w-[5.5rem] flex-1 basis-0 rounded-full bg-muted px-2.5 py-1 text-left text-[11px] font-medium leading-none text-muted-foreground transition-colors hover:text-foreground"
                   >
                     Tuỳ chỉnh
                   </button>
@@ -654,9 +670,10 @@ export default function AmountPhase({
             disabled={!canSave || (spanEnabled && spanPeriodCount < 2)}
             className="keypad-key col-span-2 rounded-2xl bg-primary font-semibold text-primary-foreground shadow-warm disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Lưu"
+            aria-busy={saving}
           >
             <Check className="mr-1.5 -mt-0.5 inline-block h-5 w-5" />
-            Lưu
+            {saving ? "Đang lưu…" : "Lưu"}
           </button>
         </div>
       </div>

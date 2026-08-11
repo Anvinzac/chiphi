@@ -16,6 +16,16 @@ import DaySection from "./DaySection";
 import WeekPager, { type WeekPage } from "./WeekPager";
 import BrandMenu from "@/components/BrandMenu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { VerifyData } from "@/types/expense";
 import { getMockGroupsForRange, isMockPaymentId } from "@/lib/mockRangeData";
 import { lockBodyScroll } from "@/lib/focusWithoutScroll";
@@ -106,6 +116,9 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   const periodStartStr = format(period.start, "yyyy-MM-dd");
   const periodEndStr = format(period.end, "yyyy-MM-dd");
   const todayStr = format(new Date(), "yyyy-MM-dd");
+  /** Current kỳ is the newest — don't invent future ranges past today. */
+  const maxPeriodOffset = useMemo(() => getPeriodOffsetForDate(new Date()), [todayStr]);
+  const canShiftForward = periodOffset < maxPeriodOffset;
   const periodIsPast = periodEndStr < todayStr;
   const periodIsFuture = periodStartStr > todayStr;
   // Range: past periods → last day of kỳ; current → today. Never write a future date.
@@ -142,12 +155,15 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   const [match, setMatch] = useState<MatchInfo | null>(null);
   const [verifyData, setVerifyData] = useState<VerifyData | null>(null);
   const [justSaved, setJustSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   // UI state
   const [rangePickerOpen, setRangePickerOpen] = useState(false);
   // Panel starts closed: returning to this page must not auto-open the add panel
   const [cardExpanded, setCardExpanded] = useState(false);
   const [cardClosing, setCardClosing] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
   const [detailEntry, setDetailEntry] = useState<PaymentEntry | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [nameFilter, setNameFilter] = useState<string | null>(null);
@@ -457,12 +473,21 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
 
   const collapseCard = useCallback(() => {
     if (!cardExpanded || cardClosing) return;
+    setDiscardOpen(false);
     setCardClosing(true);
     setTimeout(() => {
       setCardExpanded(false);
       setCardClosing(false);
     }, 300);
   }, [cardExpanded, cardClosing]);
+
+  const requestCollapseCard = useCallback(() => {
+    if (!cardExpanded || cardClosing || justSaved) {
+      collapseCard();
+      return;
+    }
+    setDiscardOpen(true);
+  }, [cardExpanded, cardClosing, justSaved, collapseCard]);
 
   const findItem = useCallback((name: string): DbItem | undefined => {
     const lower = name.toLowerCase().trim();
@@ -580,7 +605,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
 
 
   const handleSave = useCallback(async () => {
-    if (!user) return;
+    if (!user || savingRef.current) return;
     if (expenseDate > todayStr || periodIsFuture) {
       toast.error("Không thể ghi chi tiêu trước ngày hôm nay");
       return;
@@ -592,6 +617,9 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     if (entries.length === 0) return;
     const amount = entries.reduce((s, l) => s + l.amount, 0);
     const combinedNote = entries.map(l => l.note).filter(Boolean).join(" · ") || null;
+
+    savingRef.current = true;
+    setSaving(true);
 
     const finishUi = () => {
       setPhase("done");
@@ -616,112 +644,123 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       }, 600);
     };
 
-    if (spanEnabled) {
-      const periodCount =
-        spanPreset === "custom"
-          ? Math.min(120, Math.max(2, Math.floor(Number(spanCustomPeriods) || 0)))
-          : (SPAN_PRESETS.find(p => p.key === spanPreset)?.periods ?? 0);
-      if (periodCount < 2) {
-        toast.error("Chọn số kỳ từ 2 trở lên");
-        return;
-      }
-      try {
-        const result = await createExpenseSpan({
-          userId: user.id,
-          firstDate: expenseDate,
-          totalAmount: amount,
-          periodCount,
-          meta: {
-            item_name: nameValue.trim(),
-            item_id: match?.itemId || null,
-            category_id: match?.categoryId || null,
-            sub_category_id: match?.subCategoryId || null,
-            sub_sub_category_id: match?.subSubCategoryId || null,
-            supplier_id: match?.supplierId || null,
-            notes: combinedNote,
-            unit_price: match?.unitPrice,
-          },
-        });
-        if (!result) {
-          toast.error("Không chia được số tiền");
+    try {
+      if (spanEnabled) {
+        const periodCount =
+          spanPreset === "custom"
+            ? Math.min(120, Math.max(2, Math.floor(Number(spanCustomPeriods) || 0)))
+            : (SPAN_PRESETS.find(p => p.key === spanPreset)?.periods ?? 0);
+        if (periodCount < 2) {
+          toast.error("Chọn số kỳ từ 2 trở lên");
           return;
         }
-        toast.success(`Đã ghi kỳ 1/${result.periodCount}`);
-        setDataTick(t => t + 1);
-        finishUi();
-      } catch (err: any) {
-        toast.error(err.message || "Lưu chia kỳ thất bại — đã chạy migration chưa?");
+        try {
+          const result = await createExpenseSpan({
+            userId: user.id,
+            firstDate: expenseDate,
+            totalAmount: amount,
+            periodCount,
+            meta: {
+              item_name: nameValue.trim(),
+              item_id: match?.itemId || null,
+              category_id: match?.categoryId || null,
+              sub_category_id: match?.subCategoryId || null,
+              sub_sub_category_id: match?.subSubCategoryId || null,
+              supplier_id: match?.supplierId || null,
+              notes: combinedNote,
+              unit_price: match?.unitPrice,
+            },
+          });
+          if (!result) {
+            toast.error("Không chia được số tiền");
+            return;
+          }
+          toast.success(`Đã ghi kỳ 1/${result.periodCount}`);
+          setDataTick(t => t + 1);
+          finishUi();
+        } catch (err: any) {
+          toast.error(err.message || "Lưu chia kỳ thất bại — đã chạy migration chưa?");
+        }
+        return;
       }
-      return;
-    }
 
-    let pid = activePaymentId;
-    if (!pid) {
-      const { data: newPayment } = await supabase
-        .from("payments")
-        .insert({ date: expenseDate, user_id: user.id, total_amount: 0, supplier_id: match?.supplierId || null })
-        .select("id")
-        .single();
-      if (newPayment) {
-        pid = newPayment.id;
-        setActivePaymentId(pid);
+      let pid = activePaymentId;
+      if (!pid) {
+        const { data: newPayment } = await supabase
+          .from("payments")
+          .insert({ date: expenseDate, user_id: user.id, total_amount: 0, supplier_id: match?.supplierId || null })
+          .select("id")
+          .single();
+        if (newPayment) {
+          pid = newPayment.id;
+          setActivePaymentId(pid);
+        }
       }
-    }
-    if (!pid) return;
+      if (!pid) return;
 
-    const { error } = await supabase.from("sub_payments").insert(
-      entries.map(l => ({
-        payment_id: pid,
+      const { error } = await supabase.from("sub_payments").insert(
+        entries.map(l => ({
+          payment_id: pid,
+          item_name: nameValue.trim(),
+          item_id: match?.itemId || null,
+          quantity: match?.unitPrice ? l.amount / match.unitPrice : 1,
+          unit_price: match?.unitPrice || l.amount,
+          amount: l.amount,
+          category_id: match?.categoryId || null,
+          sub_category_id: match?.subCategoryId || null,
+          sub_sub_category_id: match?.subSubCategoryId || null,
+          supplier_id: match?.supplierId || null,
+          notes: l.note,
+          user_id: user.id,
+        })),
+      );
+
+      if (error) {
+        toast.error(error.message || "Lưu thất bại");
+        return;
+      }
+
+      const newEntries: PaymentEntry[] = entries.map(l => ({
         item_name: nameValue.trim(),
-        item_id: match?.itemId || null,
-        quantity: match?.unitPrice ? l.amount / match.unitPrice : 1,
-        unit_price: match?.unitPrice || l.amount,
         amount: l.amount,
         category_id: match?.categoryId || null,
-        sub_category_id: match?.subCategoryId || null,
-        sub_sub_category_id: match?.subSubCategoryId || null,
         supplier_id: match?.supplierId || null,
+        sub_payment_id: undefined,
         notes: l.note,
-        user_id: user.id,
-      }))
-    );
+      }));
 
-    if (error) {
-      toast.error(error.message || "Lưu thất bại");
-      return;
+      // Update or create group
+      setPaymentGroups(prev => {
+        const existing = prev.find(g => g.paymentId === pid);
+        if (existing) {
+          return prev.map(g =>
+            g.paymentId === pid
+              ? {
+                  ...g,
+                  entries: [...g.entries, ...newEntries],
+                  total: g.total + amount,
+                  supplierName: g.supplierName || (match?.supplierName || null),
+                }
+              : g,
+          );
+        }
+        return [
+          ...prev,
+          {
+            paymentId: pid!,
+            supplierName: match?.supplierName || null,
+            total: amount,
+            date: viewMode === "range" ? expenseDate : undefined,
+            entries: newEntries,
+          },
+        ];
+      });
+      setDayTotal(prev => prev + amount);
+      finishUi();
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
-
-    const newEntries: PaymentEntry[] = entries.map(l => ({
-      item_name: nameValue.trim(),
-      amount: l.amount,
-      category_id: match?.categoryId || null,
-      supplier_id: match?.supplierId || null,
-      sub_payment_id: undefined,
-      notes: l.note,
-    }));
-
-    // Update or create group
-    setPaymentGroups(prev => {
-      const existing = prev.find(g => g.paymentId === pid);
-      if (existing) {
-        return prev.map(g => g.paymentId === pid ? {
-          ...g,
-          entries: [...g.entries, ...newEntries],
-          total: g.total + amount,
-          supplierName: g.supplierName || (match?.supplierName || null),
-        } : g);
-      } else {
-        return [...prev, {
-          paymentId: pid!,
-          supplierName: match?.supplierName || null,
-          total: amount,
-          date: viewMode === "range" ? expenseDate : undefined,
-          entries: newEntries,
-        }];
-      }
-    });
-    setDayTotal(prev => prev + amount);
-    finishUi();
   }, [
     amountValue, noteValue, amountLines, nameValue, match, activePaymentId, user,
     expenseDate, todayStr, periodIsFuture, viewMode, collapseCard,
@@ -738,7 +777,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   const handleAmountKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      handleSave();
+      if (!savingRef.current) handleSave();
     }
     if (e.key === "Backspace" && amountValue === "") {
       e.preventDefault();
@@ -763,8 +802,16 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     setRangePickerOpen(false);
   };
 
+  useEffect(() => {
+    if (periodOffset > maxPeriodOffset) setPeriodOffset(maxPeriodOffset);
+  }, [periodOffset, maxPeriodOffset]);
+
   const shiftPeriod = (delta: number) => {
-    setPeriodOffset(prev => prev + delta);
+    setPeriodOffset(prev => {
+      const next = prev + delta;
+      if (next > maxPeriodOffset) return prev;
+      return next;
+    });
     setViewMode("range");
     setRangePickerOpen(false);
   };
@@ -847,7 +894,11 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
 
     if (viewMode === "range") {
-      setPeriodOffset(prev => prev + (dx > 0 ? -1 : 1));
+      setPeriodOffset(prev => {
+        const next = prev + (dx > 0 ? -1 : 1);
+        if (next > maxPeriodOffset) return prev;
+        return next;
+      });
       return;
     }
 
@@ -857,7 +908,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     const nextKey = format(next, "yyyy-MM-dd");
     if (nextKey > format(new Date(), "yyyy-MM-dd")) return;
     setSelectedDate(nextKey);
-  }, [selectedDate, viewMode, period.start, period.end]);
+  }, [selectedDate, viewMode, period.start, period.end, maxPeriodOffset]);
 
   const centerLabel = viewMode === "range"
     ? formatDayMonthRange(period.start, period.end)
@@ -1076,7 +1127,8 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
             <button
               type="button"
               onClick={() => shiftPeriod(1)}
-              className="inline-flex w-[15%] shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground active:scale-95"
+              disabled={!canShiftForward}
+              className="inline-flex w-[15%] shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground active:scale-95 disabled:pointer-events-none disabled:opacity-25"
               aria-label="Next period"
             >
               <ChevronRight className="h-4 w-4" strokeWidth={2.25} />
@@ -1254,7 +1306,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
           aria-label="Đóng bảng thêm chi tiêu"
           onClick={(e) => {
             e.stopPropagation();
-            collapseCard();
+            requestCollapseCard();
           }}
           onTouchStart={(e) => e.stopPropagation()}
         />
@@ -1516,6 +1568,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                     onBack={goToNamePhase}
                     onKeyDown={handleAmountKeyDown}
                     onSave={handleSave}
+                    saving={saving}
                     noteSuggestions={noteSuggestions}
                     spanEnabled={spanEnabled}
                     setSpanEnabled={setSpanEnabled}
@@ -1531,6 +1584,22 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
         </div>
         </>
       )}
+
+      {/* Confirm hide when tapping outside the add panel */}
+      <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ẩn bảng thêm chi tiêu?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Chạm ra ngoài sẽ đóng bảng nhập. Bạn có thể tiếp tục nhập hoặc ẩn bảng đi.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Tiếp tục nhập</AlertDialogCancel>
+            <AlertDialogAction onClick={collapseCard}>Ẩn bảng</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Purchase detail dialog */}
       <PurchaseDetailDialog

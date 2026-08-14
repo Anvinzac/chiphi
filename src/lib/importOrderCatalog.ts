@@ -18,8 +18,27 @@ const LEGACY_SOURCE_KEY: Record<string, string> = {
 
 const CANONICAL_KEYS = new Set(seed.categories.map(c => c.key));
 
+function isUniqueViolation(error: { code?: string } | null): boolean {
+  return error?.code === "23505";
+}
+
+const catalogImportInflight = new Map<string, Promise<{ categories: number; ingredients: number }>>();
+
 /** Upsert pantry seed into the current user's order catalog. Safe to re-run. */
 export async function importOrderCatalogFromSeed(userId: string): Promise<{
+  categories: number;
+  ingredients: number;
+}> {
+  const existing = catalogImportInflight.get(userId);
+  if (existing) return existing;
+  const pending = importOrderCatalogFromSeedOnce(userId).finally(() => {
+    catalogImportInflight.delete(userId);
+  });
+  catalogImportInflight.set(userId, pending);
+  return pending;
+}
+
+async function importOrderCatalogFromSeedOnce(userId: string): Promise<{
   categories: number;
   ingredients: number;
 }> {
@@ -88,8 +107,18 @@ export async function importOrderCatalogFromSeed(userId: string): Promise<{
           })
           .select("id")
           .single();
-        if (error) throw error;
-        catByKey.set(c.key, data.id);
+        if (error && !isUniqueViolation(error)) throw error;
+        if (data?.id) {
+          catByKey.set(c.key, data.id);
+        } else {
+          const { data: raced } = await supabase
+            .from("order_categories")
+            .select("id")
+            .eq("user_id", userId)
+            .eq("source_key", c.key)
+            .maybeSingle();
+          if (raced?.id) catByKey.set(c.key, raced.id);
+        }
       }
     }
   }
@@ -146,7 +175,7 @@ export async function importOrderCatalogFromSeed(userId: string): Promise<{
         user_id: userId,
         source_key: ing.source_key,
       });
-      if (error) throw error;
+      if (error && !isUniqueViolation(error)) throw error;
     }
     ingredientCount += 1;
   }

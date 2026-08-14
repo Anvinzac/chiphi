@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, ChevronRight } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { endOfWeek, format, isToday, isYesterday, parseISO, startOfWeek } from "date-fns";
+import { vi } from "date-fns/locale";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,6 +10,10 @@ import {
   importOrderCatalogFromSeed,
   ORDER_HUB_CATEGORIES,
 } from "@/lib/importOrderCatalog";
+import { ensureMockOrders } from "@/lib/mockOrders";
+import { formatDayMonth } from "@/lib/formatDateVi";
+import DaySection from "@/components/daily/DaySection";
+import OrdersPager, { type OrdersPage } from "@/components/orders/OrdersPager";
 
 type OrderRow = {
   id: string;
@@ -16,6 +21,7 @@ type OrderRow = {
   status: string;
   created_at: string;
   updated_at: string;
+  itemCount: number;
 };
 
 type OrderCategory = {
@@ -24,6 +30,13 @@ type OrderCategory = {
   source_key: string | null;
   sort_order: number;
 };
+
+type DayBucket = {
+  date: string;
+  orders: OrderRow[];
+};
+
+type ViewMode = "daily" | "weekly";
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "Nháp",
@@ -39,6 +52,42 @@ const CAT_HINT: Record<string, string> = {
   khac: "Admin: Khác",
 };
 
+function orderDateKey(iso: string): string {
+  return format(parseISO(iso), "yyyy-MM-dd");
+}
+
+function formatDayHeading(dateStr: string) {
+  try {
+    const d = parseISO(dateStr);
+    if (isToday(d)) return "Hôm nay";
+    if (isYesterday(d)) return "Hôm qua";
+    return format(d, "EEEE, d MMMM", { locale: vi });
+  } catch {
+    return dateStr;
+  }
+}
+
+function OrderCard({ order }: { order: OrderRow }) {
+  return (
+    <Link
+      to={`/orders/${order.id}`}
+      className="mb-2 flex items-center gap-3 rounded-xl border border-border/60 bg-card px-4 py-3 transition-colors hover:bg-muted/40"
+    >
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">{order.title}</p>
+        <p className="text-[11px] text-muted-foreground">
+          {STATUS_LABEL[order.status] || order.status}
+          <span className="mx-1.5 text-border">·</span>
+          {format(parseISO(order.created_at), "HH:mm")}
+          <span className="mx-1.5 text-border">·</span>
+          {order.itemCount} món
+        </p>
+      </div>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+    </Link>
+  );
+}
+
 export default function Orders() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -47,16 +96,24 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
   const [creatingKey, setCreatingKey] = useState<string | null>(null);
   const [ensuring, setEnsuring] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("daily");
+
+  const todayStr = format(new Date(), "yyyy-MM-dd");
 
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
+    try {
+      await ensureMockOrders(user.id);
+    } catch (err: any) {
+      toast.error(err.message || "Không tạo được đơn mẫu");
+    }
     const [ordersRes, catsRes] = await Promise.all([
       supabase
         .from("orders")
         .select("id, title, status, created_at, updated_at, order_items(id)")
         .eq("user_id", user.id)
-        .order("updated_at", { ascending: false }),
+        .order("created_at", { ascending: false }),
       supabase
         .from("order_categories")
         .select("id, name, source_key, sort_order")
@@ -65,16 +122,18 @@ export default function Orders() {
     ]);
     if (ordersRes.error) toast.error(ordersRes.error.message);
     else {
-      const raw = (ordersRes.data as (OrderRow & { order_items?: { id: string }[] })[]) || [];
+      const raw = (ordersRes.data as (Omit<OrderRow, "itemCount"> & { order_items?: { id: string }[] })[]) || [];
       const emptyIds = raw.filter(o => !(o.order_items && o.order_items.length > 0)).map(o => o.id);
       if (emptyIds.length > 0) {
-        // Drop bootstrapped empties — nothing useful to keep
         await supabase.from("orders").delete().in("id", emptyIds).eq("user_id", user.id);
       }
       setOrders(
         raw
           .filter(o => o.order_items && o.order_items.length > 0)
-          .map(({ order_items: _items, ...order }) => order),
+          .map(({ order_items, ...order }) => ({
+            ...order,
+            itemCount: order_items?.length ?? 0,
+          })),
       );
     }
     if (catsRes.error) toast.error(catsRes.error.message);
@@ -135,9 +194,70 @@ export default function Orders() {
     };
   });
 
+  const dayBuckets = useMemo<DayBucket[]>(() => {
+    const map = new Map<string, OrderRow[]>();
+    for (const order of orders) {
+      const key = orderDateKey(order.created_at);
+      const list = map.get(key);
+      if (list) list.push(order);
+      else map.set(key, [order]);
+    }
+    const days = Array.from(map.entries())
+      .map(([date, list]) => ({
+        date,
+        orders: list.sort((a, b) => b.created_at.localeCompare(a.created_at)),
+      }))
+      .sort((a, b) => b.date.localeCompare(a.date));
+    if (!map.has(todayStr)) {
+      days.unshift({ date: todayStr, orders: [] });
+    }
+    return days;
+  }, [orders, todayStr]);
+
+  const dailyPages = useMemo<OrdersPage<OrderRow>[]>(
+    () =>
+      dayBuckets.map(day => ({
+        key: day.date,
+        title: formatDayHeading(day.date),
+        count: day.orders.length,
+        sections: day.orders,
+      })),
+    [dayBuckets],
+  );
+
+  const weeklyPages = useMemo<OrdersPage<DayBucket>[]>(() => {
+    const map = new Map<string, OrdersPage<DayBucket> & { weekStart: Date }>();
+    for (const day of dayBuckets) {
+      if (day.orders.length === 0 && day.date !== todayStr) continue;
+      const d = parseISO(day.date);
+      const weekStart = startOfWeek(d, { weekStartsOn: 1 });
+      const key = format(weekStart, "yyyy-MM-dd");
+      let page = map.get(key);
+      if (!page) {
+        const weekEnd = endOfWeek(d, { weekStartsOn: 1 });
+        page = {
+          key,
+          weekStart,
+          title: `Tuần ${formatDayMonth(weekStart)} – ${formatDayMonth(weekEnd)}`,
+          count: 0,
+          sections: [],
+        };
+        map.set(key, page);
+      }
+      page.count += day.orders.length;
+      page.sections.push(day);
+    }
+    return Array.from(map.values())
+      .sort((a, b) => b.key.localeCompare(a.key))
+      .map(page => ({
+        ...page,
+        sections: page.sections.sort((a, b) => b.date.localeCompare(a.date)),
+      }));
+  }, [dayBuckets, todayStr]);
+
   return (
-    <div className="min-h-screen bg-background pb-10">
-      <div className="sticky top-0 z-10 border-b border-border/60 bg-background/95 px-4 py-3 backdrop-blur-sm">
+    <div className="flex min-h-screen flex-col bg-background">
+      <div className="sticky top-0 z-30 border-b border-border/60 bg-background/95 px-4 py-3 backdrop-blur-sm">
         <div className="mx-auto flex max-w-lg items-center gap-3">
           <Link
             to="/"
@@ -150,10 +270,36 @@ export default function Orders() {
             <h1 className="font-display text-xl text-foreground">Đặt hàng</h1>
             <p className="text-[11px] text-muted-foreground">Chọn danh mục để soạn đơn</p>
           </div>
+          <div className="inline-flex shrink-0 rounded-full border border-border/60 bg-muted/40 p-0.5">
+            <button
+              type="button"
+              onClick={() => setViewMode("daily")}
+              aria-pressed={viewMode === "daily"}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                viewMode === "daily"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Ngày
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("weekly")}
+              aria-pressed={viewMode === "weekly"}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                viewMode === "weekly"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Tuần
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-lg space-y-6 px-4 py-4">
+      <div className="mx-auto w-full max-w-lg flex-1 space-y-6 overflow-auto px-4 py-4 pb-10">
         <section className="space-y-3">
           <div>
             <h2 className="text-sm font-semibold">Danh mục</h2>
@@ -198,33 +344,37 @@ export default function Orders() {
 
         <section className="space-y-2">
           <div className="flex items-baseline justify-between gap-2">
-            <h2 className="text-sm font-semibold">Đơn gần đây</h2>
+            <h2 className="text-sm font-semibold">Đơn</h2>
             <span className="text-[11px] text-muted-foreground">{orders.length}</span>
           </div>
 
-          {!loading && orders.length === 0 && (
-            <p className="rounded-xl border border-dashed border-border px-3 py-8 text-center text-xs text-muted-foreground">
-              Chưa có đơn — chọn danh mục phía trên để bắt đầu
-            </p>
+          {loading && orders.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">Đang tải đơn…</p>
+          ) : viewMode === "daily" ? (
+            <OrdersPager
+              pages={dailyPages}
+              emptyLabel="Chưa có đơn ngày này"
+              renderSection={order => <OrderCard key={order.id} order={order} />}
+            />
+          ) : (
+            <OrdersPager
+              pages={weeklyPages}
+              emptyLabel="Chưa có đơn tuần này"
+              renderSection={day => (
+                <DaySection
+                  key={day.date}
+                  title={formatDayHeading(day.date)}
+                  meta={`${day.orders.length} đơn`}
+                >
+                  {day.orders.length === 0 ? (
+                    <p className="py-2 text-[11px] text-muted-foreground">Chưa có đơn</p>
+                  ) : (
+                    day.orders.map(order => <OrderCard key={order.id} order={order} />)
+                  )}
+                </DaySection>
+              )}
+            />
           )}
-
-          {orders.map(order => (
-            <Link
-              key={order.id}
-              to={`/orders/${order.id}`}
-              className="flex items-center gap-3 rounded-xl border border-border/60 bg-card px-4 py-3 transition-colors hover:bg-muted/40"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{order.title}</p>
-                <p className="text-[11px] text-muted-foreground">
-                  {STATUS_LABEL[order.status] || order.status}
-                  <span className="mx-1.5 text-border">·</span>
-                  {format(parseISO(order.created_at), "d/M/yyyy HH:mm")}
-                </p>
-              </div>
-              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-            </Link>
-          ))}
         </section>
       </div>
     </div>

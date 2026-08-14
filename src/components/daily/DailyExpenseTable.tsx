@@ -11,7 +11,6 @@ import ClearFieldButton from "./ClearFieldButton";
 import AmountPhase from "./AmountPhase";
 import VendorPhase from "./VendorPhase";
 import SchedulePhase from "./SchedulePhase";
-import ReceiptPhase from "./ReceiptPhase";
 import PurchaseDetailDialog from "./PurchaseDetailDialog";
 import RangeDayPicker from "./RangeDayPicker";
 import MoneyLabel from "./MoneyLabel";
@@ -112,13 +111,15 @@ interface MatchInfo {
   supplierId: string | null;
 }
 
-type InputPhase = "name" | "amount" | "vendor" | "schedule" | "receipt" | "done";
-type PagerPhase = "name" | "amount" | "vendor" | "schedule" | "receipt";
+type InputPhase = "name" | "amount" | "vendor" | "more" | "done";
+type PagerPhase = "name" | "amount" | "more";
 
-function pagerPhases(advanced: boolean): PagerPhase[] {
-  return advanced
-    ? ["name", "amount", "vendor", "schedule", "receipt"]
-    : ["name", "amount", "vendor"];
+const PAGER_PHASES: PagerPhase[] = ["name", "amount", "more"];
+
+function pagerTargetForPhase(phase: InputPhase): PagerPhase {
+  if (phase === "more") return "more";
+  if (phase === "name") return "name";
+  return "amount";
 }
 
 interface QuickCategory {
@@ -194,7 +195,6 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   const [spanPreset, setSpanPreset] = useState<SpanPresetKey>("3m");
   const [spanCustomPeriods, setSpanCustomPeriods] = useState("3");
   const [dataTick, setDataTick] = useState(0);
-  const [advancedEnabled, setAdvancedEnabled] = useState(false);
   const [scheduleRepeat, setScheduleRepeat] = useState<ScheduleRepeat>("none");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodId>("cash");
   const [paymentMethodNote, setPaymentMethodNote] = useState("");
@@ -208,8 +208,6 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   const cardRef = useRef<HTMLDivElement>(null);
   const pagerRef = useRef<HTMLDivElement>(null);
   const pagerReadyRef = useRef(false);
-  const advancedEnabledRef = useRef(advancedEnabled);
-  advancedEnabledRef.current = advancedEnabled;
   const suppliersRef = useRef(suppliers);
   suppliersRef.current = suppliers;
   const paymentsCacheRef = useRef(
@@ -574,8 +572,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   const scrollPagerTo = useCallback((target: PagerPhase, smooth: boolean) => {
     const el = pagerRef.current;
     if (!el) return;
-    const pages = pagerPhases(advancedEnabledRef.current);
-    const pageIndex = Math.max(0, pages.indexOf(target));
+    const pageIndex = Math.max(0, PAGER_PHASES.indexOf(target));
     const left = pageIndex * el.clientWidth;
     if (Math.abs(el.scrollLeft - left) < 2) return;
     pagerSyncingRef.current = true;
@@ -588,9 +585,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   const handleNameConfirmRef = useRef<(() => void) | null>(null);
   const goToNamePhaseRef = useRef<(() => void) | null>(null);
   const goToAmountPhaseRef = useRef<(() => void) | null>(null);
-  const goToVendorPhaseRef = useRef<(() => void) | null>(null);
-  const goToSchedulePhaseRef = useRef<(() => void) | null>(null);
-  const goToReceiptPhaseRef = useRef<(() => void) | null>(null);
+  const goToMorePhaseRef = useRef<(() => void) | null>(null);
   const pagerSettleTimerRef = useRef<number | null>(null);
 
   // Keep the paging scroll view in sync with phase (buttons / keyboard / save reset)
@@ -599,41 +594,36 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       if (!cardExpanded) pagerReadyRef.current = false;
       return;
     }
-    const pages = pagerPhases(advancedEnabled);
-    const target = (pages.includes(phase as PagerPhase) ? phase : "amount") as PagerPhase;
+    const target = pagerTargetForPhase(phase);
     const smooth = pagerReadyRef.current;
     const id = requestAnimationFrame(() => {
       scrollPagerTo(target, smooth);
       pagerReadyRef.current = true;
     });
     return () => cancelAnimationFrame(id);
-  }, [phase, cardExpanded, justSaved, advancedEnabled, scrollPagerTo]);
+  }, [phase, cardExpanded, justSaved, scrollPagerTo]);
 
   const settlePagerPage = useCallback(() => {
     if (pagerSyncingRef.current) return;
     const el = pagerRef.current;
     if (!el || el.clientWidth === 0) return;
-    const pages = pagerPhases(advancedEnabledRef.current);
-    const page = Math.min(pages.length - 1, Math.max(0, Math.round(el.scrollLeft / el.clientWidth)));
-    const target = pages[page];
+    const page = Math.min(
+      PAGER_PHASES.length - 1,
+      Math.max(0, Math.round(el.scrollLeft / el.clientWidth)),
+    );
+    const target = PAGER_PHASES[page];
     if (!nameValueRef.current.trim() && target !== "name") {
       scrollPagerTo("name", true);
       return;
     }
-    if (target === phaseRef.current) return;
+    if (target === pagerTargetForPhase(phaseRef.current)) return;
     if (target === "name") goToNamePhaseRef.current?.();
     else if (target === "amount") {
       if (phaseRef.current === "name") handleNameConfirmRef.current?.();
       else goToAmountPhaseRef.current?.();
-    } else if (target === "vendor") {
+    } else if (target === "more") {
       if (phaseRef.current === "name") handleNameConfirmRef.current?.();
-      goToVendorPhaseRef.current?.();
-    } else if (target === "schedule") {
-      if (phaseRef.current === "name") handleNameConfirmRef.current?.();
-      goToSchedulePhaseRef.current?.();
-    } else if (target === "receipt") {
-      if (phaseRef.current === "name") handleNameConfirmRef.current?.();
-      goToReceiptPhaseRef.current?.();
+      goToMorePhaseRef.current?.();
     }
   }, [scrollPagerTo]);
 
@@ -652,13 +642,55 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     }, 300);
   }, [cardExpanded, cardClosing]);
 
+  const hasDraftInput =
+    nameValue.trim() !== "" ||
+    amountValue.trim() !== "" ||
+    noteValue.trim() !== "" ||
+    amountLines.length > 0 ||
+    !!receiptFile ||
+    spanEnabled ||
+    scheduleRepeat !== "none" ||
+    paymentMethod !== "cash" ||
+    paymentMethodNote.trim() !== "";
+
+  const clearDraft = useCallback(() => {
+    setActivePaymentId(null);
+    setNameValue("");
+    setAmountValue("");
+    setNoteValue("");
+    setAmountLines([]);
+    setSelectedCategoryId(null);
+    setMatch(null);
+    setVerifyData(null);
+    setSpanEnabled(false);
+    setSpanPreset("3m");
+    setSpanCustomPeriods("3");
+    setScheduleRepeat("none");
+    setPaymentMethod("cash");
+    setPaymentMethodNote("");
+    setReceiptFile(null);
+    setCompletingScheduleId(null);
+    setCompletingRepeat(null);
+    setPhase("name");
+    pagerReadyRef.current = false;
+  }, []);
+
   const requestCollapseCard = useCallback(() => {
     if (!cardExpanded || cardClosing || justSaved) {
       collapseCard();
       return;
     }
+    if (!hasDraftInput) {
+      collapseCard();
+      return;
+    }
     setDiscardOpen(true);
-  }, [cardExpanded, cardClosing, justSaved, collapseCard]);
+  }, [cardExpanded, cardClosing, justSaved, hasDraftInput, collapseCard]);
+
+  const discardDraftAndCollapse = useCallback(() => {
+    clearDraft();
+    collapseCard();
+  }, [clearDraft, collapseCard]);
 
   const findItem = useCallback((name: string): DbItem | undefined => {
     const lower = name.toLowerCase().trim();
@@ -808,7 +840,6 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
           setSpanEnabled(false);
           setSpanPreset("3m");
           setSpanCustomPeriods("3");
-          setAdvancedEnabled(false);
           setScheduleRepeat("none");
           setPaymentMethod("cash");
           setPaymentMethodNote("");
@@ -1116,7 +1147,9 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     setMatch(null);
     setVerifyData(null);
     setPhase("name");
-    setAdvancedEnabled(false);
+    setSpanEnabled(false);
+    setSpanPreset("3m");
+    setSpanCustomPeriods("3");
     setScheduleRepeat("none");
     setPaymentMethod("cash");
     setPaymentMethodNote("");
@@ -1152,30 +1185,13 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     const active = document.activeElement;
     if (active instanceof HTMLElement) active.blur();
   }, []);
-  goToVendorPhaseRef.current = goToVendorPhase;
 
-  const goToSchedulePhase = useCallback(() => {
-    setAdvancedEnabled(true);
-    setPhase("schedule");
+  const goToMorePhase = useCallback(() => {
+    setPhase("more");
     const active = document.activeElement;
     if (active instanceof HTMLElement) active.blur();
   }, []);
-  goToSchedulePhaseRef.current = goToSchedulePhase;
-
-  const goToReceiptPhase = useCallback(() => {
-    setAdvancedEnabled(true);
-    setPhase("receipt");
-    const active = document.activeElement;
-    if (active instanceof HTMLElement) active.blur();
-  }, []);
-  goToReceiptPhaseRef.current = goToReceiptPhase;
-
-  const openAdvancedFromAmount = useCallback(() => {
-    setAdvancedEnabled(true);
-    setPhase("schedule");
-    const active = document.activeElement;
-    if (active instanceof HTMLElement) active.blur();
-  }, []);
+  goToMorePhaseRef.current = goToMorePhase;
 
   const skipReminder = useCallback(async (paymentId: string, entry: PaymentEntry) => {
     if (!entry.scheduleId) return;
@@ -1229,7 +1245,6 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       categoryId: entry.category_id ?? undefined,
       supplierId: entry.supplier_id ?? undefined,
     });
-    setAdvancedEnabled(false);
     setPhase("amount");
     setCardExpanded(true);
     const active = document.activeElement;
@@ -1775,20 +1790,37 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
             }`}
             style={{ boxShadow: "0 -8px 40px -4px hsl(25 30% 20% / 0.10)" }}
           >
-            {/* Phase indicator */}
+            {/* Phase indicator: name | amount | more (third stays muted until opened) */}
             <div className="flex items-center gap-2 px-5 pt-4 pb-1 shrink-0">
-              {pagerPhases(advancedEnabled).map(key => (
-                <div
-                  key={key}
-                  className={`h-1.5 flex-1 rounded-full transition-colors duration-400 ${
-                    phase === key || (phase === "done" && (key === "amount" || key === "receipt"))
-                      ? "bg-primary"
-                      : pagerPhases(advancedEnabled).indexOf(key) < pagerPhases(advancedEnabled).indexOf(phase as PagerPhase)
-                        ? "bg-primary/30"
-                        : "bg-muted"
-                  }`}
-                />
-              ))}
+              {PAGER_PHASES.map(key => {
+                const current = pagerTargetForPhase(phase);
+                const active = current === key || (phase === "done" && key === "amount");
+                const passed =
+                  key !== "more" &&
+                  PAGER_PHASES.indexOf(key) < PAGER_PHASES.indexOf(current);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-label={key === "name" ? "Tên" : key === "amount" ? "Số tiền" : "Thêm"}
+                    aria-current={active ? "step" : undefined}
+                    onClick={() => {
+                      if (key !== "name" && !nameValue.trim()) return;
+                      if (key === "name") goToNamePhase();
+                      else if (key === "amount") {
+                        if (phase === "name") handleNameConfirm();
+                        else goToAmountPhase();
+                      } else {
+                        if (phase === "name") handleNameConfirm();
+                        goToMorePhase();
+                      }
+                    }}
+                    className={`h-1.5 flex-1 rounded-full transition-colors duration-400 ${
+                      active ? "bg-primary" : passed ? "bg-primary/30" : "bg-muted"
+                    }`}
+                  />
+                );
+              })}
             </div>
             {viewMode === "range" && periodIsPast && !justSaved && (
               <p className="px-5 pb-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground/75">
@@ -1835,11 +1867,12 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
               </div>
             )}
 
-            {/* Horizontal paging: name | amount | vendor */}
+            {/* Horizontal paging: name | amount | more */}
             {!justSaved && (
+              <div className="relative flex min-h-0 flex-1 flex-col">
               <div
                 ref={pagerRef}
-                className="expense-phase-pager flex-1 min-h-0"
+                className="expense-phase-pager min-h-0 flex-1"
                 onScroll={schedulePagerSettle}
                 onTouchEnd={schedulePagerSettle}
               >
@@ -2023,23 +2056,45 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                     setVerifyData={setVerifyData}
                     onBack={goToNamePhase}
                     onOpenVendor={goToVendorPhase}
-                    onOpenAdvanced={openAdvancedFromAmount}
-                    advancedEnabled={advancedEnabled}
+                    onOpenMore={goToMorePhase}
                     onKeyDown={handleAmountKeyDown}
                     onSave={handleSave}
                     saving={saving}
                     noteSuggestions={noteSuggestions}
+                  />
+                </div>
+
+                {/* More page — always mounted, unactivated until opened */}
+                <div className="expense-phase-page flex h-full min-h-0 flex-col">
+                  <SchedulePhase
+                    amountValue={amountValue}
+                    lines={amountLines}
                     spanEnabled={spanEnabled}
                     setSpanEnabled={setSpanEnabled}
                     spanPreset={spanPreset}
                     setSpanPreset={setSpanPreset}
                     spanCustomPeriods={spanCustomPeriods}
                     setSpanCustomPeriods={setSpanCustomPeriods}
+                    scheduleRepeat={scheduleRepeat}
+                    setScheduleRepeat={setScheduleRepeat}
+                    paymentMethod={paymentMethod}
+                    setPaymentMethod={setPaymentMethod}
+                    paymentMethodNote={paymentMethodNote}
+                    setPaymentMethodNote={setPaymentMethodNote}
+                    receiptPreview={receiptPreview}
+                    onPickReceipt={setReceiptFile}
+                    onBack={goToAmountPhase}
+                    onSave={handleSave}
+                    saving={saving}
+                    canSave={
+                      !saving &&
+                      ([...amountLines, { amount: amountValue }].some(l => Number(l.amount) > 0))
+                    }
                   />
                 </div>
-
-                {/* Vendor page */}
-                <div className="expense-phase-page flex h-full min-h-0 flex-col">
+              </div>
+              {phase === "vendor" && (
+                <div className="absolute inset-0 z-10 flex flex-col bg-card">
                   <VendorPhase
                     vendors={suppliers}
                     frequentVendorIds={frequentVendorIds}
@@ -2056,36 +2111,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                     onBack={goToAmountPhase}
                   />
                 </div>
-
-                {advancedEnabled && (
-                  <>
-                    <div className="expense-phase-page flex h-full min-h-0 flex-col">
-                      <SchedulePhase
-                        scheduleRepeat={scheduleRepeat}
-                        setScheduleRepeat={setScheduleRepeat}
-                        paymentMethod={paymentMethod}
-                        setPaymentMethod={setPaymentMethod}
-                        paymentMethodNote={paymentMethodNote}
-                        setPaymentMethodNote={setPaymentMethodNote}
-                        onBack={goToAmountPhase}
-                        onNext={goToReceiptPhase}
-                      />
-                    </div>
-                    <div className="expense-phase-page flex h-full min-h-0 flex-col">
-                      <ReceiptPhase
-                        previewUrl={receiptPreview}
-                        onPickFile={setReceiptFile}
-                        onBack={goToSchedulePhase}
-                        onSave={handleSave}
-                        saving={saving}
-                        canSave={
-                          !saving &&
-                          ([...amountLines, { amount: amountValue }].some(l => Number(l.amount) > 0))
-                        }
-                      />
-                    </div>
-                  </>
-                )}
+              )}
               </div>
             )}
           </div>
@@ -2093,18 +2119,23 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
         </>
       )}
 
-      {/* Confirm hide when tapping outside the add panel */}
+      {/* Keep or delete draft when leaving the add panel */}
       <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
         <AlertDialogContent className="max-w-sm">
           <AlertDialogHeader>
-            <AlertDialogTitle>Ẩn bảng thêm chi tiêu?</AlertDialogTitle>
+            <AlertDialogTitle>Giữ phần đã nhập?</AlertDialogTitle>
             <AlertDialogDescription>
-              Chạm ra ngoài sẽ đóng bảng nhập. Bạn có thể tiếp tục nhập hoặc ẩn bảng đi.
+              Giữ lại để nhập tiếp sau, hoặc xóa hết.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Tiếp tục nhập</AlertDialogCancel>
-            <AlertDialogAction onClick={collapseCard}>Ẩn bảng</AlertDialogAction>
+            <AlertDialogCancel
+              onClick={discardDraftAndCollapse}
+              className="text-destructive hover:text-destructive"
+            >
+              Xóa
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={collapseCard}>Giữ lại</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

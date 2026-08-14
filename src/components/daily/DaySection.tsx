@@ -4,7 +4,8 @@ import MoneyLabel from "./MoneyLabel";
 
 interface DaySectionProps {
   title: string;
-  total: number;
+  total?: number;
+  meta?: ReactNode;
   children: ReactNode;
   defaultExpanded?: boolean;
 }
@@ -12,7 +13,8 @@ interface DaySectionProps {
 /** Day heading that toggles its details; details sit behind a leading vertical rule. */
 export default function DaySection({
   title,
-  total,
+  total = 0,
+  meta,
   children,
   defaultExpanded = true,
 }: DaySectionProps) {
@@ -34,11 +36,15 @@ export default function DaySection({
         <h2 className="min-w-0 flex-1 truncate text-left font-display text-base capitalize leading-none text-foreground">
           {title}
         </h2>
-        <MoneyLabel
-          amount={total}
-          className="shrink-0 text-xs text-muted-foreground"
-          smallClassName="text-[0.7em]"
-        />
+        {meta != null ? (
+          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{meta}</span>
+        ) : (
+          <MoneyLabel
+            amount={total}
+            className="shrink-0 text-xs text-muted-foreground"
+            smallClassName="text-[0.7em]"
+          />
+        )}
       </button>
 
       {expanded && (

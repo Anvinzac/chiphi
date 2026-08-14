@@ -1,10 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, Pencil, Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Pencil, Plus, X } from "lucide-react";
 import type { VerifyData } from "@/types/expense";
 import { focusWithoutScroll } from "@/lib/focusWithoutScroll";
 import ClearFieldButton from "./ClearFieldButton";
-import { SPAN_PRESETS, splitAmountAcrossPeriods, type SpanPresetKey } from "@/lib/expenseSpan";
-import MoneyLabel from "./MoneyLabel";
 
 interface MatchInfo {
   itemId: string;
@@ -34,18 +32,11 @@ interface AmountPhaseProps {
   setVerifyData: React.Dispatch<React.SetStateAction<VerifyData | null>>;
   onBack: () => void;
   onOpenVendor: () => void;
-  onOpenAdvanced: () => void;
-  advancedEnabled: boolean;
+  onOpenMore: () => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
   onSave: () => void;
   saving?: boolean;
   noteSuggestions?: string[];
-  spanEnabled: boolean;
-  setSpanEnabled: (v: boolean) => void;
-  spanPreset: SpanPresetKey;
-  setSpanPreset: (v: SpanPresetKey) => void;
-  spanCustomPeriods: string;
-  setSpanCustomPeriods: (v: string) => void;
 }
 
 type EditableField = "categoryName" | "subCategoryName" | "unitPrice" | null;
@@ -78,57 +69,21 @@ export default function AmountPhase({
   setVerifyData,
   onBack,
   onOpenVendor,
-  onOpenAdvanced,
-  advancedEnabled,
+  onOpenMore,
   onKeyDown,
   onSave,
   saving = false,
   noteSuggestions = [],
-  spanEnabled,
-  setSpanEnabled,
-  spanPreset,
-  setSpanPreset,
-  spanCustomPeriods,
-  setSpanCustomPeriods,
 }: AmountPhaseProps) {
   const [editingField, setEditingField] = useState<EditableField>(null);
   const [editValue, setEditValue] = useState("");
   const [amountActive, setAmountActive] = useState(true);
   const editInputRef = useRef<HTMLInputElement>(null);
   const noteRef = useRef<HTMLInputElement>(null);
-  const customSpanRef = useRef<HTMLInputElement>(null);
   const formScrollRef = useRef<HTMLDivElement>(null);
-  const spanSectionRef = useRef<HTMLDivElement>(null);
   const amountTrackRef = useRef<HTMLButtonElement>(null);
   const amountMeasureRef = useRef<HTMLSpanElement>(null);
   const [amountFontPx, setAmountFontPx] = useState(36);
-
-  useEffect(() => {
-    if (!spanEnabled || spanPreset !== "custom") return;
-    const id = window.setTimeout(() => {
-      focusWithoutScroll(customSpanRef.current);
-      customSpanRef.current?.select();
-    }, 30);
-    return () => window.clearTimeout(id);
-  }, [spanEnabled, spanPreset]);
-
-  useEffect(() => {
-    if (!spanEnabled) return;
-    const id = window.setTimeout(() => {
-      const scroller = formScrollRef.current;
-      const section = spanSectionRef.current;
-      if (!scroller || !section) return;
-      const sectionBottom = section.offsetTop + section.offsetHeight;
-      const visibleBottom = scroller.scrollTop + scroller.clientHeight;
-      if (sectionBottom > visibleBottom - 12) {
-        scroller.scrollTo({
-          top: Math.max(0, sectionBottom - scroller.clientHeight + 16),
-          behavior: "smooth",
-        });
-      }
-    }, 80);
-    return () => window.clearTimeout(id);
-  }, [spanEnabled]);
 
   const activateAmount = () => {
     setAmountActive(true);
@@ -208,26 +163,6 @@ export default function AmountPhase({
   const currentValid = !!amountValue.trim() && Number(amountValue) > 0;
   const canSave = !saving && (currentValid || lines.length > 0);
 
-  const spanPeriodCount = useMemo(() => {
-    if (!spanEnabled) return 0;
-    if (spanPreset === "custom") {
-      const n = Number(spanCustomPeriods);
-      return Number.isFinite(n) ? Math.min(120, Math.max(2, Math.floor(n))) : 0;
-    }
-    return SPAN_PRESETS.find(p => p.key === spanPreset)?.periods ?? 0;
-  }, [spanEnabled, spanPreset, spanCustomPeriods]);
-
-  const spanPreview = useMemo(() => {
-    if (!spanEnabled || spanPeriodCount < 2) return null;
-    const totalK = [...lines, { amount: amountValue }]
-      .map(l => Number(l.amount) || 0)
-      .reduce((s, n) => s + n, 0);
-    if (totalK <= 0) return null;
-    const total = totalK * 1000;
-    const parts = splitAmountAcrossPeriods(total, spanPeriodCount);
-    return { total, first: parts[0], periods: spanPeriodCount };
-  }, [spanEnabled, spanPeriodCount, lines, amountValue]);
-
   const addLine = () => {
     if (!currentValid) return;
     setLines(prev => [...prev, { amount: amountValue, note: noteValue.trim() }]);
@@ -305,19 +240,28 @@ export default function AmountPhase({
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col px-5 pt-2 pb-2">
-      <div className="flex shrink-0 items-center justify-between mb-2">
+      <div className="mb-2 grid shrink-0 grid-cols-[1fr_auto_1fr] items-center">
         <button
           onClick={onBack}
-          className="flex min-h-11 items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+          className="flex min-h-11 items-center gap-1 justify-self-start text-xs text-muted-foreground transition-colors hover:text-foreground"
           aria-label="Quay lại"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           <span className="max-w-[12rem] truncate">{nameValue}</span>
         </button>
         <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Số tiền</span>
+        <button
+          type="button"
+          onClick={onOpenMore}
+          className="inline-flex min-h-8 items-center gap-1 justify-self-end rounded-lg border border-border bg-transparent px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/45 hover:text-foreground"
+          aria-label="Thêm tùy chọn"
+        >
+          <span>Thêm…</span>
+          <ArrowRight className="h-3.5 w-3.5" />
+        </button>
       </div>
 
-      {/* Scrollable form — keeps meta/span chips above the fixed keypad */}
+      {/* Scrollable form — keeps meta chips above the fixed keypad */}
       <div
         ref={formScrollRef}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain no-scrollbar"
@@ -519,114 +463,6 @@ export default function AmountPhase({
             )}
         </div>
 
-        <div ref={spanSectionRef} className="mb-2 space-y-1.5">
-          <button
-            type="button"
-            onClick={() => setSpanEnabled(!spanEnabled)}
-            className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors ${
-              spanEnabled
-                ? "border-primary/40 bg-primary/10"
-                : "border-border/60 bg-muted/40 hover:bg-muted"
-            }`}
-            aria-pressed={spanEnabled}
-          >
-            <span className="text-[11px] font-medium text-foreground">Chia nhiều kỳ</span>
-            <span className="text-[10px] text-muted-foreground">
-              {spanEnabled ? "Bật" : "Sửa lớn / đặt hàng số lượng lớn"}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenAdvanced}
-            className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors ${
-              advancedEnabled
-                ? "border-primary/40 bg-primary/10"
-                : "border-border/60 bg-muted/40 hover:bg-muted"
-            }`}
-            aria-pressed={advancedEnabled}
-          >
-            <span className="text-[11px] font-medium text-foreground">Nâng cao</span>
-            <span className="text-[10px] text-muted-foreground">
-              {advancedEnabled ? "Lịch · thanh toán · biên lai" : "Nhắc lịch, cách trả, ảnh biên lai"}
-            </span>
-          </button>
-
-          {spanEnabled && (
-            <div className="space-y-1.5 rounded-xl border border-border/50 bg-card/80 px-2.5 py-2">
-              <div className="flex flex-nowrap items-center gap-1 overflow-x-auto no-scrollbar">
-                {SPAN_PRESETS.map(p => (
-                  <button
-                    key={p.key}
-                    type="button"
-                    onClick={() => setSpanPreset(p.key)}
-                    className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium leading-none transition-colors ${
-                      spanPreset === p.key
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-                {spanPreset === "custom" ? (
-                  <label className="inline-flex w-full max-w-[9rem] min-w-[5.5rem] flex-1 basis-0 items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-[11px] font-medium leading-none text-primary-foreground">
-                    <input
-                      ref={customSpanRef}
-                      type="text"
-                      inputMode="numeric"
-                      value={spanCustomPeriods}
-                      onChange={e =>
-                        setSpanCustomPeriods(e.target.value.replace(/\D/g, "").slice(0, 3))
-                      }
-                      onFocus={e => {
-                        setAmountActive(false);
-                        e.currentTarget.select();
-                      }}
-                      placeholder="…"
-                      aria-label="Số kỳ tuỳ chỉnh"
-                      className="span-chip-input w-full min-w-[2ch] max-w-[3.5ch] bg-transparent text-center tabular-nums text-primary-foreground caret-primary-foreground outline-none placeholder:text-primary-foreground/45"
-                    />
-                    <span className="shrink-0 opacity-85">kỳ</span>
-                  </label>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSpanPreset("custom");
-                      if (!spanCustomPeriods.trim()) setSpanCustomPeriods("3");
-                    }}
-                    className="w-full max-w-[9rem] min-w-[5.5rem] flex-1 basis-0 rounded-full bg-muted px-2.5 py-1 text-left text-[11px] font-medium leading-none text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    Tuỳ chỉnh
-                  </button>
-                )}
-              </div>
-              {spanPreview ? (
-                <p className="text-[10px] leading-relaxed text-muted-foreground">
-                  Tổng{" "}
-                  <MoneyLabel
-                    amount={spanPreview.total}
-                    className="inline text-[11px] font-display text-foreground"
-                    smallClassName="text-[0.7em]"
-                  />
-                  {" · "}ghi kỳ này{" "}
-                  <MoneyLabel
-                    amount={spanPreview.first}
-                    className="inline text-[11px] font-display text-foreground"
-                    smallClassName="text-[0.7em]"
-                  />{" "}
-                  (1/{spanPreview.periods}). Các kỳ sau tự thêm cùng ngày hàng tháng.
-                </p>
-              ) : (
-                <p className="text-[10px] text-muted-foreground">
-                  Nhập số tiền để xem phần ghi vào kỳ này.
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-
         {lines.length > 0 && (
           <div className="mb-2 max-h-24 space-y-1 overflow-y-auto no-scrollbar">
             {lines.map((l, i) => (
@@ -703,7 +539,7 @@ export default function AmountPhase({
           <button
             type="button"
             onClick={onSave}
-            disabled={!canSave || (spanEnabled && spanPeriodCount < 2)}
+            disabled={!canSave}
             className="keypad-key col-span-2 rounded-2xl bg-primary font-semibold text-primary-foreground shadow-warm disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Lưu"
             aria-busy={saving}

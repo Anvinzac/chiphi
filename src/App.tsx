@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
 import Settings from "./pages/Settings";
+import Vendors from "./pages/Vendors";
 import Orders from "./pages/Orders";
 import OrderDetail from "./pages/OrderDetail";
 import SupplierOrder from "./pages/SupplierOrder";
@@ -42,6 +43,7 @@ const AppRoutes = () => (
     <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
     <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
     <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+    <Route path="/vendors" element={<ProtectedRoute><Vendors /></ProtectedRoute>} />
     <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
     <Route path="/orders/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
     <Route path="*" element={<NotFound />} />

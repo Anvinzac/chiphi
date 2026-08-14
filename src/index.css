@@ -485,6 +485,11 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  .reminder-row {
+    background-image: linear-gradient(115deg, hsl(32 48% 92%) 0%, hsl(188 32% 91%) 52%, hsl(262 22% 93%) 100%);
+    border-bottom-color: hsl(32 30% 80% / 0.45);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .category-cell,
     .expense-card-enter,

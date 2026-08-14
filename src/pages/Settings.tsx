@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowLeft, Palette, FormInput } from "lucide-react";
+import { ArrowLeft, Palette, FormInput, Store } from "lucide-react";
 
 export default function Settings() {
   return (
@@ -21,6 +21,19 @@ export default function Settings() {
       </div>
 
       <div className="mx-auto max-w-lg space-y-4 px-4 py-6">
+        <Link
+          to="/vendors"
+          className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card p-4 transition-colors hover:border-primary/30"
+        >
+          <Store className="h-4 w-4 text-primary shrink-0" />
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-foreground">Nhà cung cấp</h2>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Thêm, sửa vendor mặc định và thường dùng khi ghi chi tiêu.
+            </p>
+          </div>
+        </Link>
+
         <section className="rounded-2xl border border-border/60 bg-card p-4">
           <div className="mb-2 flex items-center gap-2 text-foreground">
             <Palette className="h-4 w-4 text-primary" />

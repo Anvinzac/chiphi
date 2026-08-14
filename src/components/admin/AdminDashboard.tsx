@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import type { DateRange } from "react-day-picker";
 import MoneyLabel from "@/components/daily/MoneyLabel";
 import OrderCatalogAdmin from "@/components/admin/OrderCatalogAdmin";
+import VendorsManager from "@/components/vendors/VendorsManager";
 
 type AdminTab = "summary" | "categories" | "subcategories" | "suppliers" | "items" | "orderCats" | "orderIngs";
 type CategoryFrequency = "daily" | "weekly" | "monthly";
@@ -42,8 +43,6 @@ export default function AdminDashboard() {
   const [newCatName, setNewCatName] = useState("");
   const [addingSubTo, setAddingSubTo] = useState<string | null>(null);
   const [newSubName, setNewSubName] = useState("");
-  const [newSupName, setNewSupName] = useState("");
-  const [newSupContact, setNewSupContact] = useState("");
   const [newItemName, setNewItemName] = useState("");
   const [newItemCat, setNewItemCat] = useState("");
   const [newItemSupplier, setNewItemSupplier] = useState("");
@@ -79,7 +78,7 @@ export default function AdminDashboard() {
     { key: "summary", label: "Summary", icon: <BarChart3 className="h-4 w-4" /> },
     { key: "categories", label: "Categories", icon: <Tag className="h-4 w-4" /> },
     { key: "subcategories", label: "Sub-categories", icon: <Tag className="h-4 w-4" /> },
-    { key: "suppliers", label: "Suppliers", icon: <Users className="h-4 w-4" /> },
+    { key: "suppliers", label: "Vendors", icon: <Users className="h-4 w-4" /> },
     { key: "items", label: "Items", icon: <Tag className="h-4 w-4" /> },
     { key: "orderCats", label: "Danh mục ĐH", icon: <ShoppingBasket className="h-4 w-4" /> },
     { key: "orderIngs", label: "Nguyên liệu ĐH", icon: <ShoppingBasket className="h-4 w-4" /> },
@@ -185,19 +184,6 @@ export default function AdminDashboard() {
     const { error } = await supabase.from("sub_categories").update({ name }).eq("id", id);
     if (error) { toast.error(error.message); return; }
     setSubCategories(prev => prev.map(s => s.id === id ? { ...s, name } : s));
-  };
-
-  const addSupplier = async () => {
-    if (!newSupName.trim() || !user) return;
-    const { data, error } = await supabase.from("suppliers").insert({ name: newSupName.trim(), contact: newSupContact || null, user_id: user.id }).select("id, name, contact").single();
-    if (error) { toast.error(error.message); return; }
-    if (data) setSuppliers(prev => [...prev, data]);
-    setNewSupName(""); setNewSupContact("");
-  };
-
-  const deleteSupplier = async (id: string) => {
-    await supabase.from("suppliers").delete().eq("id", id);
-    setSuppliers(prev => prev.filter(s => s.id !== id));
   };
 
   const addItem = async () => {
@@ -442,21 +428,23 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {activeTab === "suppliers" && (
+      {activeTab === "suppliers" && user && (
         <div className="space-y-3">
-          <div className="card-editorial p-3 flex gap-2">
-            <Input placeholder="Name..." value={newSupName} onChange={(e) => setNewSupName(e.target.value)} className="flex-1" />
-            <Input placeholder="Contact..." value={newSupContact} onChange={(e) => setNewSupContact(e.target.value)} className="w-32" />
-            <Button onClick={addSupplier} disabled={!newSupName.trim()} size="sm"><Plus className="h-4 w-4" /></Button>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">
+              Nhà cung cấp dùng khi thêm chi tiêu (mặc định / thường dùng).
+            </p>
+            <a href="/vendors" className="text-xs text-primary hover:underline shrink-0">
+              Trang đầy đủ
+            </a>
           </div>
-          <div className="card-editorial overflow-hidden">
-            <table className="w-full text-sm">
-              <thead><tr className="text-xs text-muted-foreground uppercase border-b border-border"><th className="text-left px-4 py-2 font-medium">Name</th><th className="text-left px-4 py-2 font-medium">Contact</th><th className="w-10"></th></tr></thead>
-              <tbody>{suppliers.map(s => (
-                <tr key={s.id} className="border-b border-border/40"><td className="px-4 py-2">{s.name}</td><td className="px-4 py-2 text-muted-foreground">{s.contact || "—"}</td><td className="px-2 py-2"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteSupplier(s.id)}><Trash2 className="h-3 w-3" /></Button></td></tr>
-              ))}</tbody>
-            </table>
-          </div>
+          <VendorsManager
+            userId={user.id}
+            compact
+            onVendorsChange={rows =>
+              setSuppliers(rows.map(r => ({ id: r.id, name: r.name, contact: r.contact })))
+            }
+          />
         </div>
       )}
 
@@ -470,7 +458,7 @@ export default function AdminDashboard() {
                 {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               <select value={newItemSupplier} onChange={(e) => setNewItemSupplier(e.target.value)} className="h-10 rounded-md border border-input bg-background px-2 text-sm">
-                <option value="">Supplier</option>
+                <option value="">Vendor</option>
                 {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
               <Input type="number" placeholder="Price" value={newItemPrice} onChange={(e) => setNewItemPrice(e.target.value)} className="w-20" />

@@ -9,6 +9,9 @@ import PaymentGroup, { type PaymentGroupData, type PaymentEntry } from "./Paymen
 import SwipeableEntryRow from "./SwipeableEntryRow";
 import ClearFieldButton from "./ClearFieldButton";
 import AmountPhase from "./AmountPhase";
+import VendorPhase from "./VendorPhase";
+import SchedulePhase from "./SchedulePhase";
+import ReceiptPhase from "./ReceiptPhase";
 import PurchaseDetailDialog from "./PurchaseDetailDialog";
 import RangeDayPicker from "./RangeDayPicker";
 import MoneyLabel from "./MoneyLabel";
@@ -28,10 +31,22 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { VerifyData } from "@/types/expense";
 import { getMockGroupsForRange, isMockPaymentId } from "@/lib/mockRangeData";
+import { ensureMockVendors } from "@/lib/mockVendors";
 import { lockBodyScroll } from "@/lib/focusWithoutScroll";
 import { formatDayMonth, formatDayMonthRange } from "@/lib/formatDateVi";
 import { applyDueExpenseSpans, createExpenseSpan } from "@/lib/applyExpenseSpans";
 import { SPAN_PRESETS, splitAmountAcrossPeriods, type SpanPresetKey } from "@/lib/expenseSpan";
+import { QUICK_CATEGORY_DETAILS, type CategoryFrequency } from "@/lib/categoryVisuals";
+import {
+  isReminderPaymentId,
+  nextDueFrom,
+  reminderDisplayDate,
+  reminderPaymentId,
+  scheduleMetaFromDate,
+  type ExpenseScheduleRow,
+  type PaymentMethodId,
+  type ScheduleRepeat,
+} from "@/lib/expenseSchedule";
 
 type ViewMode = "range" | "daily";
 
@@ -97,8 +112,14 @@ interface MatchInfo {
   supplierId: string | null;
 }
 
-type InputPhase = "name" | "amount" | "done";
-type CategoryFrequency = "daily" | "weekly" | "monthly";
+type InputPhase = "name" | "amount" | "vendor" | "schedule" | "receipt" | "done";
+type PagerPhase = "name" | "amount" | "vendor" | "schedule" | "receipt";
+
+function pagerPhases(advanced: boolean): PagerPhase[] {
+  return advanced
+    ? ["name", "amount", "vendor", "schedule", "receipt"]
+    : ["name", "amount", "vendor"];
+}
 
 interface QuickCategory {
   id: string;
@@ -137,8 +158,9 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   const [items, setItems] = useState<DbItem[]>([]);
   const [categories, setCategories] = useState<QuickCategory[]>([]);
   const [subCategories, setSubCategories] = useState<{ id: string; name: string; category_id?: string | null }[]>([]);
-  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string; contact?: string | null }[]>([]);
   const [itemFrequency, setItemFrequency] = useState<Record<string, number>>({});
+  const [supplierFrequency, setSupplierFrequency] = useState<Record<string, number>>({});
 
   // Day data - grouped by payment (stale-while-revalidate via paymentsCacheRef)
   const [paymentGroups, setPaymentGroups] = useState<PaymentGroupData[]>([]);
@@ -172,12 +194,22 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   const [spanPreset, setSpanPreset] = useState<SpanPresetKey>("3m");
   const [spanCustomPeriods, setSpanCustomPeriods] = useState("3");
   const [dataTick, setDataTick] = useState(0);
+  const [advancedEnabled, setAdvancedEnabled] = useState(false);
+  const [scheduleRepeat, setScheduleRepeat] = useState<ScheduleRepeat>("none");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodId>("cash");
+  const [paymentMethodNote, setPaymentMethodNote] = useState("");
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+  const [completingScheduleId, setCompletingScheduleId] = useState<string | null>(null);
+  const [completingRepeat, setCompletingRepeat] = useState<Exclude<ScheduleRepeat, "none"> | null>(null);
 
   const nameRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const pagerRef = useRef<HTMLDivElement>(null);
   const pagerReadyRef = useRef(false);
+  const advancedEnabledRef = useRef(advancedEnabled);
+  advancedEnabledRef.current = advancedEnabled;
   const suppliersRef = useRef(suppliers);
   suppliersRef.current = suppliers;
   const paymentsCacheRef = useRef(
@@ -202,7 +234,15 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     });
   }, [paymentGroups, dayTotal, paymentsKey]);
 
-  // Relabel supplier names once catalog loads (payments no longer wait on suppliers)
+  useEffect(() => {
+    if (!receiptFile) {
+      setReceiptPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(receiptFile);
+    setReceiptPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [receiptFile]);
   useEffect(() => {
     if (suppliers.length === 0) return;
     setPaymentGroups(prev => {
@@ -226,31 +266,6 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   phaseRef.current = phase;
 
   const HIGH_VALUE_THRESHOLD = 200000;
-  // Soft dusty pastels — same visual weight across the set
-  const QUICK_CATEGORY_DETAILS: { name: string; emoji: string; gradient: string; frequency: CategoryFrequency }[] = [
-    { name: "Điện", emoji: "⚡", gradient: "linear-gradient(160deg, #efe4d2 0%, #d9c6a8 100%)", frequency: "monthly" },
-    { name: "Thuê nhà", emoji: "🏠", gradient: "linear-gradient(160deg, #eedfe1 0%, #d8c0c4 100%)", frequency: "monthly" },
-    { name: "Gas", emoji: "🔥", gradient: "linear-gradient(160deg, #f0ddd2 0%, #dbb9a8 100%)", frequency: "weekly" },
-    { name: "Đi chợ", emoji: "🛒", gradient: "linear-gradient(160deg, #dde8dc 0%, #bdcfb9 100%)", frequency: "daily" },
-    { name: "Bánh mì", emoji: "🥖", gradient: "linear-gradient(160deg, #f0e6d0 0%, #dbc8a6 100%)", frequency: "daily" },
-    { name: "Nguyên vật liệu", emoji: "🥬", gradient: "linear-gradient(160deg, #e0ead8 0%, #c2d2b6 100%)", frequency: "daily" },
-    { name: "Rau", emoji: "🥦", gradient: "linear-gradient(160deg, #dcead8 0%, #b8d0b0 100%)", frequency: "daily" },
-    { name: "Đậu hũ", emoji: "🧈", gradient: "linear-gradient(160deg, #efe8d8 0%, #d8ceb4 100%)", frequency: "daily" },
-    { name: "Nước tương", emoji: "🫙", gradient: "linear-gradient(160deg, #e8ddd0 0%, #d0bca8 100%)", frequency: "weekly" },
-    { name: "Gạo", emoji: "🌾", gradient: "linear-gradient(160deg, #efe6d4 0%, #d8c8a8 100%)", frequency: "weekly" },
-    { name: "Nước dừa", emoji: "🥥", gradient: "linear-gradient(160deg, #d9e6e6 0%, #b7cbcc 100%)", frequency: "weekly" },
-    { name: "Muối", emoji: "🧂", gradient: "linear-gradient(160deg, #e2e6ea 0%, #c5cbd2 100%)", frequency: "weekly" },
-    { name: "Shopee", emoji: "🛍️", gradient: "linear-gradient(160deg, #eeddd8 0%, #d6b8b0 100%)", frequency: "daily" },
-    { name: "Internet", emoji: "🌐", gradient: "linear-gradient(160deg, #dde2ec 0%, #b8c2d2 100%)", frequency: "monthly" },
-    { name: "Sửa chữa", emoji: "🛠️", gradient: "linear-gradient(160deg, #e8dfd8 0%, #cec0b4 100%)", frequency: "daily" },
-    { name: "Vệ sinh", emoji: "🧼", gradient: "linear-gradient(160deg, #d8e8e6 0%, #b4cfcc 100%)", frequency: "daily" },
-    { name: "Lương NV", emoji: "👥", gradient: "linear-gradient(160deg, #e4dde8 0%, #c8bdd2 100%)", frequency: "monthly" },
-    { name: "Thuế", emoji: "🧾", gradient: "linear-gradient(160deg, #e0e4ea 0%, #c0c6d0 100%)", frequency: "monthly" },
-    { name: "BHXH", emoji: "🛡️", gradient: "linear-gradient(160deg, #d8e6e0 0%, #b4cfc2 100%)", frequency: "monthly" },
-    { name: "Rác", emoji: "♻️", gradient: "linear-gradient(160deg, #e4ead8 0%, #c6d0b4 100%)", frequency: "monthly" },
-    { name: "Giữ xe", emoji: "🅿️", gradient: "linear-gradient(160deg, #e6e4e0 0%, #c8c6c2 100%)", frequency: "monthly" },
-    { name: "Khác", emoji: "✦", gradient: "linear-gradient(160deg, #e8dde6 0%, #d0bac8 100%)", frequency: "daily" },
-  ];
   const CHIP_FREQ_PAGES: { key: CategoryFrequency; label: string }[] = [
     { key: "monthly", label: "Tháng" },
     { key: "daily", label: "Ngày" },
@@ -292,12 +307,13 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   useEffect(() => {
     if (!user) return;
     const load = async () => {
-      const [itemsRes, catsRes, subsRes, supsRes, freqRes] = await Promise.all([
+      const [itemsRes, catsRes, subsRes, vendors, freqRes, supFreqRes] = await Promise.all([
         supabase.from("items").select("*").eq("user_id", user.id),
         supabase.from("categories").select("id, name, frequency").eq("user_id", user.id),
         supabase.from("sub_categories").select("id, name, category_id").eq("user_id", user.id),
-        supabase.from("suppliers").select("id, name").eq("user_id", user.id),
+        ensureMockVendors(user.id).catch(() => [] as { id: string; name: string; contact: string | null }[]),
         supabase.from("sub_payments").select("item_id").eq("user_id", user.id).not("item_id", "is", null),
+        supabase.from("sub_payments").select("supplier_id").eq("user_id", user.id).not("supplier_id", "is", null),
       ]);
       if (itemsRes.data) setItems(itemsRes.data);
       if (catsRes.data) {
@@ -307,13 +323,20 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
         })));
       }
       if (subsRes.data) setSubCategories(subsRes.data);
-      if (supsRes.data) setSuppliers(supsRes.data);
+      setSuppliers(vendors.map(v => ({ id: v.id, name: v.name, contact: v.contact })));
       if (freqRes.data) {
         const freq: Record<string, number> = {};
         freqRes.data.forEach((r: { item_id: string | null }) => {
           if (r.item_id) freq[r.item_id] = (freq[r.item_id] || 0) + 1;
         });
         setItemFrequency(freq);
+      }
+      if (supFreqRes.data) {
+        const freq: Record<string, number> = {};
+        (supFreqRes.data as { supplier_id: string | null }[]).forEach(r => {
+          if (r.supplier_id) freq[r.supplier_id] = (freq[r.supplier_id] || 0) + 1;
+        });
+        setSupplierFrequency(freq);
       }
     };
     load();
@@ -334,7 +357,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       if (cached.groups.length > 0) {
         if (viewMode === "range") {
           const endPayments = cached.groups.filter(
-            g => g.date === periodEndStr && !isMockPaymentId(g.paymentId),
+            g => g.date === periodEndStr && !isMockPaymentId(g.paymentId) && !isReminderPaymentId(g.paymentId),
           );
           setActivePaymentId(
             endPayments.length > 0
@@ -342,7 +365,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
               : null,
           );
         } else {
-          const lastReal = [...cached.groups].reverse().find(g => !isMockPaymentId(g.paymentId));
+          const lastReal = [...cached.groups].reverse().find(g => !isMockPaymentId(g.paymentId) && !isReminderPaymentId(g.paymentId));
           setActivePaymentId(lastReal?.paymentId ?? null);
         }
       } else {
@@ -385,6 +408,26 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       }
 
       const { data: payments } = await query;
+      if (loadId !== paymentsLoadIdRef.current) return;
+
+      const rangeStart = viewMode === "daily" ? selectedDate : periodStartStr;
+      const rangeEnd = viewMode === "daily" ? selectedDate : periodEndStr;
+      let dueSchedules: ExpenseScheduleRow[] = [];
+      try {
+        const { data: scheds, error: schedErr } = await supabase
+          .from("expense_schedules")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("active", true);
+        if (!schedErr && scheds) {
+          dueSchedules = (scheds as ExpenseScheduleRow[]).filter(s =>
+            reminderDisplayDate(s.next_due, rangeStart, rangeEnd, todayStr),
+          );
+        }
+      } catch {
+        /* table may not exist until migration */
+      }
+
       if (loadId !== paymentsLoadIdRef.current) return;
 
       const supplierList = suppliersRef.current;
@@ -431,6 +474,39 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
         groups.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
       }
 
+      if (dueSchedules.length > 0) {
+        const rangeStart = viewMode === "daily" ? selectedDate : periodStartStr;
+        const rangeEnd = viewMode === "daily" ? selectedDate : periodEndStr;
+        for (const sched of dueSchedules) {
+          const displayDate = reminderDisplayDate(sched.next_due, rangeStart, rangeEnd, todayStr);
+          if (!displayDate) continue;
+          groups.push({
+            paymentId: reminderPaymentId(sched.id),
+            supplierName: sched.supplier_id
+              ? supplierList.find(s => s.id === sched.supplier_id)?.name || null
+              : null,
+            total: 0,
+            date: displayDate,
+            entries: [{
+              item_name: sched.item_name,
+              amount: Number(sched.last_amount) || 0,
+              category_id: sched.category_id,
+              supplier_id: sched.supplier_id,
+              notes: sched.repeat === "monthly"
+                ? "Nhắc mỗi tháng"
+                : sched.repeat === "biweekly"
+                  ? "Nhắc mỗi 2 tuần"
+                  : "Nhắc mỗi tuần",
+              isPending: true,
+              scheduleId: sched.id,
+              pendingRepeat: sched.repeat,
+              paymentMethod: sched.payment_method,
+            }],
+          });
+        }
+        groups.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+      }
+
       paymentsHydratedKeyRef.current = key;
       paymentsCacheRef.current.set(key, { groups, total });
       setPaymentGroups(groups);
@@ -438,12 +514,12 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       setPaymentsReady(true);
       if (groups.length > 0) {
         if (viewMode === "range") {
-          const endPayments = groups.filter(g => g.date === periodEndStr && !isMockPaymentId(g.paymentId));
+          const endPayments = groups.filter(g => g.date === periodEndStr && !isMockPaymentId(g.paymentId) && !isReminderPaymentId(g.paymentId));
           setActivePaymentId(
             endPayments.length > 0 ? endPayments[endPayments.length - 1].paymentId : null
           );
         } else {
-          const lastReal = [...groups].reverse().find(g => !isMockPaymentId(g.paymentId));
+          const lastReal = [...groups].reverse().find(g => !isMockPaymentId(g.paymentId) && !isReminderPaymentId(g.paymentId));
           setActivePaymentId(lastReal?.paymentId ?? null);
         }
       } else {
@@ -495,10 +571,12 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     setChipFreqPage(CHIP_FREQ_PAGES[page].key);
   }, []);
 
-  const scrollPagerTo = useCallback((target: "name" | "amount", smooth: boolean) => {
+  const scrollPagerTo = useCallback((target: PagerPhase, smooth: boolean) => {
     const el = pagerRef.current;
     if (!el) return;
-    const left = target === "amount" ? el.clientWidth : 0;
+    const pages = pagerPhases(advancedEnabledRef.current);
+    const pageIndex = Math.max(0, pages.indexOf(target));
+    const left = pageIndex * el.clientWidth;
     if (Math.abs(el.scrollLeft - left) < 2) return;
     pagerSyncingRef.current = true;
     el.scrollTo({ left, behavior: smooth ? "smooth" : "auto" });
@@ -509,6 +587,10 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
 
   const handleNameConfirmRef = useRef<(() => void) | null>(null);
   const goToNamePhaseRef = useRef<(() => void) | null>(null);
+  const goToAmountPhaseRef = useRef<(() => void) | null>(null);
+  const goToVendorPhaseRef = useRef<(() => void) | null>(null);
+  const goToSchedulePhaseRef = useRef<(() => void) | null>(null);
+  const goToReceiptPhaseRef = useRef<(() => void) | null>(null);
   const pagerSettleTimerRef = useRef<number | null>(null);
 
   // Keep the paging scroll view in sync with phase (buttons / keyboard / save reset)
@@ -517,31 +599,41 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       if (!cardExpanded) pagerReadyRef.current = false;
       return;
     }
-    const target = phase === "amount" ? "amount" : "name";
+    const pages = pagerPhases(advancedEnabled);
+    const target = (pages.includes(phase as PagerPhase) ? phase : "amount") as PagerPhase;
     const smooth = pagerReadyRef.current;
-    // Wait a frame so the pager has layout after mount
     const id = requestAnimationFrame(() => {
       scrollPagerTo(target, smooth);
       pagerReadyRef.current = true;
     });
     return () => cancelAnimationFrame(id);
-  }, [phase, cardExpanded, justSaved, scrollPagerTo]);
+  }, [phase, cardExpanded, justSaved, advancedEnabled, scrollPagerTo]);
 
   const settlePagerPage = useCallback(() => {
     if (pagerSyncingRef.current) return;
     const el = pagerRef.current;
     if (!el || el.clientWidth === 0) return;
-    const page = Math.round(el.scrollLeft / el.clientWidth);
-    if (page >= 1) {
-      if (!nameValueRef.current.trim()) {
-        scrollPagerTo("name", true);
-        return;
-      }
-      if (phaseRef.current !== "amount") {
-        handleNameConfirmRef.current?.();
-      }
-    } else if (phaseRef.current === "amount") {
-      goToNamePhaseRef.current?.();
+    const pages = pagerPhases(advancedEnabledRef.current);
+    const page = Math.min(pages.length - 1, Math.max(0, Math.round(el.scrollLeft / el.clientWidth)));
+    const target = pages[page];
+    if (!nameValueRef.current.trim() && target !== "name") {
+      scrollPagerTo("name", true);
+      return;
+    }
+    if (target === phaseRef.current) return;
+    if (target === "name") goToNamePhaseRef.current?.();
+    else if (target === "amount") {
+      if (phaseRef.current === "name") handleNameConfirmRef.current?.();
+      else goToAmountPhaseRef.current?.();
+    } else if (target === "vendor") {
+      if (phaseRef.current === "name") handleNameConfirmRef.current?.();
+      goToVendorPhaseRef.current?.();
+    } else if (target === "schedule") {
+      if (phaseRef.current === "name") handleNameConfirmRef.current?.();
+      goToSchedulePhaseRef.current?.();
+    } else if (target === "receipt") {
+      if (phaseRef.current === "name") handleNameConfirmRef.current?.();
+      goToReceiptPhaseRef.current?.();
     }
   }, [scrollPagerTo]);
 
@@ -716,6 +808,13 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
           setSpanEnabled(false);
           setSpanPreset("3m");
           setSpanCustomPeriods("3");
+          setAdvancedEnabled(false);
+          setScheduleRepeat("none");
+          setPaymentMethod("cash");
+          setPaymentMethodNote("");
+          setReceiptFile(null);
+          setCompletingScheduleId(null);
+          setCompletingRepeat(null);
           setJustSaved(false);
           setPhase("name");
           pagerReadyRef.current = false;
@@ -777,26 +876,96 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       }
       if (!pid) return;
 
-      const { error } = await supabase.from("sub_payments").insert(
-        entries.map(l => ({
-          payment_id: pid,
-          item_name: nameValue.trim(),
-          item_id: match?.itemId || null,
-          quantity: match?.unitPrice ? l.amount / match.unitPrice : 1,
-          unit_price: match?.unitPrice || l.amount,
-          amount: l.amount,
-          category_id: match?.categoryId || null,
-          sub_category_id: match?.subCategoryId || null,
-          sub_sub_category_id: match?.subSubCategoryId || null,
-          supplier_id: match?.supplierId || null,
-          notes: l.note,
-          user_id: user.id,
-        })),
-      );
+      const subRows = entries.map(l => ({
+        payment_id: pid,
+        item_name: nameValue.trim(),
+        item_id: match?.itemId || null,
+        quantity: match?.unitPrice ? l.amount / match.unitPrice : 1,
+        unit_price: match?.unitPrice || l.amount,
+        amount: l.amount,
+        category_id: match?.categoryId || null,
+        sub_category_id: match?.subCategoryId || null,
+        sub_sub_category_id: match?.subSubCategoryId || null,
+        supplier_id: match?.supplierId || null,
+        notes: l.note,
+        user_id: user.id,
+        payment_method: paymentMethod,
+        payment_method_note: paymentMethodNote.trim() || null,
+      }));
+      let { error } = await supabase.from("sub_payments").insert(subRows);
+      if (error && String(error.message).includes("payment_method")) {
+        const fallback = subRows.map(({ payment_method: _pm, payment_method_note: _note, ...rest }) => rest);
+        const retry = await supabase.from("sub_payments").insert(fallback);
+        error = retry.error;
+      }
 
       if (error) {
         toast.error(error.message || "Lưu thất bại");
         return;
+      }
+
+      if (receiptFile && pid) {
+        try {
+          const ext = receiptFile.name.split(".").pop() || "jpg";
+          const path = `${user.id}/${pid}/${Date.now()}.${ext}`;
+          const { error: upErr } = await supabase.storage
+            .from("receipt-photos")
+            .upload(path, receiptFile, { contentType: receiptFile.type || "image/jpeg", upsert: false });
+          if (upErr) throw upErr;
+          await supabase.from("payments").update({ receipt_photo_path: path }).eq("id", pid);
+        } catch (err: any) {
+          toast.error(err?.message || "Không tải được ảnh biên lai");
+        }
+      }
+
+      if (completingScheduleId) {
+        const repeat =
+          scheduleRepeat !== "none" ? scheduleRepeat : (completingRepeat ?? "monthly");
+        try {
+          await supabase
+            .from("expense_schedules")
+            .update({
+              last_amount: amount,
+              next_due: nextDueFrom(expenseDate, repeat),
+              payment_method: paymentMethod,
+              payment_method_note: paymentMethodNote.trim() || null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", completingScheduleId);
+        } catch {
+          /* ignore */
+        }
+      } else if (scheduleRepeat !== "none") {
+        try {
+          const meta = scheduleMetaFromDate(expenseDate, scheduleRepeat);
+          await supabase.from("expense_schedules").insert({
+            user_id: user.id,
+            item_name: nameValue.trim(),
+            item_id: match?.itemId || null,
+            category_id: match?.categoryId || null,
+            sub_category_id: match?.subCategoryId || null,
+            supplier_id: match?.supplierId || null,
+            last_amount: amount,
+            payment_method: paymentMethod,
+            payment_method_note: paymentMethodNote.trim() || null,
+            repeat: scheduleRepeat,
+            next_due: meta.next_due,
+            weekday: meta.weekday,
+            month_day: meta.month_day,
+          });
+        } catch (err: any) {
+          if (!String(err?.message || "").includes("expense_schedules")) {
+            console.warn("expense_schedules", err);
+          }
+        }
+      }
+
+      if (match?.supplierId) {
+        const sid = match.supplierId;
+        setSupplierFrequency(prev => ({
+          ...prev,
+          [sid]: (prev[sid] || 0) + entries.length,
+        }));
       }
 
       const newEntries: PaymentEntry[] = entries.map(l => ({
@@ -810,9 +979,12 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
 
       // Update or create group
       setPaymentGroups(prev => {
-        const existing = prev.find(g => g.paymentId === pid);
+        const withoutRemind = completingScheduleId
+          ? prev.filter(g => g.paymentId !== reminderPaymentId(completingScheduleId))
+          : prev;
+        const existing = withoutRemind.find(g => g.paymentId === pid);
         if (existing) {
-          return prev.map(g =>
+          return withoutRemind.map(g =>
             g.paymentId === pid
               ? {
                   ...g,
@@ -824,7 +996,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
           );
         }
         return [
-          ...prev,
+          ...withoutRemind,
           {
             paymentId: pid!,
             supplierName: match?.supplierName || null,
@@ -844,6 +1016,8 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     amountValue, noteValue, amountLines, nameValue, match, activePaymentId, user,
     expenseDate, todayStr, periodIsFuture, viewMode, collapseCard,
     spanEnabled, spanPreset, spanCustomPeriods,
+    paymentMethod, paymentMethodNote, receiptFile, scheduleRepeat,
+    completingScheduleId, completingRepeat,
   ]);
 
   const handleNameKeyDown = (e: React.KeyboardEvent) => {
@@ -942,6 +1116,13 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     setMatch(null);
     setVerifyData(null);
     setPhase("name");
+    setAdvancedEnabled(false);
+    setScheduleRepeat("none");
+    setPaymentMethod("cash");
+    setPaymentMethodNote("");
+    setReceiptFile(null);
+    setCompletingScheduleId(null);
+    setCompletingRepeat(null);
     setCardExpanded(true);
     const active = document.activeElement;
     if (active instanceof HTMLElement) active.blur();
@@ -958,6 +1139,154 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     if (active instanceof HTMLElement) active.blur();
   }, []);
   goToNamePhaseRef.current = goToNamePhase;
+
+  const goToAmountPhase = useCallback(() => {
+    setPhase("amount");
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+  }, []);
+  goToAmountPhaseRef.current = goToAmountPhase;
+
+  const goToVendorPhase = useCallback(() => {
+    setPhase("vendor");
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+  }, []);
+  goToVendorPhaseRef.current = goToVendorPhase;
+
+  const goToSchedulePhase = useCallback(() => {
+    setAdvancedEnabled(true);
+    setPhase("schedule");
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+  }, []);
+  goToSchedulePhaseRef.current = goToSchedulePhase;
+
+  const goToReceiptPhase = useCallback(() => {
+    setAdvancedEnabled(true);
+    setPhase("receipt");
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+  }, []);
+  goToReceiptPhaseRef.current = goToReceiptPhase;
+
+  const openAdvancedFromAmount = useCallback(() => {
+    setAdvancedEnabled(true);
+    setPhase("schedule");
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+  }, []);
+
+  const openReminder = useCallback((entry: PaymentEntry) => {
+    if (!canAddExpense) {
+      toast.error("Không thể ghi chi tiêu trước ngày hôm nay");
+      return;
+    }
+    setCompletingScheduleId(entry.scheduleId ?? null);
+    setCompletingRepeat(entry.pendingRepeat ?? "monthly");
+    setScheduleRepeat(entry.pendingRepeat ?? "monthly");
+    setPaymentMethod((entry.paymentMethod as PaymentMethodId) || "cash");
+    setNameValue(entry.item_name);
+    setAmountValue("");
+    setNoteValue("");
+    setAmountLines([]);
+    const cat = categories.find(c => c.id === entry.category_id);
+    const sup = suppliers.find(s => s.id === entry.supplier_id);
+    setMatch({
+      itemId: "",
+      categoryName: cat?.name ?? "",
+      subCategoryName: "",
+      supplierName: sup?.name ?? "",
+      unitPrice: 0,
+      unit: "unit",
+      categoryId: entry.category_id,
+      subCategoryId: null,
+      subSubCategoryId: null,
+      supplierId: entry.supplier_id,
+    });
+    setVerifyData({
+      itemName: entry.item_name,
+      categoryName: cat?.name ?? "",
+      subCategoryName: "",
+      supplierName: sup?.name ?? "",
+      unitPrice: 0,
+      unit: "unit",
+      categoryId: entry.category_id ?? undefined,
+      supplierId: entry.supplier_id ?? undefined,
+    });
+    setAdvancedEnabled(false);
+    setPhase("amount");
+    setCardExpanded(true);
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+  }, [canAddExpense, categories, suppliers]);
+
+  const applyVendorSelection = useCallback((vendor: { id: string | null; name: string }) => {
+    setMatch(prev =>
+      prev
+        ? { ...prev, supplierId: vendor.id, supplierName: vendor.name }
+        : {
+            itemId: "",
+            categoryName: "",
+            subCategoryName: "",
+            supplierName: vendor.name,
+            unitPrice: 0,
+            unit: "unit",
+            categoryId: null,
+            subCategoryId: null,
+            subSubCategoryId: null,
+            supplierId: vendor.id,
+          },
+    );
+    setVerifyData(prev =>
+      prev
+        ? { ...prev, supplierId: vendor.id ?? undefined, supplierName: vendor.name }
+        : {
+            itemName: nameValue,
+            categoryName: "",
+            subCategoryName: "",
+            supplierName: vendor.name,
+            unitPrice: 0,
+            unit: "unit",
+            supplierId: vendor.id ?? undefined,
+          },
+    );
+  }, [nameValue]);
+
+  const createVendor = useCallback(
+    async (name: string) => {
+      if (!user) return null;
+      const { data, error } = await supabase
+        .from("suppliers")
+        .insert({ name: name.trim(), user_id: user.id })
+        .select("id, name, contact")
+        .single();
+      if (error) {
+        toast.error(error.message || "Không thêm được nhà cung cấp");
+        return null;
+      }
+      if (data) {
+        setSuppliers(prev =>
+          [...prev, { id: data.id, name: data.name, contact: data.contact }].sort((a, b) =>
+            a.name.localeCompare(b.name, "vi"),
+          ),
+        );
+        return { id: data.id, name: data.name, contact: data.contact };
+      }
+      return null;
+    },
+    [user],
+  );
+
+  const frequentVendorIds = useMemo(
+    () =>
+      Object.entries(supplierFrequency)
+        .sort((a, b) => b[1] - a[1])
+        .map(([id]) => id),
+    [supplierFrequency],
+  );
+
+  const defaultVendorId = match?.supplierId ?? verifyData?.supplierId ?? null;
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
@@ -978,6 +1307,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
         if (next > maxPeriodOffset) return prev;
         return next;
       });
+      window.dispatchEvent(new Event("mise:page-slide"));
       return;
     }
 
@@ -987,6 +1317,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     const nextKey = format(next, "yyyy-MM-dd");
     if (nextKey > format(new Date(), "yyyy-MM-dd")) return;
     setSelectedDate(nextKey);
+    window.dispatchEvent(new Event("mise:page-slide"));
   }, [selectedDate, viewMode, period.start, period.end, maxPeriodOffset]);
 
   const centerLabel = viewMode === "range"
@@ -1142,9 +1473,25 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       getCategoryName={getCategoryName}
       getSupplierName={getSupplierName}
       highValueThreshold={HIGH_VALUE_THRESHOLD}
-      onEntryClick={(entry) => { setDetailEntry(entry); setDetailOpen(true); }}
-      onEntryNameClick={(entry) => setNameFilter(entry.item_name)}
+      onEntryClick={(entry) => {
+        if (entry.isPending) openReminder(entry);
+        else { setDetailEntry(entry); setDetailOpen(true); }
+      }}
+      onEntryNameClick={(entry) => {
+        if (entry.isPending) openReminder(entry);
+        else setNameFilter(entry.item_name);
+      }}
       onEntryDelete={async (paymentId, entry, index) => {
+        if (entry.isPending && entry.scheduleId) {
+          const repeat = entry.pendingRepeat ?? "monthly";
+          await supabase
+            .from("expense_schedules")
+            .update({ next_due: nextDueFrom(todayStr, repeat), updated_at: new Date().toISOString() })
+            .eq("id", entry.scheduleId);
+          setPaymentGroups(prev => prev.filter(g => g.paymentId !== paymentId));
+          toast.success("Đã bỏ nhắc lần này");
+          return;
+        }
         if (entry.sub_payment_id && !isMockPaymentId(paymentId)) {
           await supabase.from("sub_payments").delete().eq("id", entry.sub_payment_id);
         }
@@ -1304,10 +1651,27 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                         notes={item.entry.notes}
                         categoryName={getCategoryName(item.entry.category_id)}
                         supplierName={getSupplierName(item.entry.supplier_id)}
-                        isHighValue={item.entry.amount >= HIGH_VALUE_THRESHOLD}
-                        onNameClick={() => setNameFilter(item.entry.item_name)}
-                        onClick={() => { setDetailEntry(item.entry); setDetailOpen(true); }}
+                        isHighValue={!item.entry.isPending && item.entry.amount >= HIGH_VALUE_THRESHOLD}
+                        isPending={item.entry.isPending}
+                        onNameClick={() => {
+                          if (item.entry.isPending) openReminder(item.entry);
+                          else setNameFilter(item.entry.item_name);
+                        }}
+                        onClick={() => {
+                          if (item.entry.isPending) openReminder(item.entry);
+                          else { setDetailEntry(item.entry); setDetailOpen(true); }
+                        }}
                         onDelete={async () => {
+                          if (item.entry.isPending && item.entry.scheduleId) {
+                            const repeat = item.entry.pendingRepeat ?? "monthly";
+                            await supabase
+                              .from("expense_schedules")
+                              .update({ next_due: nextDueFrom(todayStr, repeat), updated_at: new Date().toISOString() })
+                              .eq("id", item.entry.scheduleId);
+                            setPaymentGroups(prev => prev.filter(g => g.paymentId !== item.paymentId));
+                            toast.success("Đã bỏ nhắc lần này");
+                            return;
+                          }
                           if (item.entry.sub_payment_id && !isMockPaymentId(item.paymentId)) {
                             await supabase.from("sub_payments").delete().eq("id", item.entry.sub_payment_id);
                           }
@@ -1406,12 +1770,18 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
           >
             {/* Phase indicator */}
             <div className="flex items-center gap-2 px-5 pt-4 pb-1 shrink-0">
-              <div className={`h-1.5 flex-1 rounded-full transition-colors duration-400 ${
-                phase === "name" ? "bg-primary" : "bg-primary/30"
-              }`} />
-              <div className={`h-1.5 flex-1 rounded-full transition-colors duration-400 ${
-                phase === "amount" || phase === "done" ? "bg-primary" : "bg-muted"
-              }`} />
+              {pagerPhases(advancedEnabled).map(key => (
+                <div
+                  key={key}
+                  className={`h-1.5 flex-1 rounded-full transition-colors duration-400 ${
+                    phase === key || (phase === "done" && (key === "amount" || key === "receipt"))
+                      ? "bg-primary"
+                      : pagerPhases(advancedEnabled).indexOf(key) < pagerPhases(advancedEnabled).indexOf(phase as PagerPhase)
+                        ? "bg-primary/30"
+                        : "bg-muted"
+                  }`}
+                />
+              ))}
             </div>
             {viewMode === "range" && periodIsPast && !justSaved && (
               <p className="px-5 pb-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground/75">
@@ -1458,7 +1828,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
               </div>
             )}
 
-            {/* Horizontal paging: name | amount */}
+            {/* Horizontal paging: name | amount | vendor */}
             {!justSaved && (
               <div
                 ref={pagerRef}
@@ -1645,6 +2015,9 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                     setMatch={setMatch}
                     setVerifyData={setVerifyData}
                     onBack={goToNamePhase}
+                    onOpenVendor={goToVendorPhase}
+                    onOpenAdvanced={openAdvancedFromAmount}
+                    advancedEnabled={advancedEnabled}
                     onKeyDown={handleAmountKeyDown}
                     onSave={handleSave}
                     saving={saving}
@@ -1657,6 +2030,55 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                     setSpanCustomPeriods={setSpanCustomPeriods}
                   />
                 </div>
+
+                {/* Vendor page */}
+                <div className="expense-phase-page flex h-full min-h-0 flex-col">
+                  <VendorPhase
+                    vendors={suppliers}
+                    frequentVendorIds={frequentVendorIds}
+                    defaultVendorId={
+                      match?.itemId
+                        ? items.find(i => i.id === match.itemId)?.default_supplier_id ?? null
+                        : defaultVendorId
+                    }
+                    selectedVendorId={match?.supplierId ?? verifyData?.supplierId ?? null}
+                    selectedVendorName={match?.supplierName || verifyData?.supplierName || ""}
+                    onSelect={applyVendorSelection}
+                    onCreate={createVendor}
+                    onDone={goToAmountPhase}
+                    onBack={goToAmountPhase}
+                  />
+                </div>
+
+                {advancedEnabled && (
+                  <>
+                    <div className="expense-phase-page flex h-full min-h-0 flex-col">
+                      <SchedulePhase
+                        scheduleRepeat={scheduleRepeat}
+                        setScheduleRepeat={setScheduleRepeat}
+                        paymentMethod={paymentMethod}
+                        setPaymentMethod={setPaymentMethod}
+                        paymentMethodNote={paymentMethodNote}
+                        setPaymentMethodNote={setPaymentMethodNote}
+                        onBack={goToAmountPhase}
+                        onNext={goToReceiptPhase}
+                      />
+                    </div>
+                    <div className="expense-phase-page flex h-full min-h-0 flex-col">
+                      <ReceiptPhase
+                        previewUrl={receiptPreview}
+                        onPickFile={setReceiptFile}
+                        onBack={goToSchedulePhase}
+                        onSave={handleSave}
+                        saving={saving}
+                        canSave={
+                          !saving &&
+                          ([...amountLines, { amount: amountValue }].some(l => Number(l.amount) > 0))
+                        }
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>

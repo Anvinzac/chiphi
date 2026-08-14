@@ -255,7 +255,7 @@ export default function PurchaseDetailDialog({
 
             {/* Supplier */}
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-muted-foreground min-w-[70px]">Supplier</span>
+              <span className="text-xs text-muted-foreground min-w-[70px]">Nhà cung cấp</span>
               <span className="text-sm">{getSupplierName(entry.supplier_id) || "—"}</span>
             </div>
           </div>

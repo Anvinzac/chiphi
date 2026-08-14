@@ -33,6 +33,9 @@ interface AmountPhaseProps {
   setMatch: React.Dispatch<React.SetStateAction<MatchInfo | null>>;
   setVerifyData: React.Dispatch<React.SetStateAction<VerifyData | null>>;
   onBack: () => void;
+  onOpenVendor: () => void;
+  onOpenAdvanced: () => void;
+  advancedEnabled: boolean;
   onKeyDown: (e: React.KeyboardEvent) => void;
   onSave: () => void;
   saving?: boolean;
@@ -45,7 +48,7 @@ interface AmountPhaseProps {
   setSpanCustomPeriods: (v: string) => void;
 }
 
-type EditableField = "supplierName" | "categoryName" | "subCategoryName" | "unitPrice" | null;
+type EditableField = "categoryName" | "subCategoryName" | "unitPrice" | null;
 
 /** Match typed note query against full name or word initials (e.g. "ct" → "Cải thìa"). */
 function matchesNoteQuery(name: string, query: string): boolean {
@@ -74,6 +77,9 @@ export default function AmountPhase({
   setMatch,
   setVerifyData,
   onBack,
+  onOpenVendor,
+  onOpenAdvanced,
+  advancedEnabled,
   onKeyDown,
   onSave,
   saving = false,
@@ -234,10 +240,9 @@ export default function AmountPhase({
   const subCategory = match?.subCategoryName || verifyData?.subCategoryName || "";
   const unitPrice = match?.unitPrice ?? verifyData?.unitPrice ?? 0;
   const unit = match?.unit || verifyData?.unit || "unit";
-  const hasMeta = supplier || category || subCategory || unitPrice > 0;
+  const hasMeta = category || subCategory || unitPrice > 0;
 
   const allFields: { key: EditableField; label: string; value: string }[] = [
-    { key: "supplierName", label: "Nhà cung cấp", value: supplier },
     { key: "categoryName", label: "Danh mục", value: category },
     { key: "subCategoryName", label: "Phân loại", value: subCategory },
     { key: "unitPrice", label: `/${unit}`, value: unitPrice > 0 ? unitPrice.toLocaleString("vi-VN") : "" },
@@ -445,9 +450,25 @@ export default function AmountPhase({
           </div>
         </div>
 
-        {hasMeta && (
-          <div className="mb-2 flex flex-wrap gap-1.5">
-            {fields.map(({ key, label, value }) =>
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={onOpenVendor}
+            className={`group flex max-w-full items-center gap-1 rounded-xl border px-2.5 py-1 text-[11px] transition-all active:scale-95 ${
+              supplier
+                ? "border-border/60 bg-muted text-foreground hover:border-primary/30"
+                : "border-dashed border-primary/35 bg-primary/5 text-primary hover:border-primary/50"
+            }`}
+            aria-label="Chọn nhà cung cấp"
+          >
+            <span className="text-[10px] text-muted-foreground shrink-0">Nhà cung cấp</span>
+            <span className={`truncate font-medium ${supplier ? "" : "text-primary/80"}`}>
+              {supplier || "Chọn"}
+            </span>
+            <Pencil className="h-2.5 w-2.5 shrink-0 text-muted-foreground/50 group-hover:text-primary/70" />
+          </button>
+          {hasMeta &&
+            fields.map(({ key, label, value }) =>
               editingField === key ? (
                 <div
                   key={key}
@@ -496,8 +517,7 @@ export default function AmountPhase({
                 </button>
               ),
             )}
-          </div>
-        )}
+        </div>
 
         <div ref={spanSectionRef} className="mb-2 space-y-1.5">
           <button
@@ -513,6 +533,22 @@ export default function AmountPhase({
             <span className="text-[11px] font-medium text-foreground">Chia nhiều kỳ</span>
             <span className="text-[10px] text-muted-foreground">
               {spanEnabled ? "Bật" : "Sửa lớn / đặt hàng số lượng lớn"}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenAdvanced}
+            className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors ${
+              advancedEnabled
+                ? "border-primary/40 bg-primary/10"
+                : "border-border/60 bg-muted/40 hover:bg-muted"
+            }`}
+            aria-pressed={advancedEnabled}
+          >
+            <span className="text-[11px] font-medium text-foreground">Nâng cao</span>
+            <span className="text-[10px] text-muted-foreground">
+              {advancedEnabled ? "Lịch · thanh toán · biên lai" : "Nhắc lịch, cách trả, ảnh biên lai"}
             </span>
           </button>
 

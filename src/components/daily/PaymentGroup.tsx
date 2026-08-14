@@ -3,7 +3,7 @@ import { parseISO } from "date-fns";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import SwipeableEntryRow from "./SwipeableEntryRow";
 import MoneyLabel from "./MoneyLabel";
-import { formatDayMonth } from "@/lib/formatDateVi";
+import type { ScheduleRepeat } from "@/lib/expenseSchedule";
 
 export interface PaymentEntry {
   item_name: string;
@@ -12,6 +12,10 @@ export interface PaymentEntry {
   supplier_id: string | null;
   sub_payment_id?: string;
   notes?: string | null;
+  isPending?: boolean;
+  scheduleId?: string;
+  pendingRepeat?: Exclude<ScheduleRepeat, "none">;
+  paymentMethod?: string | null;
 }
 
 export interface PaymentGroupData {
@@ -52,7 +56,8 @@ export default function PaymentGroup({
       notes={entry.notes}
       categoryName={getCategoryName(entry.category_id)}
       supplierName={getSupplierName(entry.supplier_id)}
-      isHighValue={entry.amount >= highValueThreshold}
+      isHighValue={!entry.isPending && entry.amount >= highValueThreshold}
+      isPending={entry.isPending}
       onClick={() => onEntryClick(entry)}
       onNameClick={onEntryNameClick ? () => onEntryNameClick(entry) : undefined}
       onDelete={() => onEntryDelete(group.paymentId, entry, i)}

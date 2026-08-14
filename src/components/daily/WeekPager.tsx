@@ -32,6 +32,11 @@ export default function WeekPager<T>({ weeks, renderSection }: WeekPagerProps<T>
     setActive(Math.max(0, Math.min(weeks.length - 1, idx)));
   };
 
+  const onScrollerScroll = () => {
+    settleActive();
+    window.dispatchEvent(new Event("mise:page-slide"));
+  };
+
   const goTo = (idx: number) => {
     const el = scrollerRef.current;
     if (!el) return;
@@ -71,7 +76,7 @@ export default function WeekPager<T>({ weeks, renderSection }: WeekPagerProps<T>
 
       <div
         ref={scrollerRef}
-        onScroll={settleActive}
+        onScroll={onScrollerScroll}
         onTouchEnd={settleActive}
         onTouchStart={(e) => e.stopPropagation()}
         className="-mx-4 flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain no-scrollbar"

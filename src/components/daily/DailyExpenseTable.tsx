@@ -1498,13 +1498,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       }}
       onEntryDelete={async (paymentId, entry, index) => {
         if (entry.isPending && entry.scheduleId) {
-          const repeat = entry.pendingRepeat ?? "monthly";
-          await supabase
-            .from("expense_schedules")
-            .update({ next_due: nextDueFrom(todayStr, repeat), updated_at: new Date().toISOString() })
-            .eq("id", entry.scheduleId);
-          setPaymentGroups(prev => prev.filter(g => g.paymentId !== paymentId));
-          toast.success("Đã bỏ nhắc lần này");
+          await skipReminder(paymentId, entry);
           return;
         }
         if (entry.sub_payment_id && !isMockPaymentId(paymentId)) {
@@ -1518,6 +1512,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
         setDayTotal(prev => prev - entry.amount);
         toast.success("Deleted");
       }}
+      onEntrySkip={skipReminder}
     />
   );
 
@@ -1678,15 +1673,13 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                         }}
                         onDelete={async () => {
                           if (item.entry.isPending && item.entry.scheduleId) {
-                            const repeat = item.entry.pendingRepeat ?? "monthly";
-                            await supabase
-                              .from("expense_schedules")
-                              .update({ next_due: nextDueFrom(todayStr, repeat), updated_at: new Date().toISOString() })
-                              .eq("id", item.entry.scheduleId);
-                            setPaymentGroups(prev => prev.filter(g => g.paymentId !== item.paymentId));
-                            toast.success("Đã bỏ nhắc lần này");
+                            await skipReminder(item.paymentId, item.entry);
                             return;
                           }
+                        }}
+                        onSkip={item.entry.isPending && item.entry.scheduleId
+                          ? () => skipReminder(item.paymentId, item.entry)
+                          : undefined}
                           if (item.entry.sub_payment_id && !isMockPaymentId(item.paymentId)) {
                             await supabase.from("sub_payments").delete().eq("id", item.entry.sub_payment_id);
                           }

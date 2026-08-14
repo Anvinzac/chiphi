@@ -1177,6 +1177,21 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     if (active instanceof HTMLElement) active.blur();
   }, []);
 
+  const skipReminder = useCallback(async (paymentId: string, entry: PaymentEntry) => {
+    if (!entry.scheduleId) return;
+    const repeat = entry.pendingRepeat ?? "monthly";
+    const { error } = await supabase
+      .from("expense_schedules")
+      .update({ next_due: nextDueFrom(todayStr, repeat), updated_at: new Date().toISOString() })
+      .eq("id", entry.scheduleId);
+    if (error) {
+      toast.error(error.message || "Không bỏ qua được");
+      return;
+    }
+    setPaymentGroups(prev => prev.filter(g => g.paymentId !== paymentId));
+    toast.success("Đã bỏ qua kỳ này");
+  }, [todayStr]);
+
   const openReminder = useCallback((entry: PaymentEntry) => {
     if (!canAddExpense) {
       toast.error("Không thể ghi chi tiêu trước ngày hôm nay");

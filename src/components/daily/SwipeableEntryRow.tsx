@@ -13,6 +13,7 @@ interface SwipeableEntryRowProps {
   onDelete: () => void;
   onClick: () => void;
   onNameClick?: () => void;
+  onSkip?: () => void;
 }
 
 const ACTION_WIDTH = 88;
@@ -45,6 +46,7 @@ export default function SwipeableEntryRow({
   onDelete,
   onClick,
   onNameClick,
+  onSkip,
 }: SwipeableEntryRowProps) {
   const [offsetX, setOffsetX] = useState(0);
   const [swiping, setSwiping] = useState(false);
@@ -242,7 +244,25 @@ export default function SwipeableEntryRow({
             title={!isPending && isHighValue ? "Giá trị cao" : undefined}
           >
             {isPending ? (
-              <span className="text-xs font-medium text-primary/80">Chưa ghi</span>
+              <span className="flex items-center gap-2">
+                {onSkip && (
+                  <button
+                    type="button"
+                    className="text-[10px] px-2 py-0.5 rounded-full border border-border/60 text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (offsetRef.current !== 0) {
+                        close();
+                        return;
+                      }
+                      onSkip();
+                    }}
+                  >
+                    Bỏ qua
+                  </button>
+                )}
+                <span className="text-xs font-medium text-primary/80">Chưa ghi</span>
+              </span>
             ) : (
               <MoneyLabel
                 amount={amount}

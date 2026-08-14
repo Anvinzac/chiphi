@@ -1177,6 +1177,21 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     if (active instanceof HTMLElement) active.blur();
   }, []);
 
+  const skipReminder = useCallback(async (paymentId: string, entry: PaymentEntry) => {
+    if (!entry.scheduleId) return;
+    const repeat = entry.pendingRepeat ?? "monthly";
+    const { error } = await supabase
+      .from("expense_schedules")
+      .update({ next_due: nextDueFrom(todayStr, repeat), updated_at: new Date().toISOString() })
+      .eq("id", entry.scheduleId);
+    if (error) {
+      toast.error(error.message || "Không bỏ qua được");
+      return;
+    }
+    setPaymentGroups(prev => prev.filter(g => g.paymentId !== paymentId));
+    toast.success("Đã bỏ qua kỳ này");
+  }, [todayStr]);
+
   const openReminder = useCallback((entry: PaymentEntry) => {
     if (!canAddExpense) {
       toast.error("Không thể ghi chi tiêu trước ngày hôm nay");
@@ -1483,13 +1498,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       }}
       onEntryDelete={async (paymentId, entry, index) => {
         if (entry.isPending && entry.scheduleId) {
-          const repeat = entry.pendingRepeat ?? "monthly";
-          await supabase
-            .from("expense_schedules")
-            .update({ next_due: nextDueFrom(todayStr, repeat), updated_at: new Date().toISOString() })
-            .eq("id", entry.scheduleId);
-          setPaymentGroups(prev => prev.filter(g => g.paymentId !== paymentId));
-          toast.success("Đã bỏ nhắc lần này");
+          await skipReminder(paymentId, entry);
           return;
         }
         if (entry.sub_payment_id && !isMockPaymentId(paymentId)) {
@@ -1503,6 +1512,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
         setDayTotal(prev => prev - entry.amount);
         toast.success("Deleted");
       }}
+      onEntrySkip={skipReminder}
     />
   );
 
@@ -1663,13 +1673,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                         }}
                         onDelete={async () => {
                           if (item.entry.isPending && item.entry.scheduleId) {
-                            const repeat = item.entry.pendingRepeat ?? "monthly";
-                            await supabase
-                              .from("expense_schedules")
-                              .update({ next_due: nextDueFrom(todayStr, repeat), updated_at: new Date().toISOString() })
-                              .eq("id", item.entry.scheduleId);
-                            setPaymentGroups(prev => prev.filter(g => g.paymentId !== item.paymentId));
-                            toast.success("Đã bỏ nhắc lần này");
+                            await skipReminder(item.paymentId, item.entry);
                             return;
                           }
                           if (item.entry.sub_payment_id && !isMockPaymentId(item.paymentId)) {
@@ -1687,6 +1691,9 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                           setDayTotal(prev => prev - item.entry.amount);
                           toast.success("Deleted");
                         }}
+                        onSkip={item.entry.isPending && item.entry.scheduleId
+                          ? () => skipReminder(item.paymentId, item.entry)
+                          : undefined}
                       />
                     ))}
                   </DaySection>

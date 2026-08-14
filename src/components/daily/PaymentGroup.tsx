@@ -35,6 +35,7 @@ interface PaymentGroupProps {
   onEntryClick: (entry: PaymentEntry) => void;
   onEntryNameClick?: (entry: PaymentEntry) => void;
   onEntryDelete: (paymentId: string, entry: PaymentEntry, index: number) => void;
+  onEntrySkip?: (paymentId: string, entry: PaymentEntry) => void;
 }
 
 export default function PaymentGroup({
@@ -45,6 +46,7 @@ export default function PaymentGroup({
   onEntryClick,
   onEntryNameClick,
   onEntryDelete,
+  onEntrySkip,
 }: PaymentGroupProps) {
   const [expanded, setExpanded] = useState(true);
   const hasSupplier = Boolean(group.supplierName?.trim());
@@ -62,6 +64,11 @@ export default function PaymentGroup({
       onClick={() => onEntryClick(entry)}
       onNameClick={onEntryNameClick ? () => onEntryNameClick(entry) : undefined}
       onDelete={() => onEntryDelete(group.paymentId, entry, i)}
+      onSkip={
+        entry.isPending && entry.scheduleId && onEntrySkip
+          ? () => onEntrySkip(group.paymentId, entry)
+          : undefined
+      }
     />
   ));
 

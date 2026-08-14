@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowLeft, Palette, FormInput, Store } from "lucide-react";
+import { ArrowLeft, Palette, FormInput, Store, Bell } from "lucide-react";
 
 export default function Settings() {
   return (
@@ -30,6 +30,19 @@ export default function Settings() {
             <h2 className="text-sm font-semibold text-foreground">Nhà cung cấp</h2>
             <p className="text-xs leading-relaxed text-muted-foreground">
               Thêm, sửa vendor mặc định và thường dùng khi ghi chi tiêu.
+            </p>
+          </div>
+        </Link>
+
+        <Link
+          to="/reminders"
+          className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card p-4 transition-colors hover:border-primary/30"
+        >
+          <Bell className="h-4 w-4 text-primary shrink-0" />
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-foreground">Lịch nhắc</h2>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Tạo chi tiêu định kỳ và xem ngày nhắc tiếp theo.
             </p>
           </div>
         </Link>

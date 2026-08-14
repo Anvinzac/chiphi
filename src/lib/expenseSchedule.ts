@@ -45,11 +45,17 @@ export function nextDueFrom(dateStr: string, repeat: Exclude<ScheduleRepeat, "no
   return format(addMonths(d, 1), "yyyy-MM-dd");
 }
 
-export function scheduleMetaFromDate(dateStr: string, repeat: Exclude<ScheduleRepeat, "none">) {
+export function scheduleAnchorFromDate(dateStr: string) {
   const d = parseISO(dateStr);
   return {
     weekday: getDay(d),
     month_day: getDate(d),
+  };
+}
+
+export function scheduleMetaFromDate(dateStr: string, repeat: Exclude<ScheduleRepeat, "none">) {
+  return {
+    ...scheduleAnchorFromDate(dateStr),
     next_due: nextDueFrom(dateStr, repeat),
   };
 }
@@ -72,6 +78,14 @@ export function isReminderPaymentId(id: string) {
 
 export function reminderPaymentId(scheduleId: string) {
   return `remind-${scheduleId}`;
+}
+
+export const REPEAT_OPTIONS = SCHEDULE_OPTIONS.filter(
+  (o): o is { id: Exclude<ScheduleRepeat, "none">; label: string; hint: string } => o.id !== "none",
+);
+
+export function scheduleRepeatLabel(repeat?: string | null) {
+  return SCHEDULE_OPTIONS.find(o => o.id === repeat)?.label ?? "Lặp lại";
 }
 
 export function paymentMethodLabel(id?: string | null, note?: string | null) {

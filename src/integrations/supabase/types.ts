@@ -38,6 +38,95 @@ export type Database = {
         }
         Relationships: []
       }
+      expense_schedules: {
+        Row: {
+          active: boolean
+          category_id: string | null
+          created_at: string
+          id: string
+          item_id: string | null
+          item_name: string
+          last_amount: number
+          month_day: number | null
+          next_due: string
+          payment_method: string
+          payment_method_note: string | null
+          repeat: string
+          sub_category_id: string | null
+          supplier_id: string | null
+          updated_at: string
+          user_id: string
+          weekday: number | null
+        }
+        Insert: {
+          active?: boolean
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          item_id?: string | null
+          item_name: string
+          last_amount?: number
+          month_day?: number | null
+          next_due: string
+          payment_method?: string
+          payment_method_note?: string | null
+          repeat: string
+          sub_category_id?: string | null
+          supplier_id?: string | null
+          updated_at?: string
+          user_id: string
+          weekday?: number | null
+        }
+        Update: {
+          active?: boolean
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          item_id?: string | null
+          item_name?: string
+          last_amount?: number
+          month_day?: number | null
+          next_due?: string
+          payment_method?: string
+          payment_method_note?: string | null
+          repeat?: string
+          sub_category_id?: string | null
+          supplier_id?: string | null
+          updated_at?: string
+          user_id?: string
+          weekday?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_schedules_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_schedules_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_schedules_sub_category_id_fkey"
+            columns: ["sub_category_id"]
+            isOneToOne: false
+            referencedRelation: "sub_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_schedules_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expense_span_installments: {
         Row: {
           amount: number
@@ -525,6 +614,8 @@ export type Database = {
           item_name: string
           notes: string | null
           payment_id: string
+          payment_method: string
+          payment_method_note: string | null
           quantity: number
           sub_category_id: string | null
           sub_sub_category_id: string | null
@@ -541,6 +632,8 @@ export type Database = {
           item_name: string
           notes?: string | null
           payment_id: string
+          payment_method?: string
+          payment_method_note?: string | null
           quantity?: number
           sub_category_id?: string | null
           sub_sub_category_id?: string | null
@@ -557,6 +650,8 @@ export type Database = {
           item_name?: string
           notes?: string | null
           payment_id?: string
+          payment_method?: string
+          payment_method_note?: string | null
           quantity?: number
           sub_category_id?: string | null
           sub_sub_category_id?: string | null

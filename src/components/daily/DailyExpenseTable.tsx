@@ -1676,10 +1676,6 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                             await skipReminder(item.paymentId, item.entry);
                             return;
                           }
-                        }}
-                        onSkip={item.entry.isPending && item.entry.scheduleId
-                          ? () => skipReminder(item.paymentId, item.entry)
-                          : undefined}
                           if (item.entry.sub_payment_id && !isMockPaymentId(item.paymentId)) {
                             await supabase.from("sub_payments").delete().eq("id", item.entry.sub_payment_id);
                           }
@@ -1695,6 +1691,9 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                           setDayTotal(prev => prev - item.entry.amount);
                           toast.success("Deleted");
                         }}
+                        onSkip={item.entry.isPending && item.entry.scheduleId
+                          ? () => skipReminder(item.paymentId, item.entry)
+                          : undefined}
                       />
                     ))}
                   </DaySection>

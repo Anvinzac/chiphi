@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import MoneyLabel from "./MoneyLabel";
+import { useSnapPagerHeight } from "@/hooks/useSnapPagerHeight";
 import { formatDayMonth } from "@/lib/formatDateVi";
 
 export interface WeekPage<T> {
@@ -17,13 +18,15 @@ interface WeekPagerProps<T> {
 
 /** Each ISO week (Mon–Sun) becomes its own horizontally swipeable page. */
 export default function WeekPager<T>({ weeks, renderSection }: WeekPagerProps<T>) {
-  const scrollerRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
+  const pagesKey = weeks.map(week => week.key).join("|");
+  const { scrollerRef, bindPageRef, applyHeight } = useSnapPagerHeight(weeks.length, pagesKey);
 
   useEffect(() => {
     setActive(0);
     scrollerRef.current?.scrollTo({ left: 0 });
-  }, [weeks.length, weeks[0]?.key]);
+    applyHeight();
+  }, [weeks.length, weeks[0]?.key, applyHeight]);
 
   const settleActive = () => {
     const el = scrollerRef.current;
@@ -33,6 +36,7 @@ export default function WeekPager<T>({ weeks, renderSection }: WeekPagerProps<T>
   };
 
   const onScrollerScroll = () => {
+    applyHeight();
     settleActive();
     window.dispatchEvent(new Event("mise:page-slide"));
   };
@@ -79,10 +83,14 @@ export default function WeekPager<T>({ weeks, renderSection }: WeekPagerProps<T>
         onScroll={onScrollerScroll}
         onTouchEnd={settleActive}
         onTouchStart={(e) => e.stopPropagation()}
-        className="-mx-4 flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain no-scrollbar"
+        className="-mx-4 flex items-start snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain no-scrollbar"
       >
-        {weeks.map(week => (
-          <div key={week.key} className="w-full shrink-0 snap-center px-4">
+        {weeks.map((week, i) => (
+          <div
+            key={week.key}
+            ref={node => bindPageRef(i, node)}
+            className="w-full shrink-0 snap-center px-4"
+          >
             <div className="mb-2 flex items-baseline justify-between gap-3 px-0.5">
               <h2 className="font-display text-sm tracking-wide text-muted-foreground">
                 Tuần {formatDayMonth(week.weekStart)} – {formatDayMonth(week.weekEnd)}

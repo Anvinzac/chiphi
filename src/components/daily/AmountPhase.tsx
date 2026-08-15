@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, Check, Pencil, Plus, X } from "lucide-react";
 import type { VerifyData } from "@/types/expense";
 import { focusWithoutScroll } from "@/lib/focusWithoutScroll";
 import ClearFieldButton from "./ClearFieldButton";
+import SaveEditsDialog from "./SaveEditsDialog";
 
 interface MatchInfo {
   itemId: string;
@@ -84,6 +85,9 @@ export default function AmountPhase({
   const amountTrackRef = useRef<HTMLButtonElement>(null);
   const amountMeasureRef = useRef<HTMLSpanElement>(null);
   const [amountFontPx, setAmountFontPx] = useState(36);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const originalEditRef = useRef("");
+  const choiceRef = useRef<"save" | "discard" | null>(null);
 
   const activateAmount = () => {
     setAmountActive(true);
@@ -93,11 +97,27 @@ export default function AmountPhase({
   };
 
   const appendDigit = (digit: string) => {
+    if (confirmOpen) return;
+    if (editingField) {
+      if (chipIsDirty()) {
+        setConfirmOpen(true);
+        return;
+      }
+      setEditingField(null);
+    }
     setAmountActive(true);
     setAmountValue(`${amountValue}${digit}`.replace(/^0+(?=\d)/, ""));
   };
 
   const appendDecimal = () => {
+    if (confirmOpen) return;
+    if (editingField) {
+      if (chipIsDirty()) {
+        setConfirmOpen(true);
+        return;
+      }
+      setEditingField(null);
+    }
     setAmountActive(true);
     if (!amountValue.includes(".")) setAmountValue(amountValue ? `${amountValue}.` : "0.");
   };
@@ -117,6 +137,7 @@ export default function AmountPhase({
       ? String(match[field as keyof MatchInfo] ?? "")
       : String(verifyData?.[field as keyof VerifyData] ?? "");
     setEditValue(current);
+    originalEditRef.current = current;
     setEditingField(field);
     setAmountActive(false);
     setTimeout(() => focusWithoutScroll(editInputRef.current), 50);
@@ -136,6 +157,29 @@ export default function AmountPhase({
       return { ...prev, [editingField]: val };
     });
     setEditingField(null);
+  };
+
+  const chipIsDirty = () => {
+    if (editingField === "unitPrice") {
+      return (Number(editValue) || 0) !== (Number(originalEditRef.current) || 0);
+    }
+    return editValue.trim() !== originalEditRef.current.trim();
+  };
+
+  const cancelChipEdit = () => {
+    setEditValue(originalEditRef.current);
+    setEditingField(null);
+    activateAmount();
+  };
+
+  const requestLeaveChip = () => {
+    if (!editingField) return;
+    if (!chipIsDirty()) {
+      setEditingField(null);
+      activateAmount();
+      return;
+    }
+    setConfirmOpen(true);
   };
 
   // Long-press backspace clears the whole amount
@@ -416,6 +460,7 @@ export default function AmountPhase({
               editingField === key ? (
                 <div
                   key={key}
+                  data-chip-edit
                   className="flex items-center gap-1 rounded-xl border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs"
                 >
                   <span className="text-[10px] text-muted-foreground">{label}:</span>
@@ -430,11 +475,15 @@ export default function AmountPhase({
                         activateAmount();
                       }
                       if (e.key === "Escape") {
-                        setEditingField(null);
-                        activateAmount();
+                        e.preventDefault();
+                        requestLeaveChip();
                       }
                     }}
-                    onBlur={commitEdit}
+                    onBlur={e => {
+                      const next = e.relatedTarget as Node | null;
+                      if (e.currentTarget.closest("[data-chip-edit]")?.contains(next)) return;
+                      requestLeaveChip();
+                    }}
                     aria-label={`Sửa ${label}`}
                   />
                   <ClearFieldButton
@@ -549,6 +598,25 @@ export default function AmountPhase({
           </button>
         </div>
       </div>
+      <SaveEditsDialog
+        open={confirmOpen}
+        onOpenChange={(next) => {
+          setConfirmOpen(next);
+          if (!next && choiceRef.current == null) {
+            requestAnimationFrame(() => focusWithoutScroll(editInputRef.current));
+          }
+          choiceRef.current = null;
+        }}
+        onSave={() => {
+          choiceRef.current = "save";
+          commitEdit();
+          activateAmount();
+        }}
+        onDiscard={() => {
+          choiceRef.current = "discard";
+          cancelChipEdit();
+        }}
+      />
     </div>
   );
 }

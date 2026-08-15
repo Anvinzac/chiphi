@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,8 @@ import { Pencil, Check, History } from "lucide-react";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from "date-fns";
 import MoneyLabel from "./MoneyLabel";
 import ClearFieldButton from "./ClearFieldButton";
+import SaveEditsDialog from "./SaveEditsDialog";
+import { thousandsFromVnd, vndFromThousands } from "@/lib/vndThousands";
 
 interface PurchaseDetailDialogProps {
   open: boolean;
@@ -55,11 +57,57 @@ export default function PurchaseDetailDialog({
   const [historyPeriod, setHistoryPeriod] = useState("week");
   const [historyGroups, setHistoryGroups] = useState<PeriodGroup[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const pendingCloseRef = useRef(false);
+  const editBoxRef = useRef<HTMLDivElement>(null);
+
+  const editedAmount = vndFromThousands(editAmount);
+  const isDirty =
+    !!entry &&
+    !!editingField &&
+    (editingField === "name"
+      ? editName.trim() !== entry.item_name
+      : editedAmount !== entry.amount);
+
+  const revertEdits = () => {
+    if (!entry) return;
+    setEditName(entry.item_name);
+    setEditAmount(thousandsFromVnd(entry.amount));
+    setEditingField(null);
+  };
+
+  const requestDismiss = (closeDialog: boolean) => {
+    if (!editingField) {
+      if (closeDialog) onOpenChange(false);
+      return;
+    }
+    if (!isDirty) {
+      setEditingField(null);
+      if (closeDialog) onOpenChange(false);
+      return;
+    }
+    pendingCloseRef.current = closeDialog;
+    setConfirmOpen(true);
+  };
+
+  const discardEdits = () => {
+    const closeDialog = pendingCloseRef.current;
+    pendingCloseRef.current = false;
+    setConfirmOpen(false);
+    revertEdits();
+    if (closeDialog) onOpenChange(false);
+  };
+
+  const saveEdits = () => {
+    pendingCloseRef.current = false;
+    setConfirmOpen(false);
+    handleSave();
+  };
 
   useEffect(() => {
     if (entry) {
       setEditName(entry.item_name);
-      setEditAmount(String(entry.amount));
+      setEditAmount(thousandsFromVnd(entry.amount));
       setView("details");
       setEditingField(null);
     }
@@ -138,7 +186,7 @@ export default function PurchaseDetailDialog({
     if (!entry?.sub_payment_id || !onSave) return;
     onSave(entry.sub_payment_id, {
       item_name: editName,
-      amount: Number(editAmount) || entry.amount,
+      amount: vndFromThousands(editAmount) || entry.amount,
     });
     setEditingField(null);
   };
@@ -146,8 +194,44 @@ export default function PurchaseDetailDialog({
   if (!entry) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[92vw] rounded-xl sm:max-w-md">
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (next) onOpenChange(true);
+        else requestDismiss(true);
+      }}
+    >
+      <DialogContent
+        className="max-w-[92vw] rounded-xl sm:max-w-md"
+        onPointerDownCapture={(e) => {
+          if (!editingField || confirmOpen) return;
+          if (editBoxRef.current?.contains(e.target as Node)) return;
+          const closeBtn = (e.target as HTMLElement).closest("button.absolute");
+          if (isDirty) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          requestDismiss(!!closeBtn);
+        }}
+        onPointerDownOutside={(e) => {
+          if (confirmOpen) return;
+          if (!editingField && !isDirty) return;
+          e.preventDefault();
+          requestDismiss(true);
+        }}
+        onEscapeKeyDown={(e) => {
+          if (confirmOpen) return;
+          if (!editingField && !isDirty) return;
+          e.preventDefault();
+          requestDismiss(true);
+        }}
+        onInteractOutside={(e) => {
+          if (confirmOpen) return;
+          if (!editingField && !isDirty) return;
+          e.preventDefault();
+          requestDismiss(true);
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="font-display text-lg">{entry.item_name}</DialogTitle>
         </DialogHeader>
@@ -180,7 +264,7 @@ export default function PurchaseDetailDialog({
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs text-muted-foreground min-w-[70px]">Name</span>
               {editingField === "name" ? (
-                <div className="flex items-center gap-1.5 flex-1">
+                <div ref={editBoxRef} className="flex items-center gap-1.5 flex-1">
                   <div className="relative flex-1">
                     <Input
                       autoFocus
@@ -215,16 +299,19 @@ export default function PurchaseDetailDialog({
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs text-muted-foreground min-w-[70px]">Amount</span>
               {editingField === "amount" ? (
-                <div className="flex items-center gap-1.5 flex-1">
+                <div ref={editBoxRef} className="flex items-center gap-1.5 flex-1">
                   <div className="relative flex-1">
                     <Input
                       autoFocus
-                      type="number"
-                      className="h-8 text-sm pr-8"
+                      inputMode="decimal"
+                      className="h-8 text-sm pr-14"
                       value={editAmount}
-                      onChange={(e) => setEditAmount(e.target.value)}
+                      onChange={(e) => setEditAmount(e.target.value.replace(/[^\d.]/g, ""))}
                       onKeyDown={(e) => e.key === "Enter" && handleSave()}
                     />
+                    <span className="pointer-events-none absolute right-8 top-1/2 -translate-y-1/2 text-[10px] tabular-nums text-muted-foreground/70">
+                      .000
+                    </span>
                     <ClearFieldButton
                       visible={editAmount.length > 0}
                       size="sm"
@@ -239,7 +326,7 @@ export default function PurchaseDetailDialog({
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5 flex-1 justify-end">
-                  <MoneyLabel amount={Number(editAmount)} className="text-sm font-display" smallClassName="text-[0.75em]" suffix="" />
+                  <MoneyLabel amount={entry.amount} className="text-sm font-display" smallClassName="text-[0.75em]" suffix="" />
                   <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => setEditingField("amount")}>
                     <Pencil className="h-3 w-3" />
                   </Button>
@@ -304,6 +391,15 @@ export default function PurchaseDetailDialog({
           </div>
         )}
       </DialogContent>
+      <SaveEditsDialog
+        open={confirmOpen}
+        onOpenChange={(next) => {
+          setConfirmOpen(next);
+          if (!next) pendingCloseRef.current = false;
+        }}
+        onSave={saveEdits}
+        onDiscard={discardEdits}
+      />
     </Dialog>
   );
 }

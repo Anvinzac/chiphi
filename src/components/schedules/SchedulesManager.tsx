@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import MoneyLabel from "@/components/daily/MoneyLabel";
 import { formatDayMonth } from "@/lib/formatDateVi";
+import { thousandsFromVnd, vndFromThousands } from "@/lib/vndThousands";
 import {
   REPEAT_OPTIONS,
   scheduleAnchorFromDate,
@@ -31,16 +32,6 @@ function dueLabel(nextDue: string) {
   } catch {
     return formatDayMonth(parseISO(nextDue));
   }
-}
-
-function thousandsFromVnd(amount: number) {
-  if (!amount) return "";
-  return String(Math.round(amount / 1000));
-}
-
-function vndFromThousands(raw: string) {
-  const n = Number(raw.replace(/[^\d.]/g, ""));
-  return Number.isFinite(n) && n > 0 ? Math.round(n * 1000) : 0;
 }
 
 export default function SchedulesManager({ userId }: SchedulesManagerProps) {

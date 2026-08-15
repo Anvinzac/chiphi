@@ -36,6 +36,8 @@ import { formatDayMonth, formatDayMonthRange } from "@/lib/formatDateVi";
 import { applyDueExpenseSpans, createExpenseSpan } from "@/lib/applyExpenseSpans";
 import { SPAN_PRESETS, splitAmountAcrossPeriods, type SpanPresetKey } from "@/lib/expenseSpan";
 import { QUICK_CATEGORY_DETAILS, type CategoryFrequency } from "@/lib/categoryVisuals";
+import { getAmountDefault, setAmountDefault } from "@/lib/expenseAmountDefaults";
+import { thousandsFromVnd } from "@/lib/vndThousands";
 import {
   isReminderPaymentId,
   nextDueFrom,
@@ -192,6 +194,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   const [detailOpen, setDetailOpen] = useState(false);
   const [nameFilter, setNameFilter] = useState<string | null>(null);
   const [spanEnabled, setSpanEnabled] = useState(false);
+  const [rememberAmount, setRememberAmount] = useState(false);
   const [spanPreset, setSpanPreset] = useState<SpanPresetKey>("3m");
   const [spanCustomPeriods, setSpanCustomPeriods] = useState("3");
   const [dataTick, setDataTick] = useState(0);
@@ -663,6 +666,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     setMatch(null);
     setVerifyData(null);
     setSpanEnabled(false);
+    setRememberAmount(false);
     setSpanPreset("3m");
     setSpanCustomPeriods("3");
     setScheduleRepeat("none");
@@ -697,6 +701,15 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     return items.find(i => i.name.toLowerCase() === lower) ||
       items.find(i => i.name.toLowerCase().includes(lower));
   }, [items]);
+
+  const defaultsUserId = user?.id ?? (isDemo ? "demo" : "local");
+
+  const applyKnownAmount = useCallback((name: string, fallbackVnd?: number) => {
+    const saved = getAmountDefault(defaultsUserId, name);
+    setRememberAmount(saved != null);
+    const vnd = saved ?? fallbackVnd ?? 0;
+    if (vnd > 0) setAmountValue(thousandsFromVnd(vnd));
+  }, [defaultsUserId]);
 
   const getCategoryName = useCallback((catId: string | null) => {
     if (!catId) return undefined;
@@ -761,7 +774,8 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       categoryId: categoryId ?? undefined,
     });
     setPhase("amount");
-  }, [user, categories]);
+    applyKnownAmount(itemLabel);
+  }, [user, categories, applyKnownAmount]);
 
   const handleNameConfirm = useCallback(() => {
     if (!nameValue.trim()) return;
@@ -803,7 +817,8 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       setVerifyData(null);
       setPhase("amount");
     }
-  }, [nameValue, findItem, categories, subCategories, suppliers]);
+    applyKnownAmount(nameValue.trim());
+  }, [nameValue, findItem, categories, subCategories, suppliers, applyKnownAmount]);
   handleNameConfirmRef.current = handleNameConfirm;
 
 
@@ -838,6 +853,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
           setMatch(null);
           setVerifyData(null);
           setSpanEnabled(false);
+          setRememberAmount(false);
           setSpanPreset("3m");
           setSpanCustomPeriods("3");
           setScheduleRepeat("none");
@@ -851,6 +867,11 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
           pagerReadyRef.current = false;
         }, 300);
       }, 600);
+    };
+
+    const persistRememberedAmount = () => {
+      const savedName = nameValue.trim();
+      if (savedName) setAmountDefault(defaultsUserId, savedName, rememberAmount ? amount : null);
     };
 
     try {
@@ -886,6 +907,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
           }
           toast.success(`Đã ghi kỳ 1/${result.periodCount}`);
           setDataTick(t => t + 1);
+          persistRememberedAmount();
           finishUi();
         } catch (err: any) {
           toast.error(err.message || "Lưu chia kỳ thất bại — đã chạy migration chưa?");
@@ -934,6 +956,8 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
         toast.error(error.message || "Lưu thất bại");
         return;
       }
+
+      persistRememberedAmount();
 
       if (receiptFile && pid) {
         try {
@@ -1048,7 +1072,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     expenseDate, todayStr, periodIsFuture, viewMode, collapseCard,
     spanEnabled, spanPreset, spanCustomPeriods,
     paymentMethod, paymentMethodNote, receiptFile, scheduleRepeat,
-    completingScheduleId, completingRepeat,
+    completingScheduleId, completingRepeat, rememberAmount, defaultsUserId,
   ]);
 
   const handleNameKeyDown = (e: React.KeyboardEvent) => {
@@ -1148,6 +1172,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     setVerifyData(null);
     setPhase("name");
     setSpanEnabled(false);
+    setRememberAmount(false);
     setSpanPreset("3m");
     setSpanCustomPeriods("3");
     setScheduleRepeat("none");
@@ -1218,7 +1243,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     setScheduleRepeat(entry.pendingRepeat ?? "monthly");
     setPaymentMethod((entry.paymentMethod as PaymentMethodId) || "cash");
     setNameValue(entry.item_name);
-    setAmountValue("");
+    applyKnownAmount(entry.item_name, entry.amount);
     setNoteValue("");
     setAmountLines([]);
     const cat = categories.find(c => c.id === entry.category_id);
@@ -1249,7 +1274,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     setCardExpanded(true);
     const active = document.activeElement;
     if (active instanceof HTMLElement) active.blur();
-  }, [canAddExpense, categories, suppliers]);
+  }, [canAddExpense, categories, suppliers, applyKnownAmount]);
 
   const applyVendorSelection = useCallback((vendor: { id: string | null; name: string }) => {
     setMatch(prev =>
@@ -2012,6 +2037,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                                   subCategoryId: item.sub_category_id ?? undefined,
                                   supplierId: item.default_supplier_id ?? undefined,
                                 });
+                                applyKnownAmount(item.name);
                                 setPhase("amount");
                               }}
                               className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
@@ -2069,6 +2095,8 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                   <SchedulePhase
                     amountValue={amountValue}
                     lines={amountLines}
+                    rememberAmount={rememberAmount}
+                    setRememberAmount={setRememberAmount}
                     spanEnabled={spanEnabled}
                     setSpanEnabled={setSpanEnabled}
                     spanPreset={spanPreset}

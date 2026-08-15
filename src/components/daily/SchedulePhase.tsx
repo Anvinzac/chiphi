@@ -13,6 +13,8 @@ import MoneyLabel from "./MoneyLabel";
 interface SchedulePhaseProps {
   amountValue: string;
   lines: { amount: string }[];
+  rememberAmount: boolean;
+  setRememberAmount: (v: boolean) => void;
   spanEnabled: boolean;
   setSpanEnabled: (v: boolean) => void;
   spanPreset: SpanPresetKey;
@@ -36,6 +38,8 @@ interface SchedulePhaseProps {
 export default function SchedulePhase({
   amountValue,
   lines,
+  rememberAmount,
+  setRememberAmount,
   spanEnabled,
   setSpanEnabled,
   spanPreset,
@@ -115,6 +119,28 @@ export default function SchedulePhase({
       </div>
 
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain no-scrollbar pb-2">
+        <section>
+          <button
+            type="button"
+            onClick={() => setRememberAmount(!rememberAmount)}
+            className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition-colors ${
+              rememberAmount
+                ? "border-primary/40 bg-primary/10"
+                : "border-border/60 bg-muted/40 hover:bg-muted"
+            }`}
+            aria-pressed={rememberAmount}
+          >
+            <span className="min-w-0">
+              <span className="block text-[11px] font-medium text-foreground">Nhớ số tiền</span>
+              <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                {rememberAmount
+                  ? "Lần sau nhập tên này sẽ điền sẵn"
+                  : "Lưu làm số tiền mặc định lần sau"}
+              </span>
+            </span>
+          </button>
+        </section>
+
         <section className="space-y-1.5">
           <button
             type="button"

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { useSnapPagerHeight } from "@/hooks/useSnapPagerHeight";
 
 export interface OrdersPage<T> {
   key: string;
@@ -19,19 +20,26 @@ export default function OrdersPager<T>({
   renderSection,
   emptyLabel = "Chưa có đơn",
 }: OrdersPagerProps<T>) {
-  const scrollerRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
+  const pagesKey = pages.map(page => page.key).join("|");
+  const { scrollerRef, bindPageRef, applyHeight } = useSnapPagerHeight(pages.length, pagesKey);
 
   useEffect(() => {
     setActive(0);
     scrollerRef.current?.scrollTo({ left: 0 });
-  }, [pages.length, pages[0]?.key]);
+    applyHeight();
+  }, [pages.length, pages[0]?.key, applyHeight]);
 
   const settleActive = () => {
     const el = scrollerRef.current;
     if (!el || el.clientWidth === 0) return;
     const idx = Math.round(el.scrollLeft / el.clientWidth);
     setActive(Math.max(0, Math.min(pages.length - 1, idx)));
+  };
+
+  const onScrollerScroll = () => {
+    applyHeight();
+    settleActive();
   };
 
   const goTo = (idx: number) => {
@@ -72,12 +80,16 @@ export default function OrdersPager<T>({
 
       <div
         ref={scrollerRef}
-        onScroll={settleActive}
+        onScroll={onScrollerScroll}
         onTouchEnd={settleActive}
-        className="-mx-4 flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain no-scrollbar"
+        className="-mx-4 flex items-start snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain no-scrollbar"
       >
-        {pages.map(page => (
-          <div key={page.key} className="w-full shrink-0 snap-center px-4">
+        {pages.map((page, i) => (
+          <div
+            key={page.key}
+            ref={node => bindPageRef(i, node)}
+            className="w-full shrink-0 snap-center px-4"
+          >
             <div className="mb-2 flex items-baseline justify-between gap-3 px-0.5">
               <h2 className="min-w-0 truncate font-display text-sm tracking-wide text-muted-foreground">
                 {page.title}

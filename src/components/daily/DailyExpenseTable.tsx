@@ -38,6 +38,8 @@ import { SPAN_PRESETS, splitAmountAcrossPeriods, type SpanPresetKey } from "@/li
 import { QUICK_CATEGORY_DETAILS, type CategoryFrequency } from "@/lib/categoryVisuals";
 import { getAmountDefault, setAmountDefault } from "@/lib/expenseAmountDefaults";
 import { thousandsFromVnd } from "@/lib/vndThousands";
+import { paymentsWithSubsInRange, readLaggedSnapshot, type SnapshotPayload } from "@/lib/laggedSnapshot";
+import { useLaggedSnapshot } from "@/hooks/useLaggedSnapshot";
 import {
   isReminderPaymentId,
   nextDueFrom,
@@ -132,6 +134,7 @@ interface QuickCategory {
 
 export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTableProps = {}) {
   const { user } = useAuth();
+  const { snapshot, scheduleRefresh } = useLaggedSnapshot();
   const [viewMode, setViewMode] = useState<ViewMode>("range");
   const [periodOffset, setPeriodOffset] = useState(() => getPeriodOffsetForDate(new Date()));
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -308,23 +311,63 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   useEffect(() => {
     if (!user) return;
     const load = async () => {
-      const [itemsRes, catsRes, subsRes, vendors, freqRes, supFreqRes] = await Promise.all([
+      const applySnapshotCatalog = (data: SnapshotPayload) => {
+        setItems(data.items);
+        setCategories(data.categories.map(category => ({
+          id: category.id,
+          name: category.name,
+          frequency: (category.frequency as CategoryFrequency) || "daily",
+        })));
+        setSubCategories(data.sub_categories.map(s => ({
+          id: s.id,
+          name: s.name,
+          category_id: s.category_id,
+        })));
+        setSuppliers(data.suppliers.map(v => ({ id: v.id, name: v.name, contact: v.contact })));
+        const itemFreq: Record<string, number> = {};
+        const supFreq: Record<string, number> = {};
+        for (const row of data.sub_payments) {
+          if (row.item_id) itemFreq[row.item_id] = (itemFreq[row.item_id] || 0) + 1;
+          if (row.supplier_id) supFreq[row.supplier_id] = (supFreq[row.supplier_id] || 0) + 1;
+        }
+        setItemFrequency(itemFreq);
+        setSupplierFrequency(supFreq);
+      };
+
+      const [itemsRes, catsRes, subsRes, freqRes, supFreqRes] = await Promise.all([
         supabase.from("items").select("*").eq("user_id", user.id),
         supabase.from("categories").select("id, name, frequency").eq("user_id", user.id),
         supabase.from("sub_categories").select("id, name, category_id").eq("user_id", user.id),
-        ensureMockVendors(user.id).catch(() => [] as { id: string; name: string; contact: string | null }[]),
         supabase.from("sub_payments").select("item_id").eq("user_id", user.id).not("item_id", "is", null),
         supabase.from("sub_payments").select("supplier_id").eq("user_id", user.id).not("supplier_id", "is", null),
       ]);
-      if (itemsRes.data) setItems(itemsRes.data);
-      if (catsRes.data) {
-        setCategories(catsRes.data.map(category => ({
-          ...category,
-          frequency: (category.frequency as CategoryFrequency) || "daily",
-        })));
+      let vendors: { id: string; name: string; contact: string | null }[] = [];
+      try {
+        vendors = await ensureMockVendors(user.id);
+      } catch {
+        vendors = [];
       }
+
+      if (itemsRes.error || catsRes.error || !itemsRes.data || !catsRes.data) {
+        const lagged = snapshot ?? (await readLaggedSnapshot(user.id))?.data ?? null;
+        if (lagged) applySnapshotCatalog(lagged);
+        return;
+      }
+
+      if (itemsRes.data) setItems(itemsRes.data);
+      setCategories(catsRes.data.map(category => ({
+        ...category,
+        frequency: (category.frequency as CategoryFrequency) || "daily",
+      })));
       if (subsRes.data) setSubCategories(subsRes.data);
-      setSuppliers(vendors.map(v => ({ id: v.id, name: v.name, contact: v.contact })));
+      if (vendors.length > 0) {
+        setSuppliers(vendors.map(v => ({ id: v.id, name: v.name, contact: v.contact })));
+      } else {
+        const lagged = snapshot ?? (await readLaggedSnapshot(user.id))?.data ?? null;
+        if (lagged?.suppliers.length) {
+          setSuppliers(lagged.suppliers.map(v => ({ id: v.id, name: v.name, contact: v.contact })));
+        }
+      }
       if (freqRes.data) {
         const freq: Record<string, number> = {};
         freqRes.data.forEach((r: { item_id: string | null }) => {
@@ -341,7 +384,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       }
     };
     load();
-  }, [user]);
+  }, [user, snapshot]);
 
   // Load data for selected date or range — show cache immediately, refresh in background
   useEffect(() => {
@@ -396,9 +439,12 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
 
       if (loadId !== paymentsLoadIdRef.current) return;
 
+      const rangeStart = viewMode === "daily" ? selectedDate : periodStartStr;
+      const rangeEnd = viewMode === "daily" ? selectedDate : periodEndStr;
+
       let query = supabase
         .from("payments")
-        .select("id, date, total_amount, supplier_id, sub_payments(id, item_name, amount, category_id, supplier_id, notes)")
+        .select("id, date, total_amount, supplier_id, created_at, sub_payments(id, item_name, amount, category_id, supplier_id, notes)")
         .eq("user_id", user.id)
         .order("created_at", { ascending: true });
 
@@ -408,11 +454,28 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
         query = query.gte("date", periodStartStr).lte("date", periodEndStr);
       }
 
-      const { data: payments } = await query;
+      const { data: livePayments, error: paymentsError } = await query;
       if (loadId !== paymentsLoadIdRef.current) return;
 
-      const rangeStart = viewMode === "daily" ? selectedDate : periodStartStr;
-      const rangeEnd = viewMode === "daily" ? selectedDate : periodEndStr;
+      let payments: {
+        id: string;
+        date: string;
+        supplier_id: string | null;
+        sub_payments: {
+          id: string;
+          item_name: string;
+          amount: number;
+          category_id: string | null;
+          supplier_id: string | null;
+          notes: string | null;
+        }[] | null;
+      }[] | null = livePayments;
+
+      if (paymentsError || payments == null) {
+        const lagged = snapshot ?? (await readLaggedSnapshot(user.id))?.data ?? null;
+        payments = lagged ? paymentsWithSubsInRange(lagged, rangeStart, rangeEnd) : [];
+      }
+
       let dueSchedules: ExpenseScheduleRow[] = [];
       try {
         const { data: scheds, error: schedErr } = await supabase
@@ -424,9 +487,19 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
           dueSchedules = (scheds as ExpenseScheduleRow[]).filter(s =>
             reminderDisplayDate(s.next_due, rangeStart, rangeEnd, todayStr),
           );
+        } else if (schedErr) {
+          const lagged = snapshot ?? (await readLaggedSnapshot(user.id))?.data ?? null;
+          dueSchedules = ((lagged?.expense_schedules ?? []) as ExpenseScheduleRow[])
+            .filter(s => s.active)
+            .filter(s => reminderDisplayDate(s.next_due, rangeStart, rangeEnd, todayStr));
         }
       } catch {
-        /* table may not exist until migration */
+        const lagged = snapshot ?? (await readLaggedSnapshot(user.id))?.data ?? null;
+        if (lagged) {
+          dueSchedules = (lagged.expense_schedules as ExpenseScheduleRow[])
+            .filter(s => s.active)
+            .filter(s => reminderDisplayDate(s.next_due, rangeStart, rangeEnd, todayStr));
+        }
       }
 
       if (loadId !== paymentsLoadIdRef.current) return;
@@ -528,7 +601,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       }
     };
     loadPayments();
-  }, [user, selectedDate, viewMode, periodStartStr, periodEndStr, todayStr, dataTick, paymentsKey]);
+  }, [user, selectedDate, viewMode, periodStartStr, periodEndStr, todayStr, dataTick, paymentsKey, snapshot]);
 
   // Lock page scroll while the add panel is open (stops iOS jump-to-bottom on focus)
   useEffect(() => {
@@ -840,6 +913,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     setSaving(true);
 
     const finishUi = () => {
+      scheduleRefresh();
       setPhase("done");
       setJustSaved(true);
       setTimeout(() => {
@@ -1072,7 +1146,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     expenseDate, todayStr, periodIsFuture, viewMode, collapseCard,
     spanEnabled, spanPreset, spanCustomPeriods,
     paymentMethod, paymentMethodNote, receiptFile, scheduleRepeat,
-    completingScheduleId, completingRepeat, rememberAmount, defaultsUserId,
+    completingScheduleId, completingRepeat, rememberAmount, defaultsUserId, scheduleRefresh,
   ]);
 
   const handleNameKeyDown = (e: React.KeyboardEvent) => {

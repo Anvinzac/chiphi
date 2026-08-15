@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft, Store } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import SnapshotBanner from "@/components/SnapshotBanner";
 import VendorsManager from "@/components/vendors/VendorsManager";
 
 export default function Vendors() {
@@ -34,6 +35,8 @@ export default function Vendors() {
           </Link>
         </div>
       </div>
+
+      <SnapshotBanner />
 
       <div className="mx-auto max-w-lg px-4 py-6">
         {user ? (

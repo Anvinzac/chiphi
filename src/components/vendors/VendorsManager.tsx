@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ensureMockVendors, type VendorRow } from "@/lib/mockVendors";
+import { readLaggedSnapshot } from "@/lib/laggedSnapshot";
 
 interface VendorsManagerProps {
   userId: string;
@@ -43,7 +44,19 @@ export default function VendorsManager({
       const rows = await ensureMockVendors(userId);
       publish(rows);
     } catch (err: any) {
-      toast.error(err?.message || "Không tải được nhà cung cấp");
+      const lagged = await readLaggedSnapshot(userId);
+      if (lagged?.data.suppliers.length) {
+        publish(
+          lagged.data.suppliers.map(s => ({
+            id: s.id,
+            name: s.name,
+            contact: s.contact,
+            notes: s.notes,
+          })),
+        );
+      } else {
+        toast.error(err?.message || "Không tải được nhà cung cấp");
+      }
     } finally {
       setLoading(false);
     }

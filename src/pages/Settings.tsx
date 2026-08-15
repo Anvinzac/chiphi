@@ -1,7 +1,37 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Palette, FormInput, Store, Bell } from "lucide-react";
+import { ArrowLeft, Palette, FormInput, Store, Bell, HardDrive, Download } from "lucide-react";
+import { parseISO } from "date-fns";
+import { toast } from "sonner";
+import SnapshotBanner from "@/components/SnapshotBanner";
+import { useLaggedSnapshot } from "@/hooks/useLaggedSnapshot";
+import { formatDayMonth } from "@/lib/formatDateVi";
+import type { SnapshotMeta } from "@/lib/laggedSnapshot";
+
+function metaLine(meta: SnapshotMeta | null, empty: string) {
+  if (!meta) return empty;
+  let when = meta.localDate;
+  try {
+    when = formatDayMonth(parseISO(meta.localDate));
+  } catch {
+    /* keep iso */
+  }
+  return `${when} · ${meta.payments} chi tiêu · ${meta.orders} đơn`;
+}
 
 export default function Settings() {
+  const { todayMeta, yesterdayMeta, refresh, downloadSlot } = useLaggedSnapshot();
+  const [saving, setSaving] = useState(false);
+
+  const backupNow = async () => {
+    if (saving) return;
+    setSaving(true);
+    const ok = await refresh();
+    setSaving(false);
+    if (ok) toast.success("Đã cập nhật bản sao trên máy");
+    else toast.error("Không sao lưu được — kiểm tra kết nối");
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="sticky top-0 z-10 border-b border-border/60 bg-background/95 px-4 py-3 backdrop-blur-sm">
@@ -19,6 +49,8 @@ export default function Settings() {
           </div>
         </div>
       </div>
+
+      <SnapshotBanner />
 
       <div className="mx-auto max-w-lg space-y-4 px-4 py-6">
         <Link
@@ -46,6 +78,54 @@ export default function Settings() {
             </p>
           </div>
         </Link>
+
+        <section className="rounded-2xl border border-border/60 bg-card p-4 space-y-3">
+          <div className="flex items-center gap-2 text-foreground">
+            <HardDrive className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold">Bản sao trên máy</h2>
+          </div>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            JSON lưu trên thiết bị này. Bản “hôm qua” không bị ghi đè trong ngày, phòng khi mất kết nối Supabase.
+          </p>
+          <div className="space-y-1.5 text-xs">
+            <p>
+              <span className="text-muted-foreground">Hôm nay · </span>
+              <span className="text-foreground">{metaLine(todayMeta, "Chưa có")}</span>
+            </p>
+            <p>
+              <span className="text-muted-foreground">Một ngày trước · </span>
+              <span className="text-foreground">{metaLine(yesterdayMeta, "Chưa có")}</span>
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={backupNow}
+              disabled={saving}
+              className="rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-40"
+            >
+              {saving ? "Đang sao lưu…" : "Sao lưu ngay"}
+            </button>
+            <button
+              type="button"
+              onClick={() => downloadSlot("today")}
+              disabled={!todayMeta}
+              className="inline-flex items-center gap-1 rounded-full border border-border/70 px-3 py-1.5 text-xs font-medium text-foreground disabled:opacity-40"
+            >
+              <Download className="h-3 w-3" />
+              Tải hôm nay
+            </button>
+            <button
+              type="button"
+              onClick={() => downloadSlot("yesterday")}
+              disabled={!yesterdayMeta}
+              className="inline-flex items-center gap-1 rounded-full border border-border/70 px-3 py-1.5 text-xs font-medium text-foreground disabled:opacity-40"
+            >
+              <Download className="h-3 w-3" />
+              Tải hôm qua
+            </button>
+          </div>
+        </section>
 
         <section className="rounded-2xl border border-border/60 bg-card p-4">
           <div className="mb-2 flex items-center gap-2 text-foreground">

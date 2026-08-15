@@ -6,6 +6,8 @@ import { vi } from "date-fns/locale";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useLaggedSnapshot } from "@/hooks/useLaggedSnapshot";
+import SnapshotBanner from "@/components/SnapshotBanner";
 import {
   importOrderCatalogFromSeed,
   ORDER_HUB_CATEGORIES,
@@ -90,6 +92,7 @@ function OrderCard({ order }: { order: OrderRow }) {
 
 export default function Orders() {
   const { user } = useAuth();
+  const { snapshot } = useLaggedSnapshot();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [categories, setCategories] = useState<OrderCategory[]>([]);
@@ -106,7 +109,7 @@ export default function Orders() {
     try {
       await ensureMockOrders(user.id);
     } catch (err: any) {
-      toast.error(err.message || "Không tạo được đơn mẫu");
+      if (!snapshot) toast.error(err.message || "Không tạo được đơn mẫu");
     }
     const [ordersRes, catsRes] = await Promise.all([
       supabase
@@ -120,8 +123,30 @@ export default function Orders() {
         .eq("user_id", user.id)
         .order("sort_order", { ascending: true }),
     ]);
-    if (ordersRes.error) toast.error(ordersRes.error.message);
-    else {
+    if (ordersRes.error) {
+      const lagged = snapshot;
+      if (lagged) {
+        const countByOrder = new Map<string, number>();
+        for (const item of lagged.order_items) {
+          countByOrder.set(item.order_id, (countByOrder.get(item.order_id) || 0) + 1);
+        }
+        setOrders(
+          lagged.orders
+            .filter(o => (countByOrder.get(o.id) || 0) > 0)
+            .sort((a, b) => b.created_at.localeCompare(a.created_at))
+            .map(order => ({
+              id: order.id,
+              title: order.title,
+              status: order.status,
+              created_at: order.created_at,
+              updated_at: order.updated_at,
+              itemCount: countByOrder.get(order.id) || 0,
+            })),
+        );
+      } else {
+        toast.error(ordersRes.error.message);
+      }
+    } else {
       const raw = (ordersRes.data as (Omit<OrderRow, "itemCount"> & { order_items?: { id: string }[] })[]) || [];
       const emptyIds = raw.filter(o => !(o.order_items && o.order_items.length > 0)).map(o => o.id);
       if (emptyIds.length > 0) {
@@ -136,10 +161,22 @@ export default function Orders() {
           })),
       );
     }
-    if (catsRes.error) toast.error(catsRes.error.message);
-    else setCategories((catsRes.data as OrderCategory[]) || []);
+    if (catsRes.error) {
+      if (snapshot?.order_categories.length) {
+        setCategories(
+          snapshot.order_categories.map(c => ({
+            id: c.id,
+            name: c.name,
+            source_key: c.source_key,
+            sort_order: c.sort_order,
+          })),
+        );
+      } else {
+        toast.error(catsRes.error.message);
+      }
+    } else setCategories((catsRes.data as OrderCategory[]) || []);
     setLoading(false);
-  }, [user]);
+  }, [user, snapshot]);
 
   useEffect(() => {
     load();
@@ -298,6 +335,8 @@ export default function Orders() {
           </div>
         </div>
       </div>
+
+      <SnapshotBanner />
 
       <div className="mx-auto w-full max-w-lg flex-1 space-y-6 overflow-auto px-4 py-4 pb-10">
         <section className="space-y-3">

@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft, Bell } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import SnapshotBanner from "@/components/SnapshotBanner";
 import SchedulesManager from "@/components/schedules/SchedulesManager";
 
 export default function Reminders() {
@@ -28,6 +29,8 @@ export default function Reminders() {
           </div>
         </div>
       </div>
+
+      <SnapshotBanner />
 
       <div className="mx-auto max-w-lg px-4 py-6">
         {user ? (

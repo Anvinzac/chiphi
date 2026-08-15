@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import MoneyLabel from "@/components/daily/MoneyLabel";
 import { formatDayMonth } from "@/lib/formatDateVi";
 import { thousandsFromVnd, vndFromThousands } from "@/lib/vndThousands";
+import { readLaggedSnapshot } from "@/lib/laggedSnapshot";
 import {
   REPEAT_OPTIONS,
   scheduleAnchorFromDate,
@@ -62,7 +63,12 @@ export default function SchedulesManager({ userId }: SchedulesManagerProps) {
       if (error) throw error;
       setRows((data ?? []) as ExpenseScheduleRow[]);
     } catch (err: any) {
-      toast.error(err?.message || "Không tải được lịch nhắc");
+      const lagged = await readLaggedSnapshot(userId);
+      if (lagged?.data.expense_schedules?.length) {
+        setRows(lagged.data.expense_schedules as ExpenseScheduleRow[]);
+      } else {
+        toast.error(err?.message || "Không tải được lịch nhắc");
+      }
     } finally {
       setLoading(false);
     }

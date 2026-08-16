@@ -38,7 +38,6 @@ export default function OrdersPager<T>({
   };
 
   const onScrollerScroll = () => {
-    applyHeight();
     settleActive();
   };
 
@@ -81,14 +80,17 @@ export default function OrdersPager<T>({
       <div
         ref={scrollerRef}
         onScroll={onScrollerScroll}
-        onTouchEnd={settleActive}
-        className="-mx-4 flex items-start snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain no-scrollbar"
+        onTouchEnd={() => {
+          settleActive();
+          applyHeight(true);
+        }}
+        className="week-snap-pager -mx-4 items-start"
       >
         {pages.map((page, i) => (
           <div
             key={page.key}
             ref={node => bindPageRef(i, node)}
-            className="w-full shrink-0 snap-center px-4"
+            className="week-snap-page px-4"
           >
             <div className="mb-2 flex items-baseline justify-between gap-3 px-0.5">
               <h2 className="min-w-0 truncate font-display text-sm tracking-wide text-muted-foreground">

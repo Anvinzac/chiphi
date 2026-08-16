@@ -1,9 +1,9 @@
 import { useCallback, useLayoutEffect, useRef } from "react";
 
 /**
- * Keeps a horizontal snap pager as tall as the page in view.
- * Heights interpolate while swiping so shorter pages don't leave a gap
- * sized by the longest sibling.
+ * Keeps a horizontal snap pager as tall as the settled page.
+ * Height is applied after snap, never while the finger is moving — resizing
+ * the scroller mid-swipe makes iOS skip the middle snap point.
  */
 export function useSnapPagerHeight(pageCount: number, pagesKey: string) {
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -15,17 +15,13 @@ export function useSnapPagerHeight(pageCount: number, pagesKey: string) {
     const el = scrollerRef.current;
     if (!el || el.clientWidth === 0 || pageCount === 0) return;
 
-    const heights = heightsRef.current;
-    const progress = el.scrollLeft / el.clientWidth;
-    const last = pageCount - 1;
-    const i = Math.min(Math.max(0, Math.floor(progress)), last);
-    const t = Math.min(1, Math.max(0, progress - i));
-    const from = heights[i];
-    const to = heights[Math.min(i + 1, last)];
-    if (!from) return;
+    const idx = Math.round(el.scrollLeft / el.clientWidth);
+    const i = Math.min(Math.max(0, idx), pageCount - 1);
+    const height = heightsRef.current[i];
+    if (!height) return;
 
     el.style.transition = animate ? "height 180ms ease" : "none";
-    el.style.height = `${to ? from + (to - from) * t : from}px`;
+    el.style.height = `${height}px`;
   }, [pageCount]);
 
   const bindPageRef = useCallback((index: number, node: HTMLDivElement | null) => {
@@ -55,6 +51,14 @@ export function useSnapPagerHeight(pageCount: number, pagesKey: string) {
 
     return () => observers.forEach(ro => ro.disconnect());
   }, [pageCount, pagesKey, applyHeight]);
+
+  useLayoutEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const onEnd = () => applyHeight(true);
+    el.addEventListener("scrollend", onEnd);
+    return () => el.removeEventListener("scrollend", onEnd);
+  }, [applyHeight, pagesKey]);
 
   return { scrollerRef, bindPageRef, applyHeight };
 }

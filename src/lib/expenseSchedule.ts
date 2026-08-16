@@ -60,16 +60,35 @@ export function scheduleMetaFromDate(dateStr: string, repeat: Exclude<ScheduleRe
   };
 }
 
+/**
+ * Show a reminder only after its weekday / month-day has arrived — never as a
+ * preview on a later day this week, next week, or next month.
+ *
+ * Once due, it sits on that calendar day. A missed occurrence whose due day is
+ * off-screen is pinned to today so it is not lost.
+ */
 export function reminderDisplayDate(
   nextDue: string,
   rangeStart: string,
   rangeEnd: string,
   today: string,
 ): string | null {
+  if (nextDue > today) return null;
   if (nextDue >= rangeStart && nextDue <= rangeEnd) return nextDue;
-  // Overdue: pin to today when today is in the visible range
   if (nextDue < today && today >= rangeStart && today <= rangeEnd) return today;
   return null;
+}
+
+/** Newer dates first; within a day, due reminders sit above recorded spend. */
+export function compareGroupsByDateThenReminder(
+  a: { date?: string; paymentId: string },
+  b: { date?: string; paymentId: string },
+) {
+  const dateCmp = (b.date || "").localeCompare(a.date || "");
+  if (dateCmp !== 0) return dateCmp;
+  const aRem = isReminderPaymentId(a.paymentId) ? 0 : 1;
+  const bRem = isReminderPaymentId(b.paymentId) ? 0 : 1;
+  return aRem - bRem;
 }
 
 export function isReminderPaymentId(id: string) {

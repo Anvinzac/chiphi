@@ -1,6 +1,5 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import MoneyLabel from "./MoneyLabel";
-import { useSnapPagerHeight } from "@/hooks/useSnapPagerHeight";
 import { formatDayMonth } from "@/lib/formatDateVi";
 
 export interface WeekPage<T> {
@@ -14,31 +13,24 @@ export interface WeekPage<T> {
 interface WeekPagerProps<T> {
   weeks: WeekPage<T>[];
   renderSection: (section: T) => ReactNode;
+  footer?: ReactNode;
 }
 
 /** Each ISO week (Mon–Sun) becomes its own horizontally swipeable page. */
-export default function WeekPager<T>({ weeks, renderSection }: WeekPagerProps<T>) {
+export default function WeekPager<T>({ weeks, renderSection, footer }: WeekPagerProps<T>) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
-  const pagesKey = weeks.map(week => week.key).join("|");
-  const { scrollerRef, bindPageRef, applyHeight } = useSnapPagerHeight(weeks.length, pagesKey);
 
   useEffect(() => {
     setActive(0);
     scrollerRef.current?.scrollTo({ left: 0 });
-    applyHeight();
-  }, [weeks.length, weeks[0]?.key, applyHeight]);
+  }, [weeks.length, weeks[0]?.key]);
 
   const settleActive = () => {
     const el = scrollerRef.current;
     if (!el || el.clientWidth === 0) return;
     const idx = Math.round(el.scrollLeft / el.clientWidth);
     setActive(Math.max(0, Math.min(weeks.length - 1, idx)));
-  };
-
-  const onScrollerScroll = () => {
-    applyHeight();
-    settleActive();
-    window.dispatchEvent(new Event("mise:page-slide"));
   };
 
   const goTo = (idx: number) => {
@@ -51,10 +43,13 @@ export default function WeekPager<T>({ weeks, renderSection }: WeekPagerProps<T>
   if (weeks.length === 0) return null;
 
   return (
-    <div data-no-double-tap>
-      {/* Sticky page control — stays in view while the list scrolls */}
+    <div
+      className="flex min-h-0 flex-1 flex-col"
+      data-no-double-tap
+      onTouchStart={e => e.stopPropagation()}
+    >
       {weeks.length > 1 && (
-        <div className="sticky top-0 z-20 -mx-1 mb-1 flex items-center justify-center gap-2 bg-background/95 px-1 py-2 backdrop-blur-sm">
+        <div className="flex shrink-0 items-center justify-center gap-2 bg-background/95 px-1 py-2">
           <div className="flex items-center gap-1.5" role="tablist" aria-label="Tuần trong kỳ">
             {weeks.map((week, i) => (
               <button
@@ -80,17 +75,12 @@ export default function WeekPager<T>({ weeks, renderSection }: WeekPagerProps<T>
 
       <div
         ref={scrollerRef}
-        onScroll={onScrollerScroll}
+        onScroll={settleActive}
         onTouchEnd={settleActive}
-        onTouchStart={(e) => e.stopPropagation()}
-        className="-mx-4 flex items-start snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain no-scrollbar"
+        className="week-snap-pager week-snap-pager-fill -mx-4"
       >
-        {weeks.map((week, i) => (
-          <div
-            key={week.key}
-            ref={node => bindPageRef(i, node)}
-            className="w-full shrink-0 snap-center px-4"
-          >
+        {weeks.map(week => (
+          <div key={week.key} className="week-snap-page px-4">
             <div className="mb-2 flex items-baseline justify-between gap-3 px-0.5">
               <h2 className="font-display text-sm tracking-wide text-muted-foreground">
                 Tuần {formatDayMonth(week.weekStart)} – {formatDayMonth(week.weekEnd)}
@@ -102,6 +92,7 @@ export default function WeekPager<T>({ weeks, renderSection }: WeekPagerProps<T>
               />
             </div>
             {week.sections.map(renderSection)}
+            {footer}
           </div>
         ))}
       </div>

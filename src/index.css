@@ -485,6 +485,45 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  /* Full-width week/order pages. snap-stop: always so a fling cannot skip the middle page. */
+  .week-snap-pager {
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .week-snap-pager::-webkit-scrollbar {
+    display: none;
+  }
+
+  .week-snap-page {
+    box-sizing: border-box;
+    flex: 0 0 100%;
+    width: 100%;
+    min-width: 0;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+
+  .week-snap-pager.week-snap-pager-fill {
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .week-snap-pager-fill > .week-snap-page {
+    align-self: stretch;
+    height: auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .reminder-row {
     background-image: linear-gradient(115deg, hsl(32 48% 92%) 0%, hsl(188 32% 91%) 52%, hsl(262 22% 93%) 100%);
     border-bottom-color: hsl(32 30% 80% / 0.45);

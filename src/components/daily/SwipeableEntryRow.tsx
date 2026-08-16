@@ -244,7 +244,7 @@ export default function SwipeableEntryRow({
             title={!isPending && isHighValue ? "Giá trị cao" : undefined}
           >
             {isPending ? (
-              <span className="flex items-center gap-2">
+              <span className="flex items-center gap-1.5">
                 {onSkip && (
                   <button
                     type="button"
@@ -261,7 +261,17 @@ export default function SwipeableEntryRow({
                     Bỏ qua
                   </button>
                 )}
-                <span className="text-xs font-medium text-primary/80">Chưa ghi</span>
+                <button
+                  type="button"
+                  className="text-[10px] px-2 py-0.5 rounded-full border border-destructive/35 text-destructive hover:bg-destructive/10 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    close();
+                    onDelete();
+                  }}
+                >
+                  Xóa
+                </button>
               </span>
             ) : (
               <MoneyLabel

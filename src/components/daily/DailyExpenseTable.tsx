@@ -41,6 +41,7 @@ import { thousandsFromVnd } from "@/lib/vndThousands";
 import { paymentsWithSubsInRange, readLaggedSnapshot, type SnapshotPayload } from "@/lib/laggedSnapshot";
 import { useLaggedSnapshot } from "@/hooks/useLaggedSnapshot";
 import {
+  compareGroupsByDateThenReminder,
   isReminderPaymentId,
   nextDueFrom,
   reminderDisplayDate,
@@ -545,12 +546,10 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
           groups = [...groups, ...extra];
           total = groups.reduce((s, g) => s + g.total, 0);
         }
-        groups.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+        groups.sort(compareGroupsByDateThenReminder);
       }
 
       if (dueSchedules.length > 0) {
-        const rangeStart = viewMode === "daily" ? selectedDate : periodStartStr;
-        const rangeEnd = viewMode === "daily" ? selectedDate : periodEndStr;
         for (const sched of dueSchedules) {
           const displayDate = reminderDisplayDate(sched.next_due, rangeStart, rangeEnd, todayStr);
           if (!displayDate) continue;
@@ -578,7 +577,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
             }],
           });
         }
-        groups.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+        groups.sort(compareGroupsByDateThenReminder);
       }
 
       paymentsHydratedKeyRef.current = key;
@@ -1292,6 +1291,15 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   }, []);
   goToMorePhaseRef.current = goToMorePhase;
 
+  const dropReminderGroup = useCallback((paymentId: string) => {
+    setPaymentGroups(prev => {
+      const next = prev.filter(g => g.paymentId !== paymentId);
+      const cached = paymentsCacheRef.current.get(paymentsKey);
+      if (cached) paymentsCacheRef.current.set(paymentsKey, { groups: next, total: cached.total });
+      return next;
+    });
+  }, [paymentsKey]);
+
   const skipReminder = useCallback(async (paymentId: string, entry: PaymentEntry) => {
     if (!entry.scheduleId) return;
     const repeat = entry.pendingRepeat ?? "monthly";
@@ -1303,9 +1311,23 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       toast.error(error.message || "Không bỏ qua được");
       return;
     }
-    setPaymentGroups(prev => prev.filter(g => g.paymentId !== paymentId));
+    dropReminderGroup(paymentId);
     toast.success("Đã bỏ qua kỳ này");
-  }, [todayStr]);
+  }, [todayStr, dropReminderGroup]);
+
+  const removeReminder = useCallback(async (paymentId: string, entry: PaymentEntry) => {
+    if (!entry.scheduleId) return;
+    const { error } = await supabase
+      .from("expense_schedules")
+      .delete()
+      .eq("id", entry.scheduleId);
+    if (error) {
+      toast.error(error.message || "Không xóa được lịch nhắc");
+      return;
+    }
+    dropReminderGroup(paymentId);
+    toast.success("Đã xóa lịch nhắc");
+  }, [dropReminderGroup]);
 
   const openReminder = useCallback((entry: PaymentEntry) => {
     if (!canAddExpense) {
@@ -1523,7 +1545,12 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
         }
       });
     }
-    flat.sort((a, b) => b.date.localeCompare(a.date));
+    flat.sort((a, b) =>
+      compareGroupsByDateThenReminder(
+        { date: a.date, paymentId: a.paymentId },
+        { date: b.date, paymentId: b.paymentId },
+      ),
+    );
 
     type DayBucket = { date: string; total: number; items: FlatItem[] };
     type WeekBucket = {
@@ -1612,7 +1639,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       }}
       onEntryDelete={async (paymentId, entry, index) => {
         if (entry.isPending && entry.scheduleId) {
-          await skipReminder(paymentId, entry);
+          await removeReminder(paymentId, entry);
           return;
         }
         if (entry.sub_payment_id && !isMockPaymentId(paymentId)) {
@@ -1636,7 +1663,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
 
   return (
     <div
-      className="min-h-screen bg-background flex flex-col"
+      className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-background"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onClick={handleMainClick}
@@ -1714,7 +1741,13 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
 
       {/* Grouped entries */}
       <div
-        className={`flex-1 px-4 ${listPadClass} ${cardExpanded ? "overflow-hidden overscroll-none" : "overflow-auto"}`}
+        className={`flex-1 px-4 ${listPadClass} ${
+          cardExpanded
+            ? "overflow-hidden overscroll-none"
+            : viewMode === "range" && !nameFilter
+              ? "flex min-h-0 flex-col overflow-hidden"
+              : "overflow-auto"
+        }`}
         data-expense-list
       >
         {nameFilter && (
@@ -1787,7 +1820,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                         }}
                         onDelete={async () => {
                           if (item.entry.isPending && item.entry.scheduleId) {
-                            await skipReminder(item.paymentId, item.entry);
+                            await removeReminder(item.paymentId, item.entry);
                             return;
                           }
                           if (item.entry.sub_payment_id && !isMockPaymentId(item.paymentId)) {
@@ -1818,6 +1851,17 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
         ) : viewMode === "range" ? (
           <WeekPager
             weeks={rangeWeekPages}
+            footer={
+              paymentGroups.length > 0 ? (
+                <button
+                  onClick={startNewPurchase}
+                  className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Lần mua mới
+                </button>
+              ) : null
+            }
             renderSection={(section) => (
               <DaySection
                 key={section.date}
@@ -1833,7 +1877,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
         )}
 
         {/* New purchase button */}
-        {paymentGroups.length > 0 && !nameFilter && (
+        {paymentGroups.length > 0 && !nameFilter && viewMode !== "range" && (
           <button
             onClick={startNewPurchase}
             className="w-full mt-2 py-2.5 text-xs text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:border-primary/40 transition-colors flex items-center justify-center gap-1.5"

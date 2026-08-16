@@ -13,7 +13,7 @@ const Index = () => {
   const isSandbox = isSandboxUser(user?.email);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex h-dvh min-h-0 flex-col overflow-hidden">
       {isDemo && <DemoBanner />}
       {isSandbox && <DemoBanner variant="sandbox" />}
       <SnapshotBanner />

@@ -253,7 +253,7 @@ export async function fetchLiveSnapshot(
     ]);
 
     const failed = [payments, subPayments, categories, subCategories, items, suppliers].find(r => !r.ok);
-    if (failed && !failed.ok) return { ok: false, error: failed.error };
+    if (failed && failed.ok === false) return { ok: false, error: failed.error };
 
     const [
       expense_schedules,

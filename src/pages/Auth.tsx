@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { signInAsAdmin, isAdminDemoUser } from "@/hooks/useAdminDemoAuth";
 import { isDemoUser } from "@/hooks/useDemoAuth";
 import { isSandboxUser, signInAsSandbox } from "@/hooks/useSandboxAuth";
-import { enrollAdminDeviceFromPage, assertAllowedAdminDevice } from "@/lib/adminDevice";
+import { enrollAdminDeviceAfterPassword } from "@/lib/adminDevice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -21,16 +21,6 @@ export default function Auth() {
   // Throwaway sessions shouldn't block signing in as someone else
   const isDemoSession = isDemoUser(session?.user?.email) || isSandboxUser(session?.user?.email);
   const arrivalHandled = useRef(false);
-
-  useEffect(() => {
-    const hadToken = Boolean(
-      new URLSearchParams(window.location.hash.replace(/^#/, "")).get("mise_device")
-      || new URLSearchParams(window.location.search).get("mise_device"),
-    );
-    void enrollAdminDeviceFromPage().then(ok => {
-      if (hadToken && ok) toast.success("Thiết bị này đã được ghi nhận cho admin");
-    });
-  }, []);
 
   useEffect(() => {
     if (loading) return;
@@ -60,12 +50,11 @@ export default function Auth() {
     const email = toEmail(username);
     try {
       if (isLogin) {
-        if (isAdminDemoUser(email)) await assertAllowedAdminDevice();
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        if (isAdminDemoUser(email)) await enrollAdminDeviceAfterPassword();
         toast.success("Welcome back!");
       } else {
-        if (isAdminDemoUser(email)) await assertAllowedAdminDevice();
         const { error } = await supabase.auth.signUp({
           email,
           password,
@@ -75,6 +64,7 @@ export default function Auth() {
           },
         });
         if (error) throw error;
+        if (isAdminDemoUser(email)) await enrollAdminDeviceAfterPassword();
         toast.success("Account created!");
       }
     } catch (err: any) {

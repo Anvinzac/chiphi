@@ -2,6 +2,21 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const SEED_SUPPLIER_NAME = "Metro Wholesale";
 
+const SEED_CATEGORY_NAMES = [
+  "food & ingredients",
+  "food & ingredient",
+  "kitchen supplies",
+  "operations",
+  "beverages",
+];
+
+/** English demo catalog that was seeded into empty accounts, including admin. */
+export function isSeedCategoryName(name: string): boolean {
+  const n = name.trim().replace(/[:：]+$/g, "").replace(/\s+/g, " ").toLowerCase();
+  if (n.startsWith("food & ingredient")) return true;
+  return SEED_CATEGORY_NAMES.includes(n);
+}
+
 const SEED_ITEM_NAMES = new Set([
   "Morning Glory",
   "Bok Choy",
@@ -35,37 +50,70 @@ const SEED_ITEM_NAMES = new Set([
   "Dish Soap",
 ]);
 
+async function purgeSeededCatalog(userId: string): Promise<number> {
+  const { data: cats, error } = await supabase
+    .from("categories")
+    .select("id, name")
+    .eq("user_id", userId);
+  if (error || !cats?.length) return 0;
+
+  const seedCats = cats.filter(c => isSeedCategoryName(c.name));
+  if (seedCats.length === 0) return 0;
+  const ids = seedCats.map(c => c.id);
+
+  await supabase.from("sub_payments")
+    .update({ category_id: null, sub_category_id: null, sub_sub_category_id: null, item_id: null })
+    .eq("user_id", userId)
+    .in("category_id", ids);
+  await supabase.from("expense_schedules")
+    .update({ category_id: null, sub_category_id: null, item_id: null })
+    .eq("user_id", userId)
+    .in("category_id", ids);
+  await supabase.from("expense_spans")
+    .update({ category_id: null, sub_category_id: null, sub_sub_category_id: null, item_id: null })
+    .eq("user_id", userId)
+    .in("category_id", ids);
+
+  await supabase.from("items").delete().eq("user_id", userId).in("category_id", ids);
+  await supabase.from("sub_categories").update({ parent_sub_category_id: null }).eq("user_id", userId).in("category_id", ids);
+  await supabase.from("sub_categories").delete().eq("user_id", userId).in("category_id", ids);
+  await supabase.from("categories").delete().eq("user_id", userId).in("id", ids);
+  return seedCats.length;
+}
+
 /**
- * Remove English Metro Wholesale sample purchases from a real/admin account.
- * Only deletes payments whose lines are entirely the seeded catalog names.
+ * Remove English Metro sample spend and catalog from a real/admin account.
  */
 export async function purgeSeededSampleSpend(userId: string): Promise<number> {
-  const { data: suppliers, error: supErr } = await supabase
+  const { data: suppliers } = await supabase
     .from("suppliers")
     .select("id")
     .eq("user_id", userId)
     .eq("name", SEED_SUPPLIER_NAME);
-  if (supErr || !suppliers?.length) return 0;
 
-  const supplierIds = suppliers.map(s => s.id);
-  const { data: payments, error: payErr } = await supabase
-    .from("payments")
-    .select("id, sub_payments(item_name)")
-    .eq("user_id", userId)
-    .in("supplier_id", supplierIds);
-  if (payErr || !payments?.length) return 0;
+  let spendRemoved = 0;
+  if (suppliers?.length) {
+    const supplierIds = suppliers.map(s => s.id);
+    const { data: payments } = await supabase
+      .from("payments")
+      .select("id, sub_payments(item_name)")
+      .eq("user_id", userId)
+      .in("supplier_id", supplierIds);
+    const seedPaymentIds = (payments ?? [])
+      .filter(p => {
+        const lines = (p.sub_payments as { item_name: string }[] | null) ?? [];
+        return lines.length > 0 && lines.every(line => SEED_ITEM_NAMES.has(line.item_name));
+      })
+      .map(p => p.id);
+    if (seedPaymentIds.length > 0) {
+      await supabase.from("sub_payments").delete().in("payment_id", seedPaymentIds).eq("user_id", userId);
+      await supabase.from("payments").delete().in("id", seedPaymentIds).eq("user_id", userId);
+      spendRemoved = seedPaymentIds.length;
+    }
+  }
 
-  const seedPaymentIds = payments
-    .filter(p => {
-      const lines = (p.sub_payments as { item_name: string }[] | null) ?? [];
-      return lines.length > 0 && lines.every(line => SEED_ITEM_NAMES.has(line.item_name));
-    })
-    .map(p => p.id);
-  if (seedPaymentIds.length === 0) return 0;
-
-  await supabase.from("sub_payments").delete().in("payment_id", seedPaymentIds).eq("user_id", userId);
-  await supabase.from("payments").delete().in("id", seedPaymentIds).eq("user_id", userId);
-  return seedPaymentIds.length;
+  const catsRemoved = await purgeSeededCatalog(userId);
+  return spendRemoved + catsRemoved;
 }
 
 export async function seedDataForUser(userId: string) {

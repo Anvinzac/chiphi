@@ -41,6 +41,7 @@ import { thousandsFromVnd } from "@/lib/vndThousands";
 import { paymentsWithSubsInRange, readLaggedSnapshot, type SnapshotPayload } from "@/lib/laggedSnapshot";
 import { useLaggedSnapshot } from "@/hooks/useLaggedSnapshot";
 import { isThrowawayAccount } from "@/lib/throwawayAccount";
+import { isSeedCategoryName } from "@/lib/seedData";
 import {
   compareGroupsByDateThenReminder,
   isReminderPaymentId,
@@ -295,13 +296,18 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       daily: [],
       weekly: [],
     };
+    const seen = new Set<string>();
     for (const cat of categories) {
+      if (!throwaway && isSeedCategoryName(cat.name)) continue;
+      const key = foldCategoryName(cat.name);
+      if (seen.has(key)) continue;
+      seen.add(key);
       const visual = getCategoryVisual(cat.name);
       const freq = cat.frequency || visual.frequency;
       groups[freq].push({ ...visual, name: cat.name, frequency: freq, id: cat.id });
     }
     return groups;
-  }, [categories]);
+  }, [categories, throwaway]);
 
   const [chipFreqPage, setChipFreqPage] = useState<CategoryFrequency>("daily");
 
@@ -326,11 +332,13 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     const load = async () => {
       const applySnapshotCatalog = (data: SnapshotPayload) => {
         setItems(data.items);
-        setCategories(data.categories.map(category => ({
-          id: category.id,
-          name: category.name,
-          frequency: (category.frequency as CategoryFrequency) || "daily",
-        })));
+        setCategories(data.categories
+          .filter(category => throwaway || !isSeedCategoryName(category.name))
+          .map(category => ({
+            id: category.id,
+            name: category.name,
+            frequency: (category.frequency as CategoryFrequency) || "daily",
+          })));
         setSubCategories(data.sub_categories.map(s => ({
           id: s.id,
           name: s.name,
@@ -368,11 +376,13 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       }
 
       if (itemsRes.data) setItems(itemsRes.data);
-      let nextCategories = catsRes.data.map(category => ({
-        id: category.id,
-        name: category.name,
-        frequency: (category.frequency as CategoryFrequency) || "daily",
-      }));
+      let nextCategories = catsRes.data
+        .filter(category => throwaway || !isSeedCategoryName(category.name))
+        .map(category => ({
+          id: category.id,
+          name: category.name,
+          frequency: (category.frequency as CategoryFrequency) || "daily",
+        }));
       const have = new Set(nextCategories.map(c => foldCategoryName(c.name)));
       const missing = EXTRA_WEEKLY_CATEGORIES.filter(name => !have.has(foldCategoryName(name)));
       if (missing.length > 0) {

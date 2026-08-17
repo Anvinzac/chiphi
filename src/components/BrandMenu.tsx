@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ChevronDown, LogOut, Settings, Store, Bell, Smartphone } from "lucide-react";
+import { ChevronDown, LogOut, Settings, Store, Bell } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,10 +7,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { toast } from "sonner";
-import { useAuth } from "@/hooks/useAuth";
-import { isAdminDemoUser } from "@/hooks/useAdminDemoAuth";
-import { adminDeviceEnrollUrl } from "@/lib/adminDevice";
 
 interface BrandMenuProps {
   isDemo?: boolean;
@@ -19,23 +15,6 @@ interface BrandMenuProps {
 
 /** Interactive Mìsè brand trigger with Settings / Sign Out. */
 export default function BrandMenu({ isDemo, onSignOut }: BrandMenuProps) {
-  const { user } = useAuth();
-  const isAdmin = isAdminDemoUser(user?.email);
-
-  const copyAdminDeviceLink = async () => {
-    const url = adminDeviceEnrollUrl();
-    if (!url) {
-      toast.error("Chưa ghi nhận thiết bị admin trên máy này");
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success("Đã sao chép liên kết ghi thiết bị");
-    } catch {
-      toast.error("Không sao chép được liên kết");
-    }
-  };
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -68,15 +47,6 @@ export default function BrandMenu({ isDemo, onSignOut }: BrandMenuProps) {
             Cài đặt
           </Link>
         </DropdownMenuItem>
-        {isAdmin && (
-          <DropdownMenuItem
-            className="flex cursor-pointer items-center gap-2"
-            onSelect={() => void copyAdminDeviceLink()}
-          >
-            <Smartphone className="h-4 w-4" />
-            Liên kết thiết bị admin
-          </DropdownMenuItem>
-        )}
         <DropdownMenuSeparator />
         {isDemo ? (
           <DropdownMenuItem asChild>

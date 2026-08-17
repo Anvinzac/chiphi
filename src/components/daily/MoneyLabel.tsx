@@ -35,7 +35,15 @@ export default function MoneyLabel({
       {small ? (
         <>
           <span className={mainClassName}>{main}</span>
-          <span className={cn("text-[0.75em] opacity-80", smallClassName)}>{small}</span>
+          <span
+            className={
+              mode === "k"
+                ? mainClassName
+                : cn("text-[0.75em] opacity-80", smallClassName)
+            }
+          >
+            {small}
+          </span>
         </>
       ) : (
         <span className={mainClassName}>{main}</span>

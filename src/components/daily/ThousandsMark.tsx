@@ -6,5 +6,9 @@ export default function ThousandsMark({ className }: { className?: string }) {
   const [mode] = useThousandsSuffix();
   const text = thousandsInputMark(mode);
   if (!text) return null;
-  return <span className={cn("tabular-nums", className)}>{text}</span>;
+  return (
+    <span className={cn("tabular-nums", className, mode === "k" && "text-[1em] leading-none opacity-100")}>
+      {text}
+    </span>
+  );
 }

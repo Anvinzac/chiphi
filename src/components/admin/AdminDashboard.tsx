@@ -54,6 +54,13 @@ export default function AdminDashboard() {
   const [newSubFlatName, setNewSubFlatName] = useState("");
   const [editingSubId, setEditingSubId] = useState<string | null>(null);
   const [editingSubName, setEditingSubName] = useState("");
+  const [dataTick, setDataTick] = useState(0);
+
+  useEffect(() => {
+    const onAccountData = () => setDataTick(n => n + 1);
+    window.addEventListener("mise:account-data", onAccountData);
+    return () => window.removeEventListener("mise:account-data", onAccountData);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -72,7 +79,7 @@ export default function AdminDashboard() {
       if (p.data) setPayments(p.data as any);
     };
     load();
-  }, [user]);
+  }, [user, dataTick]);
 
   const tabs: { key: AdminTab; label: string; icon: React.ReactNode }[] = [
     { key: "summary", label: "Summary", icon: <BarChart3 className="h-4 w-4" /> },

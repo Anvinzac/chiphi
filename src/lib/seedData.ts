@@ -1,6 +1,72 @@
 import { supabase } from "@/integrations/supabase/client";
 
-const SEED_KEY = "mise-seeded";
+export const SEED_SUPPLIER_NAME = "Metro Wholesale";
+
+const SEED_ITEM_NAMES = new Set([
+  "Morning Glory",
+  "Bok Choy",
+  "Carrots",
+  "Potatoes",
+  "Onions",
+  "Garlic",
+  "Ginger",
+  "Thai Basil",
+  "Lemongrass",
+  "Chili Peppers",
+  "Tomatoes",
+  "Bean Sprouts",
+  "Chicken Breast",
+  "Chicken Thigh",
+  "Pork Belly",
+  "Ground Pork",
+  "Beef Sirloin",
+  "Tiger Prawns",
+  "Squid",
+  "Fish Fillet",
+  "Eggs",
+  "Butter",
+  "Coconut Milk",
+  "Cooking Oil",
+  "Fish Sauce",
+  "Soy Sauce",
+  "Rice",
+  "Noodles",
+  "Sugar",
+  "Dish Soap",
+]);
+
+/**
+ * Remove English Metro Wholesale sample purchases from a real/admin account.
+ * Only deletes payments whose lines are entirely the seeded catalog names.
+ */
+export async function purgeSeededSampleSpend(userId: string): Promise<number> {
+  const { data: suppliers, error: supErr } = await supabase
+    .from("suppliers")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("name", SEED_SUPPLIER_NAME);
+  if (supErr || !suppliers?.length) return 0;
+
+  const supplierIds = suppliers.map(s => s.id);
+  const { data: payments, error: payErr } = await supabase
+    .from("payments")
+    .select("id, sub_payments(item_name)")
+    .eq("user_id", userId)
+    .in("supplier_id", supplierIds);
+  if (payErr || !payments?.length) return 0;
+
+  const seedPaymentIds = payments
+    .filter(p => {
+      const lines = (p.sub_payments as { item_name: string }[] | null) ?? [];
+      return lines.length > 0 && lines.every(line => SEED_ITEM_NAMES.has(line.item_name));
+    })
+    .map(p => p.id);
+  if (seedPaymentIds.length === 0) return 0;
+
+  await supabase.from("sub_payments").delete().in("payment_id", seedPaymentIds).eq("user_id", userId);
+  await supabase.from("payments").delete().in("id", seedPaymentIds).eq("user_id", userId);
+  return seedPaymentIds.length;
+}
 
 export async function seedDataForUser(userId: string) {
   // Check if already seeded via a simple flag in categories count
@@ -58,7 +124,7 @@ export async function seedDataForUser(userId: string) {
     { name: "Farm Fresh Co.", contact: "0901234567", user_id: userId },
     { name: "Green Valley Market", contact: "0907654321", user_id: userId },
     { name: "Ocean Catch Seafood", contact: "0909876543", user_id: userId },
-    { name: "Metro Wholesale", contact: "0903456789", user_id: userId },
+    { name: SEED_SUPPLIER_NAME, contact: "0903456789", user_id: userId },
     { name: "Local Herb Garden", contact: "0905678901", user_id: userId },
   ]).select("id, name");
 
@@ -79,24 +145,24 @@ export async function seedDataForUser(userId: string) {
     { name: "Chili Peppers", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Vegetables"], sub_sub_category_id: subSubMap["Herbs & Aromatics"], default_supplier_id: supMap["Green Valley Market"], default_unit_price: 30000, unit: "kg", user_id: userId },
     { name: "Tomatoes", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Vegetables"], sub_sub_category_id: subSubMap["Root Vegetables"], default_supplier_id: supMap["Farm Fresh Co."], default_unit_price: 22000, unit: "kg", user_id: userId },
     { name: "Bean Sprouts", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Vegetables"], sub_sub_category_id: subSubMap["Leafy Greens"], default_supplier_id: supMap["Green Valley Market"], default_unit_price: 8000, unit: "kg", user_id: userId },
-    { name: "Chicken Breast", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Meat & Seafood"], sub_sub_category_id: subSubMap["Poultry"], default_supplier_id: supMap["Metro Wholesale"], default_unit_price: 85000, unit: "kg", user_id: userId },
-    { name: "Chicken Thigh", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Meat & Seafood"], sub_sub_category_id: subSubMap["Poultry"], default_supplier_id: supMap["Metro Wholesale"], default_unit_price: 75000, unit: "kg", user_id: userId },
-    { name: "Pork Belly", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Meat & Seafood"], sub_sub_category_id: subSubMap["Beef & Pork"], default_supplier_id: supMap["Metro Wholesale"], default_unit_price: 120000, unit: "kg", user_id: userId },
-    { name: "Ground Pork", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Meat & Seafood"], sub_sub_category_id: subSubMap["Beef & Pork"], default_supplier_id: supMap["Metro Wholesale"], default_unit_price: 95000, unit: "kg", user_id: userId },
-    { name: "Beef Sirloin", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Meat & Seafood"], sub_sub_category_id: subSubMap["Beef & Pork"], default_supplier_id: supMap["Metro Wholesale"], default_unit_price: 250000, unit: "kg", user_id: userId },
+    { name: "Chicken Breast", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Meat & Seafood"], sub_sub_category_id: subSubMap["Poultry"], default_supplier_id: supMap[SEED_SUPPLIER_NAME], default_unit_price: 85000, unit: "kg", user_id: userId },
+    { name: "Chicken Thigh", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Meat & Seafood"], sub_sub_category_id: subSubMap["Poultry"], default_supplier_id: supMap[SEED_SUPPLIER_NAME], default_unit_price: 75000, unit: "kg", user_id: userId },
+    { name: "Pork Belly", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Meat & Seafood"], sub_sub_category_id: subSubMap["Beef & Pork"], default_supplier_id: supMap[SEED_SUPPLIER_NAME], default_unit_price: 120000, unit: "kg", user_id: userId },
+    { name: "Ground Pork", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Meat & Seafood"], sub_sub_category_id: subSubMap["Beef & Pork"], default_supplier_id: supMap[SEED_SUPPLIER_NAME], default_unit_price: 95000, unit: "kg", user_id: userId },
+    { name: "Beef Sirloin", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Meat & Seafood"], sub_sub_category_id: subSubMap["Beef & Pork"], default_supplier_id: supMap[SEED_SUPPLIER_NAME], default_unit_price: 250000, unit: "kg", user_id: userId },
     { name: "Tiger Prawns", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Meat & Seafood"], sub_sub_category_id: subSubMap["Seafood"], default_supplier_id: supMap["Ocean Catch Seafood"], default_unit_price: 280000, unit: "kg", user_id: userId },
     { name: "Squid", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Meat & Seafood"], sub_sub_category_id: subSubMap["Seafood"], default_supplier_id: supMap["Ocean Catch Seafood"], default_unit_price: 150000, unit: "kg", user_id: userId },
     { name: "Fish Fillet", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Meat & Seafood"], sub_sub_category_id: subSubMap["Seafood"], default_supplier_id: supMap["Ocean Catch Seafood"], default_unit_price: 180000, unit: "kg", user_id: userId },
-    { name: "Eggs", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Dairy & Eggs"], default_supplier_id: supMap["Metro Wholesale"], default_unit_price: 3500, unit: "piece", user_id: userId },
-    { name: "Butter", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Dairy & Eggs"], default_supplier_id: supMap["Metro Wholesale"], default_unit_price: 65000, unit: "block", user_id: userId },
-    { name: "Coconut Milk", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Dairy & Eggs"], default_supplier_id: supMap["Metro Wholesale"], default_unit_price: 18000, unit: "can", user_id: userId },
-    { name: "Cooking Oil", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Dry Goods & Spices"], default_supplier_id: supMap["Metro Wholesale"], default_unit_price: 45000, unit: "liter", user_id: userId },
-    { name: "Fish Sauce", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Dry Goods & Spices"], default_supplier_id: supMap["Metro Wholesale"], default_unit_price: 22000, unit: "bottle", user_id: userId },
-    { name: "Soy Sauce", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Dry Goods & Spices"], default_supplier_id: supMap["Metro Wholesale"], default_unit_price: 18000, unit: "bottle", user_id: userId },
-    { name: "Rice", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Dry Goods & Spices"], default_supplier_id: supMap["Metro Wholesale"], default_unit_price: 16000, unit: "kg", user_id: userId },
-    { name: "Noodles", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Dry Goods & Spices"], default_supplier_id: supMap["Metro Wholesale"], default_unit_price: 12000, unit: "pack", user_id: userId },
-    { name: "Sugar", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Dry Goods & Spices"], default_supplier_id: supMap["Metro Wholesale"], default_unit_price: 15000, unit: "kg", user_id: userId },
-    { name: "Dish Soap", category_id: catMap["Kitchen Supplies"], sub_category_id: subMap["Cleaning"], default_supplier_id: supMap["Metro Wholesale"], default_unit_price: 35000, unit: "bottle", user_id: userId },
+    { name: "Eggs", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Dairy & Eggs"], default_supplier_id: supMap[SEED_SUPPLIER_NAME], default_unit_price: 3500, unit: "piece", user_id: userId },
+    { name: "Butter", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Dairy & Eggs"], default_supplier_id: supMap[SEED_SUPPLIER_NAME], default_unit_price: 65000, unit: "block", user_id: userId },
+    { name: "Coconut Milk", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Dairy & Eggs"], default_supplier_id: supMap[SEED_SUPPLIER_NAME], default_unit_price: 18000, unit: "can", user_id: userId },
+    { name: "Cooking Oil", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Dry Goods & Spices"], default_supplier_id: supMap[SEED_SUPPLIER_NAME], default_unit_price: 45000, unit: "liter", user_id: userId },
+    { name: "Fish Sauce", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Dry Goods & Spices"], default_supplier_id: supMap[SEED_SUPPLIER_NAME], default_unit_price: 22000, unit: "bottle", user_id: userId },
+    { name: "Soy Sauce", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Dry Goods & Spices"], default_supplier_id: supMap[SEED_SUPPLIER_NAME], default_unit_price: 18000, unit: "bottle", user_id: userId },
+    { name: "Rice", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Dry Goods & Spices"], default_supplier_id: supMap[SEED_SUPPLIER_NAME], default_unit_price: 16000, unit: "kg", user_id: userId },
+    { name: "Noodles", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Dry Goods & Spices"], default_supplier_id: supMap[SEED_SUPPLIER_NAME], default_unit_price: 12000, unit: "pack", user_id: userId },
+    { name: "Sugar", category_id: catMap["Food & Ingredients"], sub_category_id: subMap["Dry Goods & Spices"], default_supplier_id: supMap[SEED_SUPPLIER_NAME], default_unit_price: 15000, unit: "kg", user_id: userId },
+    { name: "Dish Soap", category_id: catMap["Kitchen Supplies"], sub_category_id: subMap["Cleaning"], default_supplier_id: supMap[SEED_SUPPLIER_NAME], default_unit_price: 35000, unit: "bottle", user_id: userId },
   ]).select("id, name, category_id, sub_category_id, default_supplier_id, default_unit_price");
   if (!itemsData) return;
   const itemMap = Object.fromEntries(itemsData.map(i => [i.name, i]));
@@ -270,7 +336,7 @@ export async function seedDataForUser(userId: string) {
       date: dateStr,
       user_id: userId,
       total_amount: totalAmount,
-      supplier_id: supMap["Metro Wholesale"],
+      supplier_id: supMap[SEED_SUPPLIER_NAME],
     }).select("id").single();
 
     if (!payment) continue;

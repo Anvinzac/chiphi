@@ -40,6 +40,7 @@ import { getAmountDefault, setAmountDefault } from "@/lib/expenseAmountDefaults"
 import { thousandsFromVnd } from "@/lib/vndThousands";
 import { paymentsWithSubsInRange, readLaggedSnapshot, type SnapshotPayload } from "@/lib/laggedSnapshot";
 import { useLaggedSnapshot } from "@/hooks/useLaggedSnapshot";
+import { isThrowawayAccount } from "@/lib/throwawayAccount";
 import {
   compareGroupsByDateThenReminder,
   isReminderPaymentId,
@@ -135,6 +136,7 @@ interface QuickCategory {
 
 export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTableProps = {}) {
   const { user } = useAuth();
+  const throwaway = isThrowawayAccount(user?.email);
   const { snapshot, scheduleRefresh } = useLaggedSnapshot();
   const [viewMode, setViewMode] = useState<ViewMode>("range");
   const [periodOffset, setPeriodOffset] = useState(() => getPeriodOffsetForDate(new Date()));
@@ -226,9 +228,20 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
 
   const paymentsKey =
     viewMode === "daily"
-      ? `daily:${selectedDate}`
-      : `range:${periodStartStr}:${periodEndStr}`;
+      ? `${user?.id ?? "anon"}:daily:${selectedDate}`
+      : `${user?.id ?? "anon"}:range:${periodStartStr}:${periodEndStr}`;
   paymentsKeyRef.current = paymentsKey;
+
+  useEffect(() => {
+    paymentsCacheRef.current.clear();
+    paymentsHydratedKeyRef.current = null;
+  }, [user?.id]);
+
+  useEffect(() => {
+    const onAccountData = () => setDataTick(n => n + 1);
+    window.addEventListener("mise:account-data", onAccountData);
+    return () => window.removeEventListener("mise:account-data", onAccountData);
+  }, []);
 
   // Keep cache in sync with optimistic local edits for the visible period
   useEffect(() => {
@@ -344,7 +357,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       ]);
       let vendors: { id: string; name: string; contact: string | null }[] = [];
       try {
-        vendors = await ensureMockVendors(user.id);
+        vendors = await ensureMockVendors(user.id, { allowSeed: throwaway });
       } catch {
         vendors = [];
       }
@@ -385,7 +398,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       }
     };
     load();
-  }, [user, snapshot]);
+  }, [user, snapshot, throwaway]);
 
   // Load data for selected date or range — show cache immediately, refresh in background
   useEffect(() => {
@@ -537,8 +550,8 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
         });
       }
 
-      // Inject client mock spend for empty (or sparse) previous-range testing
-      if (viewMode === "range") {
+      // Client-only sample spend — throwaway accounts only, never mixed into admin/real data
+      if (throwaway && viewMode === "range") {
         const mocks = getMockGroupsForRange(periodStartStr, periodEndStr);
         if (mocks.length > 0) {
           const realIds = new Set(groups.map(g => g.paymentId));
@@ -600,7 +613,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       }
     };
     loadPayments();
-  }, [user, selectedDate, viewMode, periodStartStr, periodEndStr, todayStr, dataTick, paymentsKey, snapshot]);
+  }, [user, selectedDate, viewMode, periodStartStr, periodEndStr, todayStr, dataTick, paymentsKey, snapshot, throwaway]);
 
   // Lock page scroll while the add panel is open (stops iOS jump-to-bottom on focus)
   useEffect(() => {

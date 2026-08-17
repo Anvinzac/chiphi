@@ -1,14 +1,30 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { seedDataForUser } from "@/lib/seedData";
+import { purgeSeededSampleSpend, seedDataForUser } from "@/lib/seedData";
+import { isThrowawayAccount } from "@/lib/throwawayAccount";
 import type { Session } from "@supabase/supabase-js";
 
-let seedPromise: Promise<void> | null = null;
+const seedByUser = new Map<string, Promise<void>>();
+const purgedRealUsers = new Set<string>();
 
-function ensureSeed(userId: string) {
-  if (!seedPromise) {
-    seedPromise = seedDataForUser(userId);
+function onSignedIn(userId: string, email?: string | null) {
+  if (isThrowawayAccount(email)) {
+    if (!seedByUser.has(userId)) {
+      seedByUser.set(userId, seedDataForUser(userId).catch(() => {
+        seedByUser.delete(userId);
+      }));
+    }
+    return;
   }
+  if (purgedRealUsers.has(userId)) return;
+  purgedRealUsers.add(userId);
+  void purgeSeededSampleSpend(userId)
+    .then(removed => {
+      if (removed > 0) window.dispatchEvent(new Event("mise:account-data"));
+    })
+    .catch(() => {
+      purgedRealUsers.delete(userId);
+    });
 }
 
 export function useAuth() {
@@ -19,20 +35,19 @@ export function useAuth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setLoading(false);
-      if (session?.user) ensureSeed(session.user.id);
+      if (session?.user) onSignedIn(session.user.id, session.user.email);
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
-      if (session?.user) ensureSeed(session.user.id);
+      if (session?.user) onSignedIn(session.user.id, session.user.email);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const signOut = async () => {
-    seedPromise = null;
     await supabase.auth.signOut();
   };
 

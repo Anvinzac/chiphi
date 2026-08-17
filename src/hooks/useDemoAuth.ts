@@ -1,6 +1,6 @@
 import { createQuickSignIn } from "@/lib/quickAuth";
+import { DEMO_EMAIL } from "@/lib/throwawayAccount";
 
-const DEMO_EMAIL = "demo@mise.local";
 const DEMO_PASSWORD = "MiseDemo2024!";
 
 /** Shared demo account (manual sign-in only — never auto-logged). */

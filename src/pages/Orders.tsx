@@ -13,6 +13,7 @@ import {
   ORDER_HUB_CATEGORIES,
 } from "@/lib/importOrderCatalog";
 import { ensureMockOrders } from "@/lib/mockOrders";
+import { isThrowawayAccount } from "@/lib/throwawayAccount";
 import { formatDayMonth } from "@/lib/formatDateVi";
 import DaySection from "@/components/daily/DaySection";
 import OrdersPager, { type OrdersPage } from "@/components/orders/OrdersPager";
@@ -107,7 +108,7 @@ export default function Orders() {
     if (!user) return;
     setLoading(true);
     try {
-      await ensureMockOrders(user.id);
+      if (isThrowawayAccount(user.email)) await ensureMockOrders(user.id);
     } catch (err: any) {
       if (!snapshot) toast.error(err.message || "Không tạo được đơn mẫu");
     }

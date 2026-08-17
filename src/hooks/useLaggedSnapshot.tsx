@@ -51,12 +51,15 @@ export function LaggedSnapshotProvider({ children }: { children: ReactNode }) {
 
   const loadMeta = useCallback(async (id: string) => {
     const meta = await snapshotMeta(id);
+    if (userIdRef.current !== id) return;
     setTodayMeta(meta.today);
     setYesterdayMeta(meta.yesterday);
   }, []);
 
   const applyFallback = useCallback(async (id: string) => {
+    if (userIdRef.current !== id) return false;
     const lagged = await readLaggedSnapshot(id);
+    if (userIdRef.current !== id) return false;
     if (!lagged) {
       setSnapshot(null);
       setFallback(null);
@@ -73,8 +76,10 @@ export function LaggedSnapshotProvider({ children }: { children: ReactNode }) {
     const id = userIdRef.current;
     if (!id) return false;
     const live = await fetchLiveSnapshot(id);
+    if (userIdRef.current !== id) return false;
     if (live.ok) {
       await saveLaggedSnapshot(id, live.data);
+      if (userIdRef.current !== id) return false;
       setSnapshot(live.data);
       setFallback(null);
       setMode("live");
@@ -82,6 +87,7 @@ export function LaggedSnapshotProvider({ children }: { children: ReactNode }) {
       return true;
     }
     await applyFallback(id);
+    if (userIdRef.current !== id) return false;
     await loadMeta(id);
     return false;
   }, [applyFallback, loadMeta]);
@@ -110,12 +116,24 @@ export function LaggedSnapshotProvider({ children }: { children: ReactNode }) {
       setYesterdayMeta(null);
       return;
     }
+    setSnapshot(null);
+    setFallback(null);
+    setTodayMeta(null);
+    setYesterdayMeta(null);
     setMode("loading");
     void refresh();
     return () => {
       if (timerRef.current) window.clearTimeout(timerRef.current);
     };
   }, [userId, refresh]);
+
+  useEffect(() => {
+    const onAccountData = () => {
+      void refresh();
+    };
+    window.addEventListener("mise:account-data", onAccountData);
+    return () => window.removeEventListener("mise:account-data", onAccountData);
+  }, [refresh]);
 
   const value = useMemo<LaggedSnapshotValue>(
     () => ({

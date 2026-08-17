@@ -19,8 +19,11 @@ export type VendorRow = {
   notes: string | null;
 };
 
-/** Insert mock vendors when the user has none yet. Returns the current supplier list. */
-export async function ensureMockVendors(userId: string): Promise<VendorRow[]> {
+/** Insert mock vendors when a throwaway account has none yet. Returns the current supplier list. */
+export async function ensureMockVendors(
+  userId: string,
+  { allowSeed = false }: { allowSeed?: boolean } = {},
+): Promise<VendorRow[]> {
   const { data: existing, error } = await supabase
     .from("suppliers")
     .select("id, name, contact, notes")
@@ -28,7 +31,7 @@ export async function ensureMockVendors(userId: string): Promise<VendorRow[]> {
     .order("name");
 
   if (error) throw error;
-  if (existing && existing.length > 0) return existing;
+  if ((existing && existing.length > 0) || !allowSeed) return existing ?? [];
 
   const { data: inserted, error: insertError } = await supabase
     .from("suppliers")

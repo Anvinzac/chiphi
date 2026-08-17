@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ensureMockVendors, type VendorRow } from "@/lib/mockVendors";
 import { readLaggedSnapshot } from "@/lib/laggedSnapshot";
+import { isThrowawayAccount } from "@/lib/throwawayAccount";
+import { useAuth } from "@/hooks/useAuth";
 
 interface VendorsManagerProps {
   userId: string;
@@ -19,6 +21,7 @@ export default function VendorsManager({
   compact = false,
   onVendorsChange,
 }: VendorsManagerProps) {
+  const { user } = useAuth();
   const [vendors, setVendors] = useState<VendorRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
@@ -41,7 +44,9 @@ export default function VendorsManager({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const rows = await ensureMockVendors(userId);
+      const rows = await ensureMockVendors(userId, {
+        allowSeed: isThrowawayAccount(user?.email),
+      });
       publish(rows);
     } catch (err: any) {
       const lagged = await readLaggedSnapshot(userId);
@@ -60,7 +65,7 @@ export default function VendorsManager({
     } finally {
       setLoading(false);
     }
-  }, [userId, publish]);
+  }, [userId, publish, user?.email]);
 
   useEffect(() => {
     load();

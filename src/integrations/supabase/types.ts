@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_devices: {
+        Row: {
+          device_id: string
+          enrolled_via: string
+          first_seen_at: string
+          id: string
+          last_seen_at: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          device_id: string
+          enrolled_via: string
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          device_id?: string
+          enrolled_via?: string
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string
@@ -794,6 +824,18 @@ export type Database = {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
+        }
+        Returns: boolean
+      }
+      is_enrolled_admin_device: {
+        Args: { p_device_id: string }
+        Returns: boolean
+      }
+      touch_admin_device: {
+        Args: {
+          p_device_id: string
+          p_enrolled_via: string
+          p_user_agent?: string
         }
         Returns: boolean
       }

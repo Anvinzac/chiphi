@@ -6,6 +6,6 @@ describe("getCategoryVisual", () => {
     expect(foldCategoryName("Gia vị")).toBe(foldCategoryName("Gia vi"));
     expect(getCategoryVisual("Gia vi").name).toBe("Gia vị");
     expect(getCategoryVisual("Mang ve").name).toBe("Mang về");
-    expect(getCategoryVisual("Da").emoji).toBe("🥓");
+    expect(getCategoryVisual("Da").emoji).toBe("🧊");
   });
 });

@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import SnapshotBanner from "@/components/SnapshotBanner";
 import { useLaggedSnapshot } from "@/hooks/useLaggedSnapshot";
 import { formatDayMonth } from "@/lib/formatDateVi";
+import { THOUSANDS_SUFFIX_OPTIONS } from "@/lib/thousandsSuffix";
+import { useThousandsSuffix } from "@/hooks/useThousandsSuffix";
 import type { SnapshotMeta } from "@/lib/laggedSnapshot";
 
 function metaLine(meta: SnapshotMeta | null, empty: string) {
@@ -22,6 +24,7 @@ function metaLine(meta: SnapshotMeta | null, empty: string) {
 export default function Settings() {
   const { todayMeta, yesterdayMeta, refresh, downloadSlot } = useLaggedSnapshot();
   const [saving, setSaving] = useState(false);
+  const [mode, setMode] = useThousandsSuffix();
 
   const backupNow = async () => {
     if (saving) return;
@@ -130,11 +133,32 @@ export default function Settings() {
         <section className="rounded-2xl border border-border/60 bg-card p-4">
           <div className="mb-2 flex items-center gap-2 text-foreground">
             <Palette className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold">Giao diện</h2>
+            <h2 className="text-sm font-semibold">Ba số 0 cuối</h2>
           </div>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Sắp có: chủ đề màu, cỡ chữ, và bố cục danh sách chi tiêu.
+          <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
+            Cách hiện 450.000₫ trên danh sách và ô nhập: k, nghìn, hoặc ẩn hẳn.
           </p>
+          <div className="grid grid-cols-4 gap-1.5">
+            {THOUSANDS_SUFFIX_OPTIONS.map(option => {
+              const on = mode === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setMode(option.id)}
+                  aria-pressed={on}
+                  className={`rounded-xl border px-2 py-2 text-center transition-colors ${
+                    on
+                      ? "border-primary/45 bg-primary/10 text-foreground"
+                      : "border-border/60 bg-muted/40 text-muted-foreground hover:border-primary/25 hover:text-foreground"
+                  }`}
+                >
+                  <span className="block text-sm font-semibold leading-tight">{option.label}</span>
+                  <span className="mt-0.5 block text-[10px] tabular-nums opacity-80">{option.sample}</span>
+                </button>
+              );
+            })}
+          </div>
         </section>
 
         <section className="rounded-2xl border border-border/60 bg-card p-4">

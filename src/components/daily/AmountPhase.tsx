@@ -4,6 +4,9 @@ import type { VerifyData } from "@/types/expense";
 import { focusWithoutScroll } from "@/lib/focusWithoutScroll";
 import ClearFieldButton from "./ClearFieldButton";
 import SaveEditsDialog from "./SaveEditsDialog";
+import ThousandsMark from "./ThousandsMark";
+import { thousandsCaption } from "@/lib/thousandsSuffix";
+import { useThousandsSuffix } from "@/hooks/useThousandsSuffix";
 
 interface MatchInfo {
   itemId: string;
@@ -76,6 +79,7 @@ export default function AmountPhase({
   saving = false,
   noteSuggestions = [],
 }: AmountPhaseProps) {
+  const [thousandsMode] = useThousandsSuffix();
   const [editingField, setEditingField] = useState<EditableField>(null);
   const [editValue, setEditValue] = useState("");
   const [amountActive, setAmountActive] = useState(true);
@@ -347,7 +351,7 @@ export default function AmountPhase({
                     <span className="text-muted-foreground/25">0</span>
                   )}
                   {amountActive && <span className="amount-caret" aria-hidden="true" />}
-                  <span className="ml-0.5 text-[0.65em] text-muted-foreground/35">.000</span>
+                  <ThousandsMark className="ml-0.5 text-[0.65em] text-muted-foreground/35" />
                 </span>
               </button>
               <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center">
@@ -359,7 +363,7 @@ export default function AmountPhase({
               </div>
             </div>
             <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
-              nghìn ₫
+              {thousandsCaption(thousandsMode)}
             </p>
           </div>
 
@@ -522,7 +526,7 @@ export default function AmountPhase({
                 <Plus className="h-3 w-3 shrink-0 text-primary/70" />
                 <span className="font-display tabular-nums text-foreground">
                   {Number(l.amount).toLocaleString("vi-VN")}
-                  <span className="text-muted-foreground/60">.000</span>
+                  <ThousandsMark className="text-muted-foreground/60" />
                 </span>
                 {l.note && <span className="truncate text-muted-foreground">{l.note}</span>}
                 <button

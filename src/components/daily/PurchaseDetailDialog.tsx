@@ -10,6 +10,7 @@ import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarte
 import MoneyLabel from "./MoneyLabel";
 import ClearFieldButton from "./ClearFieldButton";
 import SaveEditsDialog from "./SaveEditsDialog";
+import ThousandsMark from "./ThousandsMark";
 import { thousandsFromVnd, vndFromThousands } from "@/lib/vndThousands";
 
 interface PurchaseDetailDialogProps {
@@ -310,7 +311,7 @@ export default function PurchaseDetailDialog({
                       onKeyDown={(e) => e.key === "Enter" && handleSave()}
                     />
                     <span className="pointer-events-none absolute right-8 top-1/2 -translate-y-1/2 text-[10px] tabular-nums text-muted-foreground/70">
-                      .000
+                      <ThousandsMark />
                     </span>
                     <ClearFieldButton
                       visible={editAmount.length > 0}

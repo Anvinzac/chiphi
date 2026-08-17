@@ -6,19 +6,22 @@ interface QuickAccount {
   username: string;
   /** Runs after a successful sign-in, e.g. to grant a role. */
   afterSignIn?: () => Promise<void>;
+  /** Runs before any network call. Throw to abort, e.g. unknown device. */
+  beforeSignIn?: () => Promise<void>;
 }
 
 /**
  * Signs into a built-in account, creating it on first use.
  * Returns a shared promise so concurrent callers don't race.
  */
-export function createQuickSignIn({ email, password, username, afterSignIn }: QuickAccount) {
+export function createQuickSignIn({ email, password, username, afterSignIn, beforeSignIn }: QuickAccount) {
   let pending: Promise<void> | null = null;
 
   return function signIn(): Promise<void> {
     if (pending) return pending;
 
     pending = (async () => {
+      await beforeSignIn?.();
       const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
 
       if (!signInErr) {

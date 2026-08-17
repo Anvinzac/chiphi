@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import MoneyLabel from "@/components/daily/MoneyLabel";
+import ThousandsMark from "@/components/daily/ThousandsMark";
 import { formatDayMonth } from "@/lib/formatDateVi";
 import { thousandsFromVnd, vndFromThousands } from "@/lib/vndThousands";
 import { readLaggedSnapshot } from "@/lib/laggedSnapshot";
@@ -254,7 +255,7 @@ export default function SchedulesManager({ userId }: SchedulesManagerProps) {
                 className="text-sm pr-10"
               />
               <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
-                .000
+                <ThousandsMark />
               </span>
             </div>
           </div>
@@ -373,7 +374,7 @@ export default function SchedulesManager({ userId }: SchedulesManagerProps) {
                 className="pr-10"
               />
               <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
-                .000 ₫
+                <ThousandsMark />
               </span>
             </div>
           </label>

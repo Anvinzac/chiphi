@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { createQuickSignIn } from "@/lib/quickAuth";
+import { assertAllowedAdminDevice } from "@/lib/adminDevice";
 
 const ADMIN_EMAIL = "admin@mise.local";
 const ADMIN_PASSWORD = "AdminDemo2024!";
@@ -24,6 +25,7 @@ export const signInAsAdmin = createQuickSignIn({
   email: ADMIN_EMAIL,
   password: ADMIN_PASSWORD,
   username: "admin",
+  beforeSignIn: assertAllowedAdminDevice,
   afterSignIn: ensureAdminRole,
 });
 

@@ -1,4 +1,6 @@
 import { cn } from "@/lib/utils";
+import { formatVndParts } from "@/lib/thousandsSuffix";
+import { useThousandsSuffix } from "@/hooks/useThousandsSuffix";
 
 interface MoneyLabelProps {
   amount: number;
@@ -22,19 +24,18 @@ export default function MoneyLabel({
   locale = "vi-VN",
   zeroDisplay,
 }: MoneyLabelProps) {
-  const formatted =
-    amount === 0 && zeroDisplay ? zeroDisplay : amount.toLocaleString(locale);
-  const lastDot = formatted.lastIndexOf(".");
-
-  const main = lastDot !== -1 ? formatted.slice(0, lastDot) : formatted;
-  const small = lastDot !== -1 ? formatted.slice(lastDot + 1) : "";
+  const [mode] = useThousandsSuffix();
+  const usePlaceholder = amount === 0 && zeroDisplay && mode === "000";
+  const { main, small } = usePlaceholder
+    ? { main: zeroDisplay.slice(0, zeroDisplay.lastIndexOf(".")), small: `.${zeroDisplay.slice(zeroDisplay.lastIndexOf(".") + 1)}` }
+    : formatVndParts(amount, mode, locale);
 
   return (
     <span className={cn("tabular-nums whitespace-nowrap", className)}>
-      {lastDot !== -1 ? (
+      {small ? (
         <>
           <span className={mainClassName}>{main}</span>
-          <span className={cn("text-[0.75em] opacity-80", smallClassName)}>.{small}</span>
+          <span className={cn("text-[0.75em] opacity-80", smallClassName)}>{small}</span>
         </>
       ) : (
         <span className={mainClassName}>{main}</span>

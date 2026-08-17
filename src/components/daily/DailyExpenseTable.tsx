@@ -1672,7 +1672,12 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
 
   // Fixed height for both phases — paging must not resize the panel
   const panelHeight = "min(80svh, 36rem)";
-  const listPadClass = cardExpanded ? "pb-[min(82svh,37rem)]" : "pb-24";
+  const weekPagerOpen = viewMode === "range" && !nameFilter;
+  const listPadClass = cardExpanded
+    ? "pb-[min(82svh,37rem)]"
+    : weekPagerOpen
+      ? "pb-0"
+      : "pb-24";
 
   return (
     <div

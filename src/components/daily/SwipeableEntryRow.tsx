@@ -158,7 +158,7 @@ export default function SwipeableEntryRow({
   const titleClass = "text-sm font-medium truncate text-foreground/90 text-left min-w-0";
 
   return (
-    <div className="relative overflow-hidden">
+    <div className="relative overflow-hidden" data-swipeable-entry>
       <div
         className="absolute inset-y-0 right-0 flex"
         style={{ width: ACTION_WIDTH }}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import MoneyLabel from "./MoneyLabel";
 import { formatDayMonth } from "@/lib/formatDateVi";
+import { useSnapPagerAxisLock } from "@/hooks/useSnapPagerAxisLock";
 
 export interface WeekPage<T> {
   key: string;
@@ -20,6 +21,7 @@ interface WeekPagerProps<T> {
 export default function WeekPager<T>({ weeks, renderSection, footer }: WeekPagerProps<T>) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
+  useSnapPagerAxisLock(scrollerRef);
 
   useEffect(() => {
     setActive(0);
@@ -81,18 +83,20 @@ export default function WeekPager<T>({ weeks, renderSection, footer }: WeekPager
       >
         {weeks.map(week => (
           <div key={week.key} className="week-snap-page px-4">
-            <div className="mb-2 flex items-baseline justify-between gap-3 px-0.5">
-              <h2 className="font-display text-sm tracking-wide text-muted-foreground">
-                Tuần {formatDayMonth(week.weekStart)} – {formatDayMonth(week.weekEnd)}
-              </h2>
-              <MoneyLabel
-                amount={week.total}
-                className="text-xs text-muted-foreground"
-                smallClassName="text-[0.7em]"
-              />
+            <div className="week-snap-page-inner">
+              <div className="mb-2 flex items-baseline justify-between gap-3 px-0.5">
+                <h2 className="font-display text-sm tracking-wide text-muted-foreground">
+                  Tuần {formatDayMonth(week.weekStart)} – {formatDayMonth(week.weekEnd)}
+                </h2>
+                <MoneyLabel
+                  amount={week.total}
+                  className="text-xs text-muted-foreground"
+                  smallClassName="text-[0.7em]"
+                />
+              </div>
+              {week.sections.map(renderSection)}
+              {footer}
             </div>
-            {week.sections.map(renderSection)}
-            {footer}
           </div>
         ))}
       </div>

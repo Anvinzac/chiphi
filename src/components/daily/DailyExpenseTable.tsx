@@ -35,7 +35,7 @@ import { lockBodyScroll } from "@/lib/focusWithoutScroll";
 import { formatDayMonth, formatDayMonthRange } from "@/lib/formatDateVi";
 import { applyDueExpenseSpans, createExpenseSpan } from "@/lib/applyExpenseSpans";
 import { SPAN_PRESETS, splitAmountAcrossPeriods, type SpanPresetKey } from "@/lib/expenseSpan";
-import { QUICK_CATEGORY_DETAILS, type CategoryFrequency } from "@/lib/categoryVisuals";
+import { EXTRA_WEEKLY_CATEGORIES, foldCategoryName, getCategoryVisual, type CategoryFrequency } from "@/lib/categoryVisuals";
 import { getAmountDefault, setAmountDefault } from "@/lib/expenseAmountDefaults";
 import { thousandsFromVnd } from "@/lib/vndThousands";
 import { paymentsWithSubsInRange, readLaggedSnapshot, type SnapshotPayload } from "@/lib/laggedSnapshot";
@@ -290,16 +290,15 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     { key: "weekly", label: "Tuần" },
   ];
   const chipsByFrequency = useMemo(() => {
-    const groups: Record<CategoryFrequency, typeof QUICK_CATEGORY_DETAILS> = {
+    const groups: Record<CategoryFrequency, Array<ReturnType<typeof getCategoryVisual> & { id: string }>> = {
       monthly: [],
       daily: [],
       weekly: [],
     };
-    // Prefer DB frequency (Admin edits) over the hardcoded preset
-    for (const detail of QUICK_CATEGORY_DETAILS) {
-      const fromDb = categories.find(c => c.name.toLowerCase() === detail.name.toLowerCase());
-      const freq = fromDb?.frequency || detail.frequency;
-      groups[freq].push(detail);
+    for (const cat of categories) {
+      const visual = getCategoryVisual(cat.name);
+      const freq = cat.frequency || visual.frequency;
+      groups[freq].push({ ...visual, name: cat.name, frequency: freq, id: cat.id });
     }
     return groups;
   }, [categories]);
@@ -350,7 +349,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
 
       const [itemsRes, catsRes, subsRes, freqRes, supFreqRes] = await Promise.all([
         supabase.from("items").select("*").eq("user_id", user.id),
-        supabase.from("categories").select("id, name, frequency").eq("user_id", user.id),
+        supabase.from("categories").select("id, name, frequency").eq("user_id", user.id).order("name"),
         supabase.from("sub_categories").select("id, name, category_id").eq("user_id", user.id),
         supabase.from("sub_payments").select("item_id").eq("user_id", user.id).not("item_id", "is", null),
         supabase.from("sub_payments").select("supplier_id").eq("user_id", user.id).not("supplier_id", "is", null),
@@ -369,10 +368,30 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       }
 
       if (itemsRes.data) setItems(itemsRes.data);
-      setCategories(catsRes.data.map(category => ({
-        ...category,
+      let nextCategories = catsRes.data.map(category => ({
+        id: category.id,
+        name: category.name,
         frequency: (category.frequency as CategoryFrequency) || "daily",
-      })));
+      }));
+      const have = new Set(nextCategories.map(c => foldCategoryName(c.name)));
+      const missing = EXTRA_WEEKLY_CATEGORIES.filter(name => !have.has(foldCategoryName(name)));
+      if (missing.length > 0) {
+        const { data: inserted } = await supabase
+          .from("categories")
+          .insert(missing.map(name => ({ name, frequency: "weekly" as const, user_id: user.id })))
+          .select("id, name, frequency");
+        if (inserted?.length) {
+          nextCategories = [
+            ...nextCategories,
+            ...inserted.map(category => ({
+              id: category.id,
+              name: category.name,
+              frequency: (category.frequency as CategoryFrequency) || "weekly",
+            })),
+          ].sort((a, b) => a.name.localeCompare(b.name, "vi"));
+        }
+      }
+      setCategories(nextCategories);
       if (subsRes.data) setSubCategories(subsRes.data);
       if (vendors.length > 0) {
         setSuppliers(vendors.map(v => ({ id: v.id, name: v.name, contact: v.contact })));
@@ -812,7 +831,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     let categoryId = existing?.id || null;
 
     if (!categoryId) {
-      const preset = QUICK_CATEGORY_DETAILS.find(d => d.name.toLowerCase() === categoryName.toLowerCase());
+      const preset = getCategoryVisual(categoryName);
       const frequency: CategoryFrequency = preset?.frequency || "daily";
       const { data, error } = await supabase
         .from("categories")
@@ -2106,7 +2125,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                                 categories.find(c => c.id === selectedCategoryId)?.name === category.name;
                               return (
                                 <button
-                                  key={category.name}
+                                  key={category.id}
                                   type="button"
                                   onClick={() => handleQuickCategory(category.name)}
                                   style={{

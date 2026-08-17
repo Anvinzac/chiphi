@@ -7,6 +7,14 @@ export type CategoryVisual = {
   frequency: CategoryFrequency;
 };
 
+export function foldCategoryName(name: string) {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "");
+}
+
 /** Soft dusty pastels — same visual weight across the set */
 export const QUICK_CATEGORY_DETAILS: CategoryVisual[] = [
   { name: "Điện", emoji: "⚡", gradient: "linear-gradient(160deg, #efe4d2 0%, #d9c6a8 100%)", frequency: "monthly" },
@@ -21,6 +29,9 @@ export const QUICK_CATEGORY_DETAILS: CategoryVisual[] = [
   { name: "Gạo", emoji: "🌾", gradient: "linear-gradient(160deg, #efe6d4 0%, #d8c8a8 100%)", frequency: "weekly" },
   { name: "Nước dừa", emoji: "🥥", gradient: "linear-gradient(160deg, #d9e6e6 0%, #b7cbcc 100%)", frequency: "weekly" },
   { name: "Muối", emoji: "🧂", gradient: "linear-gradient(160deg, #e2e6ea 0%, #c5cbd2 100%)", frequency: "weekly" },
+  { name: "Da", emoji: "🥓", gradient: "linear-gradient(160deg, #ead8d4 0%, #d2b4ac 100%)", frequency: "weekly" },
+  { name: "Gia vị", emoji: "🌶️", gradient: "linear-gradient(160deg, #eadfd4 0%, #d4c0b0 100%)", frequency: "weekly" },
+  { name: "Mang về", emoji: "🥡", gradient: "linear-gradient(160deg, #e4e0d8 0%, #ccc4b8 100%)", frequency: "weekly" },
   { name: "Shopee", emoji: "🛍️", gradient: "linear-gradient(160deg, #eeddd8 0%, #d6b8b0 100%)", frequency: "daily" },
   { name: "Internet", emoji: "🌐", gradient: "linear-gradient(160deg, #dde2ec 0%, #b8c2d2 100%)", frequency: "monthly" },
   { name: "Sửa chữa", emoji: "🛠️", gradient: "linear-gradient(160deg, #e8dfd8 0%, #cec0b4 100%)", frequency: "daily" },
@@ -33,7 +44,9 @@ export const QUICK_CATEGORY_DETAILS: CategoryVisual[] = [
   { name: "Khác", emoji: "✦", gradient: "linear-gradient(160deg, #e8dde6 0%, #d0bac8 100%)", frequency: "daily" },
 ];
 
-const BY_NAME = new Map(QUICK_CATEGORY_DETAILS.map(d => [d.name.toLowerCase(), d]));
+export const EXTRA_WEEKLY_CATEGORIES = ["Da", "Gia vị", "Mang về"] as const;
+
+const BY_NAME = new Map(QUICK_CATEGORY_DETAILS.map(d => [foldCategoryName(d.name), d]));
 
 const FALLBACK: CategoryVisual = {
   name: "Khác",
@@ -44,5 +57,5 @@ const FALLBACK: CategoryVisual = {
 
 export function getCategoryVisual(name?: string | null): CategoryVisual {
   if (!name?.trim()) return FALLBACK;
-  return BY_NAME.get(name.trim().toLowerCase()) ?? FALLBACK;
+  return BY_NAME.get(foldCategoryName(name)) ?? FALLBACK;
 }

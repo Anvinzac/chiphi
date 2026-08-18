@@ -374,40 +374,43 @@ export default function AmountPhase({
             >
               Ghi chú
             </label>
-            <div className="flex items-center gap-1.5">
-              <ClearFieldButton
-                visible={noteValue.length > 0}
-                onClear={() => {
-                  setNoteValue("");
-                  focusWithoutScroll(noteRef.current);
-                }}
-                label="Xóa ghi chú"
-                size="sm"
-              />
-              <input
-                ref={noteRef}
-                id="expense-note"
-                type="text"
-                value={noteValue}
-                onChange={e => setNoteValue(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    if (!saving) onSave();
-                  }
-                }}
-                placeholder="Tùy chọn"
-                maxLength={80}
-                className="w-full min-w-0 border-b border-border/45 bg-transparent pb-1.5 text-right text-base font-medium leading-tight text-foreground caret-primary outline-none transition-[border-color,box-shadow] duration-200 placeholder:font-normal placeholder:text-muted-foreground/30 focus:border-primary/55 focus:shadow-[0_1px_0_0_hsl(var(--primary)/0.35)]"
-                aria-label="Ghi chú thêm (tùy chọn)"
-                autoComplete="off"
-                enterKeyHint="done"
-                onFocus={() => {
-                  setAmountActive(false);
-                  window.scrollTo(0, 0);
-                  requestAnimationFrame(() => window.scrollTo(0, 0));
-                }}
-              />
+            <div className="flex w-full justify-end">
+              <div className="inline-flex min-w-0 max-w-full items-center gap-1">
+                <input
+                  ref={noteRef}
+                  id="expense-note"
+                  type="text"
+                  value={noteValue}
+                  onChange={e => setNoteValue(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      if (!saving) onSave();
+                    }
+                  }}
+                  placeholder="Tùy chọn"
+                  maxLength={80}
+                  size={Math.max(8, [...noteValue].length + 1)}
+                  className="max-w-full min-w-0 border-b border-border/45 bg-transparent pb-1.5 text-right text-base font-medium leading-tight text-foreground caret-primary outline-none transition-[border-color,box-shadow] duration-200 placeholder:font-normal placeholder:text-muted-foreground/30 focus:border-primary/55 focus:shadow-[0_1px_0_0_hsl(var(--primary)/0.35)]"
+                  aria-label="Ghi chú thêm (tùy chọn)"
+                  autoComplete="off"
+                  enterKeyHint="done"
+                  onFocus={() => {
+                    setAmountActive(false);
+                    window.scrollTo(0, 0);
+                    requestAnimationFrame(() => window.scrollTo(0, 0));
+                  }}
+                />
+                <ClearFieldButton
+                  visible={noteValue.length > 0}
+                  onClear={() => {
+                    setNoteValue("");
+                    focusWithoutScroll(noteRef.current);
+                  }}
+                  label="Xóa ghi chú"
+                  size="sm"
+                />
+              </div>
             </div>
           </div>
         </div>

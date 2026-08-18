@@ -16,6 +16,7 @@ import RangeDayPicker from "./RangeDayPicker";
 import MoneyLabel from "./MoneyLabel";
 import DaySection from "./DaySection";
 import WeekPager, { type WeekPage } from "./WeekPager";
+import ListSearchBar, { SEARCH_BAR_HEIGHT } from "./ListSearchBar";
 import BrandMenu from "@/components/BrandMenu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -92,6 +93,21 @@ function getPeriodOffsetForDate(date: Date) {
     return 1 + Math.floor(differenceInCalendarDays(date, addDays(PERIOD_ZERO_END, 1)) / PERIOD_LENGTH_DAYS);
   }
   return -1 + Math.floor(differenceInCalendarDays(date, PERIOD_PREV_START) / PERIOD_LENGTH_DAYS);
+}
+
+function matchesListSearch(
+  entry: PaymentEntry,
+  needle: string,
+  categoryName?: string,
+  supplierName?: string,
+) {
+  const q = foldCategoryName(needle);
+  if (!q) return true;
+  if (foldCategoryName(entry.item_name).includes(q)) return true;
+  if (entry.notes && foldCategoryName(entry.notes).includes(q)) return true;
+  if (categoryName && foldCategoryName(categoryName).includes(q)) return true;
+  if (supplierName && foldCategoryName(supplierName).includes(q)) return true;
+  return false;
 }
 
 interface DbItem {
@@ -199,7 +215,11 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   const [discardOpen, setDiscardOpen] = useState(false);
   const [detailEntry, setDetailEntry] = useState<PaymentEntry | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
-  const [nameFilter, setNameFilter] = useState<string | null>(null);
+  const [listSearch, setListSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchPullPx, setSearchPullPx] = useState(0);
+  const [searchPulling, setSearchPulling] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [spanEnabled, setSpanEnabled] = useState(false);
   const [rememberAmount, setRememberAmount] = useState(false);
   const [spanPreset, setSpanPreset] = useState<SpanPresetKey>("3m");
@@ -262,6 +282,12 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     setReceiptPreview(url);
     return () => URL.revokeObjectURL(url);
   }, [receiptFile]);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    const t = window.setTimeout(() => searchInputRef.current?.focus(), 60);
+    return () => window.clearTimeout(t);
+  }, [searchOpen]);
   useEffect(() => {
     if (suppliers.length === 0) return;
     setPaymentGroups(prev => {
@@ -1566,8 +1592,8 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   }, [viewMode, rangeDaySections]);
 
   const filteredNameSections = useMemo(() => {
-    if (!nameFilter) return null;
-    const needle = nameFilter.toLowerCase().trim();
+    const needle = listSearch.trim();
+    if (!needle) return null;
     type FlatItem = {
       entry: PaymentEntry;
       paymentId: string;
@@ -1577,7 +1603,12 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     const flat: FlatItem[] = [];
     for (const group of paymentGroups) {
       group.entries.forEach((entry, entryIndex) => {
-        if (entry.item_name.toLowerCase().trim() === needle) {
+        if (matchesListSearch(
+          entry,
+          needle,
+          getCategoryName(entry.category_id),
+          getSupplierName(entry.supplier_id),
+        )) {
           flat.push({
             entry,
             paymentId: group.paymentId,
@@ -1645,9 +1676,24 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       count: flat.length,
       weeks,
     };
-  }, [nameFilter, paymentGroups, selectedDate]);
+  }, [listSearch, paymentGroups, selectedDate, getCategoryName, getSupplierName]);
 
   const displayTotal = filteredNameSections ? filteredNameSections.total : dayTotal;
+  const hasListSearch = listSearch.trim().length > 0;
+
+  const openListSearch = useCallback((query = listSearch) => {
+    setListSearch(query);
+    setSearchPullPx(0);
+    setSearchPulling(false);
+    setSearchOpen(true);
+  }, [listSearch]);
+
+  const closeListSearch = useCallback(() => {
+    setSearchOpen(false);
+    setSearchPullPx(0);
+    setSearchPulling(false);
+    searchInputRef.current?.blur();
+  }, []);
 
   const formatDayHeading = (dateStr: string) => {
     try {
@@ -1667,7 +1713,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   const renderPaymentGroup = (group: PaymentGroupData) => (
     <PaymentGroup
       key={group.paymentId}
-      group={viewMode === "range" && !nameFilter ? { ...group, date: undefined } : group}
+      group={viewMode === "range" && !hasListSearch ? { ...group, date: undefined } : group}
       getCategoryName={getCategoryName}
       getSupplierName={getSupplierName}
       highValueThreshold={HIGH_VALUE_THRESHOLD}
@@ -1677,7 +1723,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       }}
       onEntryNameClick={(entry) => {
         if (entry.isPending) openReminder(entry);
-        else setNameFilter(entry.item_name);
+        else openListSearch(entry.item_name);
       }}
       onEntryDelete={async (paymentId, entry, index) => {
         if (entry.isPending && entry.scheduleId) {
@@ -1701,7 +1747,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
 
   // Fixed height for both phases — paging must not resize the panel
   const panelHeight = "min(80svh, 36rem)";
-  const weekPagerOpen = viewMode === "range" && !nameFilter;
+  const weekPagerOpen = viewMode === "range" && !hasListSearch;
   const listPadClass = cardExpanded
     ? "pb-[min(82svh,37rem)]"
     : weekPagerOpen
@@ -1775,7 +1821,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
 
         <div className="min-w-[6.75rem] shrink-0 text-right tabular-nums">
           <span className="block text-[10px] uppercase tracking-widest text-muted-foreground">
-            {nameFilter ? "Lọc" : "Tổng"}
+            {hasListSearch ? "Lọc" : "Tổng"}
           </span>
           <MoneyLabel
             amount={displayTotal}
@@ -1791,21 +1837,42 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
         className={`flex-1 px-4 ${listPadClass} ${
           cardExpanded
             ? "overflow-hidden overscroll-none"
-            : viewMode === "range" && !nameFilter
+            : viewMode === "range" || searchOpen || hasListSearch
               ? "flex min-h-0 flex-col overflow-hidden"
               : "overflow-auto"
         }`}
         data-expense-list
       >
-        {nameFilter && (
+        {(searchOpen || searchPullPx > 0) && (
+          <div
+            className="shrink-0 overflow-hidden"
+            style={{
+              height: searchOpen ? SEARCH_BAR_HEIGHT : searchPullPx,
+              transition: searchPulling ? "none" : "height 0.22s cubic-bezier(0.2, 0.9, 0.3, 1)",
+            }}
+          >
+            <ListSearchBar
+              query={listSearch}
+              onQueryChange={setListSearch}
+              onDismiss={closeListSearch}
+              inputRef={searchInputRef}
+            />
+          </div>
+        )}
+
+        {hasListSearch && !searchOpen && (
           <div className="mb-3 flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2" data-no-double-tap>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Đang lọc</p>
-              <p className="truncate font-display text-base leading-tight">{nameFilter}</p>
-            </div>
             <button
               type="button"
-              onClick={() => setNameFilter(null)}
+              onClick={() => openListSearch()}
+              className="min-w-0 flex-1 text-left"
+            >
+              <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Đang lọc</p>
+              <p className="truncate font-display text-base leading-tight">{listSearch.trim()}</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setListSearch("")}
               className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-background text-muted-foreground shadow-sm transition-colors hover:text-foreground"
               aria-label="Xóa bộ lọc"
             >
@@ -1824,9 +1891,10 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
         )}
 
         {filteredNameSections ? (
-          filteredNameSections.count === 0 ? (
+          <div className="min-h-0 flex-1 overflow-auto">
+          {filteredNameSections.count === 0 ? (
             <div className="text-center pt-10 text-sm text-muted-foreground">
-              Không có khoản nào tên “{nameFilter}”
+              Không có khoản nào khớp “{listSearch.trim()}”
             </div>
           ) : (
             filteredNameSections.weeks.map(week => (
@@ -1859,7 +1927,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                         isPending={item.entry.isPending}
                         onNameClick={() => {
                           if (item.entry.isPending) openReminder(item.entry);
-                          else setNameFilter(item.entry.item_name);
+                          else openListSearch(item.entry.item_name);
                         }}
                         onClick={() => {
                           if (item.entry.isPending) openReminder(item.entry);
@@ -1894,10 +1962,25 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                 ))}
               </section>
             ))
-          )
+          )}
+          </div>
         ) : viewMode === "range" ? (
           <WeekPager
             weeks={rangeWeekPages}
+            searchPullEnabled={!searchOpen}
+            onSearchPull={px => {
+              setSearchPulling(true);
+              setSearchPullPx(px);
+            }}
+            onSearchPullEnd={open => {
+              setSearchPulling(false);
+              if (open) {
+                setSearchOpen(true);
+                setSearchPullPx(0);
+              } else {
+                setSearchPullPx(0);
+              }
+            }}
             footer={
               paymentGroups.length > 0 ? (
                 <button
@@ -1924,7 +2007,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
         )}
 
         {/* New purchase button */}
-        {paymentGroups.length > 0 && !nameFilter && viewMode !== "range" && (
+        {paymentGroups.length > 0 && !hasListSearch && viewMode !== "range" && (
           <button
             onClick={startNewPurchase}
             className="w-full mt-2 py-2.5 text-xs text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:border-primary/40 transition-colors flex items-center justify-center gap-1.5"

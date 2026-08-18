@@ -2,7 +2,6 @@ import { useEffect, type RefObject } from "react";
 
 const MOVE_PX = 12;
 const HORIZONTAL_PX = 28;
-const HORIZONTAL_ON_ROW_PX = 96;
 const HORIZONTAL_RATIO = 2.2;
 const PAGE_FLIP_PX = 56;
 
@@ -19,7 +18,6 @@ export function useSnapPagerAxisLock(scrollerRef: RefObject<HTMLElement | null>)
     let startX = 0;
     let startY = 0;
     let startLeft = 0;
-    let fromEntry = false;
 
     const pages = () => el.querySelectorAll<HTMLElement>(".week-snap-page");
 
@@ -48,7 +46,6 @@ export function useSnapPagerAxisLock(scrollerRef: RefObject<HTMLElement | null>)
       startY = t.clientY;
       startLeft = el.scrollLeft;
       axis = null;
-      fromEntry = Boolean((e.target as Element | null)?.closest("[data-swipeable-entry]"));
       restorePages();
     };
 
@@ -62,11 +59,10 @@ export function useSnapPagerAxisLock(scrollerRef: RefObject<HTMLElement | null>)
         const adx = Math.abs(dx);
         const ady = Math.abs(dy);
         if (adx < MOVE_PX && ady < MOVE_PX) return;
-        const needX = fromEntry ? HORIZONTAL_ON_ROW_PX : HORIZONTAL_PX;
         if (ady >= MOVE_PX && ady >= adx) {
           axis = "y";
           lockY();
-        } else if (adx >= needX && adx > ady * HORIZONTAL_RATIO) {
+        } else if (adx >= HORIZONTAL_PX && adx > ady * HORIZONTAL_RATIO) {
           axis = "x";
           lockX();
         } else {
@@ -101,7 +97,6 @@ export function useSnapPagerAxisLock(scrollerRef: RefObject<HTMLElement | null>)
         el.scrollLeft = startLeft;
       }
       axis = null;
-      fromEntry = false;
       restorePages();
     };
 

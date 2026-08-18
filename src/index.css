@@ -361,6 +361,10 @@
     padding: 0;
   }
 
+  .amount-note input {
+    width: auto;
+  }
+
   .amount-note input::placeholder {
     font-style: italic;
   }

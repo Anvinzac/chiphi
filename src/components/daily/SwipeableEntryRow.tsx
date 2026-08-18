@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import MoneyLabel from "./MoneyLabel";
 import CategoryGlyph from "./CategoryGlyph";
 
@@ -16,24 +16,9 @@ interface SwipeableEntryRowProps {
   onSkip?: () => void;
 }
 
-const ACTION_WIDTH = 88;
-const OPEN_THRESHOLD = 40;
-const PAGER_MOVE_PX = 12;
-
-function findHorizontalScroller(el: HTMLElement | null): HTMLElement | null {
-  let node = el?.parentElement ?? null;
-  while (node && node !== document.body) {
-    const { overflowX } = getComputedStyle(node);
-    if (
-      (overflowX === "auto" || overflowX === "scroll") &&
-      node.scrollWidth > node.clientWidth + 8
-    ) {
-      return node;
-    }
-    node = node.parentElement;
-  }
-  return null;
-}
+const HOLD_MS = 480;
+const MOVE_CANCEL_PX = 10;
+const ARM_EVENT = "mise:entry-delete-arm";
 
 export default function SwipeableEntryRow({
   item_name,
@@ -48,240 +33,208 @@ export default function SwipeableEntryRow({
   onNameClick,
   onSkip,
 }: SwipeableEntryRowProps) {
-  const [offsetX, setOffsetX] = useState(0);
-  const [swiping, setSwiping] = useState(false);
+  const rowId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const holdTimer = useRef<number | null>(null);
   const startX = useRef(0);
   const startY = useRef(0);
-  const startOffset = useRef(0);
-  const locked = useRef<"h" | "v" | null>(null);
-  const offsetRef = useRef(0);
-  const pagerRef = useRef<HTMLElement | null>(null);
-  const pagerStartLeft = useRef(0);
-  const cancelledByPager = useRef(false);
+  const suppressClick = useRef(false);
+  const [confirming, setConfirming] = useState(false);
 
-  useEffect(() => {
-    offsetRef.current = offsetX;
-  }, [offsetX]);
-
-  const close = useCallback(() => setOffsetX(0), []);
-
-  const pagerMoved = useCallback(() => {
-    const scroller = pagerRef.current;
-    if (!scroller) return false;
-    return Math.abs(scroller.scrollLeft - pagerStartLeft.current) > PAGER_MOVE_PX;
+  const clearHold = useCallback(() => {
+    if (holdTimer.current != null) {
+      window.clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
   }, []);
 
-  const cancelForPager = useCallback(() => {
-    cancelledByPager.current = true;
-    locked.current = "v";
-    setOffsetX(0);
-    setSwiping(false);
-  }, []);
+  const armDelete = useCallback(() => {
+    holdTimer.current = null;
+    suppressClick.current = true;
+    setConfirming(true);
+    window.dispatchEvent(new CustomEvent(ARM_EVENT, { detail: rowId }));
+  }, [rowId]);
+
+  const cancelConfirm = useCallback(() => setConfirming(false), []);
+
+  useEffect(() => () => clearHold(), [clearHold]);
 
   useEffect(() => {
-    const onPagerSlide = () => {
-      if (offsetRef.current !== 0 || swiping) cancelForPager();
+    const onArm = (e: Event) => {
+      if ((e as CustomEvent<string>).detail !== rowId) setConfirming(false);
     };
-    window.addEventListener("mise:page-slide", onPagerSlide);
-    return () => window.removeEventListener("mise:page-slide", onPagerSlide);
-  }, [cancelForPager, swiping]);
-
-  useEffect(() => {
-    if (!swiping) return;
-    const scroller = pagerRef.current;
-    if (!scroller) return;
     const onScroll = () => {
-      if (pagerMoved()) cancelForPager();
+      clearHold();
+      setConfirming(false);
     };
-    scroller.addEventListener("scroll", onScroll, { passive: true });
-    return () => scroller.removeEventListener("scroll", onScroll);
-  }, [swiping, pagerMoved, cancelForPager]);
+    window.addEventListener(ARM_EVENT, onArm);
+    window.addEventListener("mise:page-slide", cancelConfirm);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      window.removeEventListener(ARM_EVENT, onArm);
+      window.removeEventListener("mise:page-slide", cancelConfirm);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [rowId, cancelConfirm, clearHold]);
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    startX.current = e.touches[0].clientX;
-    startY.current = e.touches[0].clientY;
-    startOffset.current = offsetRef.current;
-    locked.current = null;
-    cancelledByPager.current = false;
-    const scroller = findHorizontalScroller(e.currentTarget as HTMLElement);
-    pagerRef.current = scroller;
-    pagerStartLeft.current = scroller?.scrollLeft ?? 0;
-    setSwiping(true);
-  }, []);
+  useEffect(() => {
+    if (!confirming) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (rootRef.current?.contains(e.target as Node)) return;
+      setConfirming(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [confirming]);
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!swiping || cancelledByPager.current) return;
-    if (pagerMoved()) {
-      cancelForPager();
-      return;
-    }
-    const dx = e.touches[0].clientX - startX.current;
-    const dy = e.touches[0].clientY - startY.current;
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (isPending || confirming || e.button !== 0) return;
+    startX.current = e.clientX;
+    startY.current = e.clientY;
+    clearHold();
+    holdTimer.current = window.setTimeout(armDelete, HOLD_MS);
+  };
 
-    if (!locked.current && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
-      locked.current = Math.abs(dy) > Math.abs(dx) ? "v" : "h";
-      if (locked.current === "v") {
-        setSwiping(false);
-        return;
-      }
-    }
-    if (locked.current !== "h") return;
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (holdTimer.current == null) return;
+    const dx = e.clientX - startX.current;
+    const dy = e.clientY - startY.current;
+    if (dx * dx + dy * dy > MOVE_CANCEL_PX * MOVE_CANCEL_PX) clearHold();
+  };
 
-    const next = Math.min(0, Math.max(-ACTION_WIDTH, startOffset.current + dx));
-    setOffsetX(next);
-  }, [swiping, pagerMoved, cancelForPager]);
+  const handlePointerEnd = () => clearHold();
 
-  const handleTouchEnd = useCallback(() => {
-    setSwiping(false);
-    if (cancelledByPager.current || pagerMoved()) {
-      cancelledByPager.current = false;
-      locked.current = null;
-      setOffsetX(0);
-      return;
-    }
-    if (locked.current !== "h") {
-      locked.current = null;
-      return;
-    }
-    locked.current = null;
-    setOffsetX(offsetRef.current < -OPEN_THRESHOLD ? -ACTION_WIDTH : 0);
-  }, [pagerMoved]);
+  const consumeSuppressedClick = () => {
+    if (!suppressClick.current) return false;
+    suppressClick.current = false;
+    return true;
+  };
 
   const handleRowClick = () => {
-    if (offsetRef.current !== 0) {
-      close();
+    if (consumeSuppressedClick()) return;
+    if (confirming) {
+      cancelConfirm();
       return;
     }
     onClick();
   };
 
+  const handleNameClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (consumeSuppressedClick()) return;
+    if (confirming) {
+      cancelConfirm();
+      return;
+    }
+    onNameClick?.();
+  };
+
   const titleClass = "text-sm font-medium truncate text-foreground/90 text-left min-w-0";
 
   return (
-    <div className="relative overflow-hidden" data-swipeable-entry>
+    <div
+      ref={rootRef}
+      className="relative select-none [-webkit-touch-callout:none]"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+      onContextMenu={e => {
+        if (!isPending) e.preventDefault();
+      }}
+    >
       <div
-        className="absolute inset-y-0 right-0 flex"
-        style={{ width: ACTION_WIDTH }}
-        aria-hidden={offsetX === 0}
-      >
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-            close();
-          }}
-          className="h-full w-full bg-destructive text-destructive-foreground text-sm font-semibold tracking-wide active:brightness-90"
-          aria-label="Xóa"
-        >
-          Xóa
-        </button>
-      </div>
-
-      <div
-        className="relative bg-background transition-transform will-change-transform"
-        style={{
-          transform: `translateX(${offsetX}px)`,
-          transition: swiping ? "none" : "transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1)",
-        }}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        className={`flex items-start justify-between gap-3 px-3 py-3 cursor-pointer active:bg-muted/20 transition-colors border-b border-border/35 ${
+          isPending ? "reminder-row" : ""
+        } ${confirming ? "bg-destructive/5" : ""}`}
         onClick={handleRowClick}
       >
-        <div className={`flex items-start justify-between gap-3 px-3 py-3 cursor-pointer active:bg-muted/20 transition-colors border-b border-border/35 ${
-          isPending ? "reminder-row" : ""
-        }`}>
-          <CategoryGlyph categoryName={categoryName} />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 min-w-0">
-              {onNameClick ? (
-                <button
-                  type="button"
-                  className={`${titleClass} hover:text-primary transition-colors`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (offsetRef.current !== 0) {
-                      close();
-                      return;
-                    }
-                    onNameClick();
-                  }}
-                >
-                  {item_name}
-                </button>
-              ) : (
-                <span className={titleClass}>{item_name}</span>
-              )}
-              {supplierName && !isPending && (
-                <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-accent/25 text-accent-foreground">
-                  {supplierName}
-                </span>
-              )}
-              {isPending && (
-                <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-background/70 text-primary font-medium">
-                  Nhắc lịch
-                </span>
-              )}
-            </div>
-            {notes && (
-              <p className="mt-0.5 text-[11px] text-muted-foreground/75 truncate italic leading-snug">
-                {notes}
-              </p>
+        <CategoryGlyph categoryName={categoryName} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            {onNameClick ? (
+              <button type="button" className={`${titleClass} hover:text-primary transition-colors`} onClick={handleNameClick}>
+                {item_name}
+              </button>
+            ) : (
+              <span className={titleClass}>{item_name}</span>
             )}
-            {categoryName && (
-              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted/70 text-muted-foreground">
-                  {categoryName}
-                </span>
-              </div>
+            {supplierName && !isPending && (
+              <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-accent/25 text-accent-foreground">
+                {supplierName}
+              </span>
+            )}
+            {isPending && (
+              <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-background/70 text-primary font-medium">
+                Nhắc lịch
+              </span>
             )}
           </div>
-          <span
-            className={`shrink-0 pt-0.5 pl-1 ${
-              !isPending && isHighValue ? "border-b-2 border-destructive/70" : ""
-            }`}
-            title={!isPending && isHighValue ? "Giá trị cao" : undefined}
-          >
-            {isPending ? (
-              <span className="flex items-center gap-1.5">
-                {onSkip && (
-                  <button
-                    type="button"
-                    className="text-[10px] px-2 py-0.5 rounded-full border border-border/60 text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (offsetRef.current !== 0) {
-                        close();
-                        return;
-                      }
-                      onSkip();
-                    }}
-                  >
-                    Bỏ qua
-                  </button>
-                )}
+          {notes && (
+            <p className="mt-0.5 text-[11px] text-muted-foreground/75 truncate italic leading-snug">
+              {notes}
+            </p>
+          )}
+          {categoryName && (
+            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted/70 text-muted-foreground">
+                {categoryName}
+              </span>
+            </div>
+          )}
+        </div>
+        <span
+          className={`shrink-0 pt-0.5 pl-1 ${
+            !isPending && !confirming && isHighValue ? "border-b-2 border-destructive/70" : ""
+          }`}
+          title={!isPending && isHighValue ? "Giá trị cao" : undefined}
+        >
+          {isPending ? (
+            <span className="flex items-center gap-1.5">
+              {onSkip && (
                 <button
                   type="button"
-                  className="text-[10px] px-2 py-0.5 rounded-full border border-destructive/35 text-destructive hover:bg-destructive/10 transition-colors"
-                  onClick={(e) => {
+                  className="text-[10px] px-2 py-0.5 rounded-full border border-border/60 text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+                  onClick={e => {
                     e.stopPropagation();
-                    close();
-                    onDelete();
+                    onSkip();
                   }}
                 >
-                  Xóa
+                  Bỏ qua
                 </button>
-              </span>
-            ) : (
-              <MoneyLabel
-                amount={amount}
-                className="text-sm font-display text-foreground/85"
-                smallClassName="text-[0.7em]"
-              />
-            )}
-          </span>
-        </div>
+              )}
+              <button
+                type="button"
+                className="text-[10px] px-2 py-0.5 rounded-full border border-destructive/35 text-destructive hover:bg-destructive/10 transition-colors"
+                onClick={e => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+              >
+                Xóa
+              </button>
+            </span>
+          ) : confirming ? (
+            <button
+              type="button"
+              className="text-xs font-semibold px-3 py-1 rounded-full bg-destructive text-destructive-foreground active:brightness-90"
+              aria-label="Xóa"
+              onClick={e => {
+                e.stopPropagation();
+                onDelete();
+                cancelConfirm();
+              }}
+            >
+              Xóa
+            </button>
+          ) : (
+            <MoneyLabel
+              amount={amount}
+              className="text-sm font-display text-foreground/85"
+              smallClassName="text-[0.7em]"
+            />
+          )}
+        </span>
       </div>
     </div>
   );

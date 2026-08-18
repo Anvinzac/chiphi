@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Check, Copy, QrCode, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, Copy, QrCode, Store } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   generateShareToken,
   hashPin,
+  markOrderPinUnlocked,
   orderShareUrl,
 } from "@/lib/orderShare";
 import { importOrderCatalogFromSeed } from "@/lib/importOrderCatalog";
@@ -19,6 +20,7 @@ import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import MoneyLabel from "@/components/daily/MoneyLabel";
+import { useHoldToConfirm } from "@/hooks/useHoldToConfirm";
 import {
   Dialog,
   DialogContent,
@@ -62,6 +64,107 @@ function defaultQty(ing: CatalogIngredient): string {
     return String(ing.quick_quantities[0]);
   }
   return "1";
+}
+
+function OrderFilledRow({
+  row,
+  expanded,
+  estimate,
+  chipCloud,
+  onExpand,
+  onUpdate,
+  onRemove,
+}: {
+  row: OrderItemDraft;
+  expanded: boolean;
+  estimate: number | null;
+  chipCloud: ReactNode;
+  onExpand: () => void;
+  onUpdate: (patch: Partial<OrderItemDraft>) => void;
+  onRemove: () => void;
+}) {
+  const { confirming, cancelConfirm, consumeClick, rootRef, holdProps } = useHoldToConfirm({
+    ignoreSelector: "input, textarea, button",
+  });
+
+  const handleRowActivate = () => {
+    if (consumeClick()) return;
+    if (confirming) {
+      cancelConfirm();
+      return;
+    }
+    onExpand();
+  };
+
+  return (
+    <div
+      ref={rootRef}
+      className={`overflow-hidden rounded-2xl border transition-colors select-none [-webkit-touch-callout:none] ${
+        expanded ? "border-primary/30 bg-card shadow-sm" : "border-border/50 bg-card"
+      } ${confirming ? "bg-destructive/5" : ""}`}
+      {...holdProps}
+    >
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={handleRowActivate}
+        onKeyDown={e => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleRowActivate();
+          }
+        }}
+        className={`flex w-full cursor-pointer items-center gap-2 px-3 py-2.5 text-left ${
+          expanded ? "bg-primary/5" : ""
+        }`}
+      >
+        <p className="min-w-0 flex-1 truncate text-sm font-medium leading-tight">
+          {row.name}
+        </p>
+        <div
+          className="flex shrink-0 items-baseline justify-center gap-1"
+          onClick={e => e.stopPropagation()}
+          onPointerDown={e => e.stopPropagation()}
+        >
+          <Input
+            value={row.quantity}
+            onFocus={() => onUpdate({ quantity: "" })}
+            onChange={e => onUpdate({ quantity: e.target.value.replace(/[^\d.]/g, "") })}
+            placeholder="0"
+            inputMode="decimal"
+            className="h-7 w-14 border-0 bg-muted/40 px-1.5 text-center text-sm tabular-nums shadow-none focus-visible:ring-1"
+            aria-label={`Số lượng ${row.name}`}
+          />
+          <span className="text-xs text-muted-foreground/45">{row.unit}</span>
+        </div>
+        <div className="min-w-[4.5rem] shrink-0 text-right">
+          {confirming ? (
+            <button
+              type="button"
+              className="text-xs font-semibold px-3 py-1 rounded-full bg-destructive text-destructive-foreground active:brightness-90"
+              aria-label={`Xóa ${row.name}`}
+              onClick={e => {
+                e.stopPropagation();
+                onRemove();
+                cancelConfirm();
+              }}
+            >
+              Xóa
+            </button>
+          ) : estimate != null ? (
+            <MoneyLabel
+              amount={estimate}
+              className="text-sm font-display text-foreground/90"
+              smallClassName="text-[0.7em]"
+            />
+          ) : (
+            <span className="text-[11px] text-muted-foreground/40">—</span>
+          )}
+        </div>
+      </div>
+      {expanded && chipCloud}
+    </div>
+  );
 }
 
 export default function OrderDetail() {
@@ -686,6 +789,18 @@ export default function OrderDetail() {
     }
   };
 
+  const openVendorPreview = () => {
+    const token = shareToken;
+    const oid = orderIdRef.current;
+    if (!token) {
+      toast.error("Tạo link trước đã");
+      return;
+    }
+    markOrderPinUnlocked(token);
+    setShareOpen(false);
+    navigate(`/o/${token}${oid ? `?from=${oid}` : ""}`);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">
@@ -716,6 +831,16 @@ export default function OrderDetail() {
               Danh mục: <span className="font-medium text-foreground/80">{lockedCatName}</span>
             </p>
           </div>
+          {shareToken && (
+            <button
+              type="button"
+              onClick={openVendorPreview}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="Xem như nhà cung cấp"
+            >
+              <Store className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -733,78 +858,19 @@ export default function OrderDetail() {
           <>
             {/* Filled rows — tap to expand chip cloud here */}
             {items.map((row, index) => {
-              const estimate = lineEstimate(row);
               const key = `item-${index}`;
               const expanded = expandedKey === key;
               return (
-                <div
+                <OrderFilledRow
                   key={row.id || key}
-                  className={`overflow-hidden rounded-2xl border transition-colors ${
-                    expanded
-                      ? "border-primary/30 bg-card shadow-sm"
-                      : "border-border/50 bg-card"
-                  }`}
-                >
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => expandSlot(key)}
-                    onKeyDown={e => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        expandSlot(key);
-                      }
-                    }}
-                    className={`flex w-full cursor-pointer items-center gap-2 px-3 py-2.5 text-left ${
-                      expanded ? "bg-primary/5" : ""
-                    }`}
-                  >
-                    <p className="min-w-0 flex-1 truncate text-sm font-medium leading-tight">
-                      {row.name}
-                    </p>
-                    <div
-                      className="flex shrink-0 items-baseline justify-center gap-1"
-                      onClick={e => e.stopPropagation()}
-                      onPointerDown={e => e.stopPropagation()}
-                    >
-                      <Input
-                        value={row.quantity}
-                        onFocus={() => updateRow(index, { quantity: "" })}
-                        onChange={e =>
-                          updateRow(index, { quantity: e.target.value.replace(/[^\d.]/g, "") })
-                        }
-                        placeholder="0"
-                        inputMode="decimal"
-                        className="h-7 w-14 border-0 bg-muted/40 px-1.5 text-center text-sm tabular-nums shadow-none focus-visible:ring-1"
-                        aria-label={`Số lượng ${row.name}`}
-                      />
-                      <span className="text-xs text-muted-foreground/45">{row.unit}</span>
-                    </div>
-                    <div className="w-[4.5rem] shrink-0 text-right">
-                      {estimate != null ? (
-                        <MoneyLabel
-                          amount={estimate}
-                          className="text-sm font-display text-foreground/90"
-                          smallClassName="text-[0.7em]"
-                        />
-                      ) : (
-                        <span className="text-[11px] text-muted-foreground/40">—</span>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={e => {
-                        e.stopPropagation();
-                        removeRow(index);
-                      }}
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                      aria-label={`Xóa ${row.name}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                  {expanded && renderChipCloud()}
-                </div>
+                  row={row}
+                  expanded={expanded}
+                  estimate={lineEstimate(row)}
+                  chipCloud={expanded ? renderChipCloud() : null}
+                  onExpand={() => expandSlot(key)}
+                  onUpdate={patch => updateRow(index, patch)}
+                  onRemove={() => removeRow(index)}
+                />
               );
             })}
 
@@ -840,7 +906,6 @@ export default function OrderDetail() {
                     <span className="w-[4.5rem] shrink-0 text-right text-[11px] text-muted-foreground/25">
                       ước tính
                     </span>
-                    <span className="inline-flex h-8 w-8 shrink-0" aria-hidden="true" />
                   </button>
                   {expanded && renderChipCloud()}
                 </div>
@@ -927,6 +992,10 @@ export default function OrderDetail() {
               <Button type="button" onClick={copyLink} className="w-full gap-2">
                 <Copy className="h-4 w-4" />
                 Copy link
+              </Button>
+              <Button type="button" variant="outline" onClick={openVendorPreview} className="w-full gap-2">
+                <Store className="h-4 w-4" />
+                Xem như nhà cung cấp
               </Button>
             </div>
           )}

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
 import MoneyLabel from "./MoneyLabel";
 import CategoryGlyph from "./CategoryGlyph";
+import { useHoldToConfirm } from "@/hooks/useHoldToConfirm";
 
 interface SwipeableEntryRowProps {
   item_name: string;
@@ -16,10 +16,6 @@ interface SwipeableEntryRowProps {
   onSkip?: () => void;
 }
 
-const HOLD_MS = 480;
-const MOVE_CANCEL_PX = 10;
-const ARM_EVENT = "mise:entry-delete-arm";
-
 export default function SwipeableEntryRow({
   item_name,
   amount,
@@ -33,85 +29,12 @@ export default function SwipeableEntryRow({
   onNameClick,
   onSkip,
 }: SwipeableEntryRowProps) {
-  const rowId = useId();
-  const rootRef = useRef<HTMLDivElement>(null);
-  const holdTimer = useRef<number | null>(null);
-  const startX = useRef(0);
-  const startY = useRef(0);
-  const suppressClick = useRef(false);
-  const [confirming, setConfirming] = useState(false);
-
-  const clearHold = useCallback(() => {
-    if (holdTimer.current != null) {
-      window.clearTimeout(holdTimer.current);
-      holdTimer.current = null;
-    }
-  }, []);
-
-  const armDelete = useCallback(() => {
-    holdTimer.current = null;
-    suppressClick.current = true;
-    setConfirming(true);
-    window.dispatchEvent(new CustomEvent(ARM_EVENT, { detail: rowId }));
-  }, [rowId]);
-
-  const cancelConfirm = useCallback(() => setConfirming(false), []);
-
-  useEffect(() => () => clearHold(), [clearHold]);
-
-  useEffect(() => {
-    const onArm = (e: Event) => {
-      if ((e as CustomEvent<string>).detail !== rowId) setConfirming(false);
-    };
-    const onScroll = () => {
-      clearHold();
-      setConfirming(false);
-    };
-    window.addEventListener(ARM_EVENT, onArm);
-    window.addEventListener("mise:page-slide", cancelConfirm);
-    window.addEventListener("scroll", onScroll, true);
-    return () => {
-      window.removeEventListener(ARM_EVENT, onArm);
-      window.removeEventListener("mise:page-slide", cancelConfirm);
-      window.removeEventListener("scroll", onScroll, true);
-    };
-  }, [rowId, cancelConfirm, clearHold]);
-
-  useEffect(() => {
-    if (!confirming) return;
-    const onPointerDown = (e: PointerEvent) => {
-      if (rootRef.current?.contains(e.target as Node)) return;
-      setConfirming(false);
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [confirming]);
-
-  const handlePointerDown = (e: React.PointerEvent) => {
-    if (isPending || confirming || e.button !== 0) return;
-    startX.current = e.clientX;
-    startY.current = e.clientY;
-    clearHold();
-    holdTimer.current = window.setTimeout(armDelete, HOLD_MS);
-  };
-
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (holdTimer.current == null) return;
-    const dx = e.clientX - startX.current;
-    const dy = e.clientY - startY.current;
-    if (dx * dx + dy * dy > MOVE_CANCEL_PX * MOVE_CANCEL_PX) clearHold();
-  };
-
-  const handlePointerEnd = () => clearHold();
-
-  const consumeSuppressedClick = () => {
-    if (!suppressClick.current) return false;
-    suppressClick.current = false;
-    return true;
-  };
+  const { confirming, cancelConfirm, consumeClick, rootRef, holdProps } = useHoldToConfirm({
+    enabled: !isPending,
+  });
 
   const handleRowClick = () => {
-    if (consumeSuppressedClick()) return;
+    if (consumeClick()) return;
     if (confirming) {
       cancelConfirm();
       return;
@@ -121,7 +44,7 @@ export default function SwipeableEntryRow({
 
   const handleNameClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (consumeSuppressedClick()) return;
+    if (consumeClick()) return;
     if (confirming) {
       cancelConfirm();
       return;
@@ -135,13 +58,7 @@ export default function SwipeableEntryRow({
     <div
       ref={rootRef}
       className="relative select-none [-webkit-touch-callout:none]"
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerEnd}
-      onPointerCancel={handlePointerEnd}
-      onContextMenu={e => {
-        if (!isPending) e.preventDefault();
-      }}
+      {...holdProps}
     >
       <div
         className={`flex items-start justify-between gap-3 px-3 py-3 cursor-pointer active:bg-muted/20 transition-colors border-b border-border/35 ${

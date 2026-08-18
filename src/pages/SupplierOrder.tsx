@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -37,6 +38,7 @@ export default function SupplierOrder() {
   const { token = "" } = useParams<{ token: string }>();
   const [searchParams] = useSearchParams();
   const allowBypass = import.meta.env.DEV || searchParams.get("bypass") === "1";
+  const fromOrderId = searchParams.get("from");
 
   const [order, setOrder] = useState<SharedOrder | null>(null);
   const [items, setItems] = useState<SharedItem[]>([]);
@@ -161,6 +163,15 @@ export default function SupplierOrder() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center px-4">
         <div className="w-full max-w-sm space-y-4 rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
+          {fromOrderId && (
+            <Link
+              to={`/orders/${fromOrderId}`}
+              className="-mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Quay lại đơn
+            </Link>
+          )}
           <div className="text-center">
             <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Mìsè đặt hàng</p>
             <h1 className="font-display text-2xl text-foreground mt-1">{order.title}</h1>
@@ -197,8 +208,21 @@ export default function SupplierOrder() {
   return (
     <div className="min-h-screen bg-background pb-28">
       <div className="sticky top-0 z-10 border-b border-border/60 bg-background/95 px-4 py-3 backdrop-blur-sm">
-        <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Đơn nhà cung cấp</p>
-        <h1 className="font-display text-xl text-foreground">{order.title}</h1>
+        <div className="mx-auto flex max-w-lg items-start gap-3">
+          {fromOrderId && (
+            <Link
+              to={`/orders/${fromOrderId}`}
+              className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="Quay lại đơn"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Đơn nhà cung cấp</p>
+            <h1 className="font-display text-xl text-foreground">{order.title}</h1>
+          </div>
+        </div>
       </div>
 
       <div className="mx-auto max-w-lg space-y-3 px-4 py-4">

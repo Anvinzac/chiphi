@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import MoneyLabel from "./MoneyLabel";
 import { formatDayMonth } from "@/lib/formatDateVi";
-import { useSnapPagerAxisLock } from "@/hooks/useSnapPagerAxisLock";
-import { SEARCH_BAR_HEIGHT, SEARCH_PULL_OPEN_PX } from "./ListSearchBar";
+import { useSnapPagerAxisLock, type SearchPullOptions } from "@/hooks/useSnapPagerAxisLock";
 
 export interface WeekPage<T> {
   key: string;
@@ -17,31 +16,35 @@ interface WeekPagerProps<T> {
   renderSection: (section: T) => ReactNode;
   footer?: ReactNode;
   searchPullEnabled?: boolean;
+  searchSlotRef?: RefObject<HTMLElement | null>;
   onSearchPull?: (px: number) => void;
   onSearchPullEnd?: (open: boolean) => void;
 }
 
 /**
  * Each ISO week (Mon–Sun) becomes its own horizontally swipeable page.
- * Pull down on the week dots to reveal list search in the parent.
+ * Pull down from the week dots or the top of a week list to reveal search.
  */
 export default function WeekPager<T>({
   weeks,
   renderSection,
   footer,
   searchPullEnabled = false,
+  searchSlotRef,
   onSearchPull,
   onSearchPullEnd,
 }: WeekPagerProps<T>) {
+  const rootRef = useRef<HTMLDivElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
-  useSnapPagerAxisLock(scrollerRef);
-
-  const pullStartX = useRef(0);
-  const pullStartY = useRef(0);
-  const pullLocked = useRef<"pull" | "skip" | null>(null);
-  const pullPx = useRef(0);
-  const didPull = useRef(false);
+  const searchPullRef = useRef<SearchPullOptions>({ enabled: false });
+  searchPullRef.current = {
+    enabled: searchPullEnabled,
+    slotRef: searchSlotRef,
+    onPull: onSearchPull,
+    onPullEnd: onSearchPullEnd,
+  };
+  useSnapPagerAxisLock(scrollerRef, rootRef, searchPullRef, weeks.length);
 
   useEffect(() => {
     setActive(0);
@@ -62,54 +65,18 @@ export default function WeekPager<T>({
     setActive(idx);
   };
 
-  const endPull = () => {
-    if (!searchPullEnabled) return;
-    if (pullLocked.current === "pull") {
-      didPull.current = pullPx.current > 8;
-      onSearchPullEnd?.(pullPx.current >= SEARCH_PULL_OPEN_PX);
-    }
-    pullLocked.current = null;
-    pullPx.current = 0;
-  };
-
-  const onPullStart = (e: React.TouchEvent) => {
-    if (!searchPullEnabled) return;
-    pullStartX.current = e.touches[0].clientX;
-    pullStartY.current = e.touches[0].clientY;
-    pullLocked.current = null;
-    pullPx.current = 0;
-  };
-
-  const onPullMove = (e: React.TouchEvent) => {
-    if (!searchPullEnabled || pullLocked.current === "skip") return;
-    const dx = e.touches[0].clientX - pullStartX.current;
-    const dy = e.touches[0].clientY - pullStartY.current;
-    if (!pullLocked.current) {
-      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
-      const downward = dy > 8 && dy > Math.abs(dx) * 1.35;
-      pullLocked.current = downward ? "pull" : "skip";
-      if (!downward) return;
-    }
-    if (pullLocked.current !== "pull") return;
-    const next = Math.min(SEARCH_BAR_HEIGHT + 10, Math.max(0, dy * 0.62));
-    pullPx.current = next;
-    onSearchPull?.(next);
-  };
-
   if (weeks.length === 0) return null;
 
   return (
     <div
+      ref={rootRef}
       className="flex min-h-0 flex-1 flex-col"
       data-no-double-tap
       onTouchStart={e => e.stopPropagation()}
     >
       <div
+        data-week-dots
         className="flex shrink-0 items-center justify-center gap-2 bg-background/95 px-1 py-2"
-        onTouchStart={onPullStart}
-        onTouchMove={onPullMove}
-        onTouchEnd={endPull}
-        onTouchCancel={endPull}
       >
         {weeks.length > 1 ? (
           <>
@@ -119,13 +86,7 @@ export default function WeekPager<T>({
                   key={week.key}
                   type="button"
                   role="tab"
-                  onClick={() => {
-                    if (didPull.current) {
-                      didPull.current = false;
-                      return;
-                    }
-                    goTo(i);
-                  }}
+                  onClick={() => goTo(i)}
                   aria-label={`Tuần ${formatDayMonth(week.weekStart)} – ${formatDayMonth(week.weekEnd)}`}
                   aria-selected={i === active}
                   className={`h-1.5 rounded-full transition-all duration-200 ${
@@ -141,7 +102,7 @@ export default function WeekPager<T>({
             </span>
           </>
         ) : (
-          <div className="h-1.5 w-8 rounded-full bg-border/70" aria-hidden="true" />
+          <span className="h-1.5 w-8 rounded-full bg-transparent" aria-hidden />
         )}
       </div>
 

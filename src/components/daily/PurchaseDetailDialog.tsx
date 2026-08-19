@@ -10,6 +10,7 @@ import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarte
 import MoneyLabel from "./MoneyLabel";
 import ClearFieldButton from "./ClearFieldButton";
 import SaveEditsDialog from "./SaveEditsDialog";
+import AmountNumpad from "./AmountNumpad";
 import ThousandsMark from "./ThousandsMark";
 import { thousandsFromVnd, vndFromThousands } from "@/lib/vndThousands";
 
@@ -26,6 +27,7 @@ interface PurchaseDetailDialogProps {
   getCategoryName: (id: string | null) => string | undefined;
   getSupplierName: (id: string | null) => string | undefined;
   onSave?: (id: string, updates: { item_name: string; amount: number }) => void;
+  startOnAmount?: boolean;
 }
 
 interface HistoryEntry {
@@ -49,6 +51,7 @@ export default function PurchaseDetailDialog({
   getCategoryName,
   getSupplierName,
   onSave,
+  startOnAmount = false,
 }: PurchaseDetailDialogProps) {
   const { user } = useAuth();
   const [view, setView] = useState<"details" | "history">("details");
@@ -110,9 +113,9 @@ export default function PurchaseDetailDialog({
       setEditName(entry.item_name);
       setEditAmount(thousandsFromVnd(entry.amount));
       setView("details");
-      setEditingField(null);
+      setEditingField(startOnAmount ? "amount" : null);
     }
-  }, [entry]);
+  }, [entry, startOnAmount]);
 
   useEffect(() => {
     if (view !== "history" || !entry || !user) return;
@@ -297,43 +300,53 @@ export default function PurchaseDetailDialog({
             </div>
 
             {/* Amount */}
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-muted-foreground min-w-[70px]">Amount</span>
-              {editingField === "amount" ? (
-                <div ref={editBoxRef} className="flex items-center gap-1.5 flex-1">
-                  <div className="relative flex-1">
-                    <Input
-                      autoFocus
-                      inputMode="decimal"
-                      className="h-8 text-sm pr-14"
-                      value={editAmount}
-                      onChange={(e) => setEditAmount(e.target.value.replace(/[^\d.]/g, ""))}
-                      onKeyDown={(e) => e.key === "Enter" && handleSave()}
-                    />
-                    <span className="pointer-events-none absolute right-8 top-1/2 -translate-y-1/2 text-[10px] tabular-nums text-muted-foreground/70">
-                      <ThousandsMark />
+            {editingField === "amount" ? (
+              <div ref={editBoxRef} className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-muted-foreground">Amount</span>
+                  <div className="flex min-w-0 items-center justify-end gap-1.5">
+                    <span className="inline-flex min-w-0 items-baseline justify-end font-display text-xl tabular-nums leading-none text-foreground">
+                      {editAmount ? (
+                        Number(editAmount).toLocaleString("vi-VN")
+                      ) : (
+                        <span className="text-muted-foreground/25">0</span>
+                      )}
+                      <span className="amount-caret" aria-hidden="true" />
+                      <ThousandsMark className="text-[0.65em] text-muted-foreground/45" />
                     </span>
                     <ClearFieldButton
                       visible={editAmount.length > 0}
                       size="sm"
                       label="Xóa số tiền"
-                      className="absolute right-1 top-1/2 -translate-y-1/2"
                       onClear={() => setEditAmount("")}
                     />
+                    <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={handleSave}>
+                      <Check className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSave}>
-                    <Check className="h-3.5 w-3.5" />
-                  </Button>
                 </div>
-              ) : (
+                <AmountNumpad
+                  onDigit={digit =>
+                    setEditAmount(prev => `${prev}${digit}`.replace(/^0+(?=\d)/, ""))
+                  }
+                  onDecimal={() =>
+                    setEditAmount(prev => (prev.includes(".") ? prev : prev ? `${prev}.` : "0."))
+                  }
+                  onBackspace={() => setEditAmount(prev => prev.slice(0, -1))}
+                  onClear={() => setEditAmount("")}
+                />
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground min-w-[70px]">Amount</span>
                 <div className="flex items-center gap-1.5 flex-1 justify-end">
                   <MoneyLabel amount={entry.amount} className="text-sm font-display" smallClassName="text-[0.75em]" suffix="" />
                   <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => setEditingField("amount")}>
                     <Pencil className="h-3 w-3" />
                   </Button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Category */}
             <div className="flex items-center justify-between gap-2">

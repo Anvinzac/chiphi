@@ -4,6 +4,7 @@ import type { VerifyData } from "@/types/expense";
 import { focusWithoutScroll } from "@/lib/focusWithoutScroll";
 import ClearFieldButton from "./ClearFieldButton";
 import SaveEditsDialog from "./SaveEditsDialog";
+import AmountNumpad from "./AmountNumpad";
 import ThousandsMark from "./ThousandsMark";
 import { thousandsCaption } from "@/lib/thousandsSuffix";
 import { useThousandsSuffix } from "@/hooks/useThousandsSuffix";
@@ -186,28 +187,6 @@ export default function AmountPhase({
     setConfirmOpen(true);
   };
 
-  // Long-press backspace clears the whole amount
-  const holdRef = useRef<number | null>(null);
-  const heldRef = useRef(false);
-  const startHold = () => {
-    heldRef.current = false;
-    holdRef.current = window.setTimeout(() => {
-      heldRef.current = true;
-      clearAmount();
-    }, 500);
-  };
-  const endHold = () => {
-    if (holdRef.current) window.clearTimeout(holdRef.current);
-    holdRef.current = null;
-  };
-  const handleBackspaceClick = () => {
-    if (heldRef.current) {
-      heldRef.current = false;
-      return;
-    }
-    removeLastDigit();
-  };
-
   const currentValid = !!amountValue.trim() && Number(amountValue) > 0;
   const canSave = !saving && (currentValid || lines.length > 0);
 
@@ -264,28 +243,6 @@ export default function AmountPhase({
     return () => ro.disconnect();
   }, [amountDisplay, amountActive]);
 
-  const keys = [
-    [
-      { label: "1", action: () => appendDigit("1") },
-      { label: "2", action: () => appendDigit("2") },
-      { label: "3", action: () => appendDigit("3") },
-    ],
-    [
-      { label: "4", action: () => appendDigit("4") },
-      { label: "5", action: () => appendDigit("5") },
-      { label: "6", action: () => appendDigit("6") },
-    ],
-    [
-      { label: "7", action: () => appendDigit("7") },
-      { label: "8", action: () => appendDigit("8") },
-      { label: "9", action: () => appendDigit("9") },
-    ],
-    [
-      { label: ".", action: appendDecimal, muted: true },
-      { label: "0", action: () => appendDigit("0") },
-    ],
-  ];
-
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col px-5 pt-2 pb-2">
       <div className="mb-2 grid shrink-0 grid-cols-[1fr_auto_1fr] items-center">
@@ -331,29 +288,34 @@ export default function AmountPhase({
                 requestAnimationFrame(() => window.scrollTo(0, 0));
               }}
             />
-            <div className="flex items-center gap-1.5">
-              <button
-                ref={amountTrackRef}
-                type="button"
-                className="min-w-0 flex-1 cursor-text overflow-hidden text-left"
-                onClick={activateAmount}
-                aria-label="Nhập số tiền"
-                aria-pressed={amountActive}
-              >
-                <span
-                  ref={amountMeasureRef}
-                  className="inline-flex max-w-none items-baseline whitespace-nowrap font-display tabular-nums leading-none text-foreground"
-                  style={{ fontSize: amountFontPx }}
+            <div className="flex items-start gap-1.5">
+              <div className="min-w-0 flex-1">
+                <button
+                  ref={amountTrackRef}
+                  type="button"
+                  className="flex w-full min-w-0 cursor-text justify-end overflow-hidden text-right"
+                  onClick={activateAmount}
+                  aria-label="Nhập số tiền"
+                  aria-pressed={amountActive}
                 >
-                  {amountValue ? (
-                    amountDisplay
-                  ) : (
-                    <span className="text-muted-foreground/25">0</span>
-                  )}
-                  {amountActive && <span className="amount-caret" aria-hidden="true" />}
-                  <ThousandsMark className="ml-0.5 text-[0.65em] text-muted-foreground/35" />
-                </span>
-              </button>
+                  <span
+                    ref={amountMeasureRef}
+                    className="inline-flex max-w-none items-baseline whitespace-nowrap font-display tabular-nums leading-none text-foreground"
+                    style={{ fontSize: amountFontPx }}
+                  >
+                    {amountValue ? (
+                      amountDisplay
+                    ) : (
+                      <span className="text-muted-foreground/25">0</span>
+                    )}
+                    {amountActive && <span className="amount-caret" aria-hidden="true" />}
+                    <ThousandsMark className="text-[0.65em] text-muted-foreground/35" />
+                  </span>
+                </button>
+                <p className="mt-1 text-right text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
+                  {thousandsCaption(thousandsMode)}
+                </p>
+              </div>
               <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center">
                 <ClearFieldButton
                   visible={amountValue.length > 0}
@@ -362,9 +324,6 @@ export default function AmountPhase({
                 />
               </div>
             </div>
-            <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
-              {thousandsCaption(thousandsMode)}
-            </p>
           </div>
 
           <div className="amount-note group flex w-[min(42%,11.5rem)] shrink-0 flex-col justify-end self-stretch">
@@ -548,40 +507,12 @@ export default function AmountPhase({
 
       {/* Fixed keypad — never covers chips above */}
       <div className="mt-1.5 flex shrink-0 flex-col gap-1.5">
-        {keys.map((row, ri) => (
-          <div key={ri} className="grid grid-cols-3 gap-1.5">
-            {row.map(({ label, action, muted }) => (
-              <button
-                key={label}
-                type="button"
-                onClick={action}
-                className={`keypad-key rounded-2xl border text-xl font-medium shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  muted
-                    ? "border-border/60 bg-background text-muted-foreground hover:bg-muted"
-                    : "border-border/60 bg-card text-foreground hover:bg-muted"
-                }`}
-                aria-label={`Nhập ${label}`}
-              >
-                {label}
-              </button>
-            ))}
-            {ri === keys.length - 1 && (
-              <button
-                type="button"
-                onClick={handleBackspaceClick}
-                onPointerDown={startHold}
-                onPointerUp={endHold}
-                onPointerLeave={endHold}
-                onPointerCancel={endHold}
-                onContextMenu={e => e.preventDefault()}
-                className="keypad-key rounded-2xl border border-border/60 bg-background text-xl font-medium text-muted-foreground shadow-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label="Xóa số cuối (giữ để xóa hết)"
-              >
-                ⌫
-              </button>
-            )}
-          </div>
-        ))}
+        <AmountNumpad
+          onDigit={appendDigit}
+          onDecimal={appendDecimal}
+          onBackspace={removeLastDigit}
+          onClear={clearAmount}
+        />
         <div className="grid grid-cols-3 gap-1.5">
           <button
             type="button"

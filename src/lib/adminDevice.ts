@@ -11,15 +11,32 @@ export function isAdminDeviceGateOpen(now = Date.now()): boolean {
   return now < ADMIN_DEVICE_OPEN_UNTIL;
 }
 
+function createDeviceId(): string {
+  const c = typeof crypto !== "undefined" ? crypto : undefined;
+  if (typeof c?.randomUUID === "function") {
+    return c.randomUUID().toUpperCase();
+  }
+  const bytes = new Uint8Array(16);
+  if (c?.getRandomValues) {
+    c.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`.toUpperCase();
+}
+
 export function getOrCreateDeviceId(): string {
   try {
     const existing = localStorage.getItem(STORAGE_KEY)?.trim();
     if (existing) return existing.toUpperCase();
-    const id = crypto.randomUUID().toUpperCase();
+    const id = createDeviceId();
     localStorage.setItem(STORAGE_KEY, id);
     return id;
   } catch {
-    return crypto.randomUUID().toUpperCase();
+    return createDeviceId();
   }
 }
 

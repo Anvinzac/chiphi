@@ -215,11 +215,13 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   const [discardOpen, setDiscardOpen] = useState(false);
   const [detailEntry, setDetailEntry] = useState<PaymentEntry | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [detailFocusAmount, setDetailFocusAmount] = useState(false);
   const [listSearch, setListSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchPullPx, setSearchPullPx] = useState(0);
   const [searchPulling, setSearchPulling] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchSlotRef = useRef<HTMLDivElement>(null);
   const [spanEnabled, setSpanEnabled] = useState(false);
   const [rememberAmount, setRememberAmount] = useState(false);
   const [spanPreset, setSpanPreset] = useState<SpanPresetKey>("3m");
@@ -1681,18 +1683,34 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   const displayTotal = filteredNameSections ? filteredNameSections.total : dayTotal;
   const hasListSearch = listSearch.trim().length > 0;
 
-  const openListSearch = useCallback((query = listSearch) => {
-    setListSearch(query);
+  const filterAlikePurchases = useCallback((name: string) => {
+    setListSearch(name);
+    setSearchOpen(false);
     setSearchPullPx(0);
     setSearchPulling(false);
-    setSearchOpen(true);
-  }, [listSearch]);
+  }, []);
+
+  const openEntryDetails = useCallback((entry: PaymentEntry, focusAmount = false) => {
+    if (entry.isPending) {
+      openReminder(entry);
+      return;
+    }
+    setDetailFocusAmount(focusAmount);
+    setDetailEntry(entry);
+    setDetailOpen(true);
+  }, [openReminder]);
 
   const closeListSearch = useCallback(() => {
     setSearchOpen(false);
     setSearchPullPx(0);
     setSearchPulling(false);
     searchInputRef.current?.blur();
+  }, []);
+
+  const openListSearch = useCallback(() => {
+    setSearchOpen(true);
+    setSearchPullPx(0);
+    setSearchPulling(false);
   }, []);
 
   const formatDayHeading = (dateStr: string) => {
@@ -1717,14 +1735,12 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       getCategoryName={getCategoryName}
       getSupplierName={getSupplierName}
       highValueThreshold={HIGH_VALUE_THRESHOLD}
-      onEntryClick={(entry) => {
-        if (entry.isPending) openReminder(entry);
-        else { setDetailEntry(entry); setDetailOpen(true); }
-      }}
+      onEntryClick={(entry) => openEntryDetails(entry)}
       onEntryNameClick={(entry) => {
         if (entry.isPending) openReminder(entry);
-        else openListSearch(entry.item_name);
+        else filterAlikePurchases(entry.item_name);
       }}
+      onEntryAmountClick={(entry) => openEntryDetails(entry, true)}
       onEntryDelete={async (paymentId, entry, index) => {
         if (entry.isPending && entry.scheduleId) {
           await removeReminder(paymentId, entry);
@@ -1843,20 +1859,24 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
         }`}
         data-expense-list
       >
-        {(searchOpen || searchPullPx > 0) && (
+        {(searchOpen || searchPullPx > 0 || (viewMode === "range" && !hasListSearch)) && (
           <div
-            className="shrink-0 overflow-hidden"
+            ref={searchSlotRef}
+            data-search-pull-slot
+            className="shrink-0 overflow-hidden flex flex-col justify-end"
             style={{
               height: searchOpen ? SEARCH_BAR_HEIGHT : searchPullPx,
               transition: searchPulling ? "none" : "height 0.22s cubic-bezier(0.2, 0.9, 0.3, 1)",
             }}
           >
-            <ListSearchBar
-              query={listSearch}
-              onQueryChange={setListSearch}
-              onDismiss={closeListSearch}
-              inputRef={searchInputRef}
-            />
+            <div className="shrink-0" style={{ height: SEARCH_BAR_HEIGHT }}>
+              <ListSearchBar
+                query={listSearch}
+                onQueryChange={setListSearch}
+                onDismiss={closeListSearch}
+                inputRef={searchInputRef}
+              />
+            </div>
           </div>
         )}
 
@@ -1927,12 +1947,10 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                         isPending={item.entry.isPending}
                         onNameClick={() => {
                           if (item.entry.isPending) openReminder(item.entry);
-                          else openListSearch(item.entry.item_name);
+                          else filterAlikePurchases(item.entry.item_name);
                         }}
-                        onClick={() => {
-                          if (item.entry.isPending) openReminder(item.entry);
-                          else { setDetailEntry(item.entry); setDetailOpen(true); }
-                        }}
+                        onClick={() => openEntryDetails(item.entry)}
+                        onAmountClick={() => openEntryDetails(item.entry, true)}
                         onDelete={async () => {
                           if (item.entry.isPending && item.entry.scheduleId) {
                             await removeReminder(item.paymentId, item.entry);
@@ -1968,6 +1986,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
           <WeekPager
             weeks={rangeWeekPages}
             searchPullEnabled={!searchOpen}
+            searchSlotRef={searchSlotRef}
             onSearchPull={px => {
               setSearchPulling(true);
               setSearchPullPx(px);
@@ -2419,10 +2438,14 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       {/* Purchase detail dialog */}
       <PurchaseDetailDialog
         open={detailOpen}
-        onOpenChange={setDetailOpen}
+        onOpenChange={open => {
+          setDetailOpen(open);
+          if (!open) setDetailFocusAmount(false);
+        }}
         entry={detailEntry}
         getCategoryName={getCategoryName}
         getSupplierName={getSupplierName}
+        startOnAmount={detailFocusAmount}
         onSave={async (id, updates) => {
           await supabase.from("sub_payments").update(updates).eq("id", id);
           setPaymentGroups(prev => prev.map(g => ({

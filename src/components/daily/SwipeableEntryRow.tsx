@@ -13,6 +13,7 @@ interface SwipeableEntryRowProps {
   onDelete: () => void;
   onClick: () => void;
   onNameClick?: () => void;
+  onAmountClick?: () => void;
   onSkip?: () => void;
 }
 
@@ -27,6 +28,7 @@ export default function SwipeableEntryRow({
   onDelete,
   onClick,
   onNameClick,
+  onAmountClick,
   onSkip,
 }: SwipeableEntryRowProps) {
   const { confirming, cancelConfirm, consumeClick, rootRef, holdProps } = useHoldToConfirm({
@@ -50,6 +52,16 @@ export default function SwipeableEntryRow({
       return;
     }
     onNameClick?.();
+  };
+
+  const handleAmountClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (consumeClick()) return;
+    if (confirming) {
+      cancelConfirm();
+      return;
+    }
+    onAmountClick?.();
   };
 
   const titleClass = "text-sm font-medium truncate text-foreground/90 text-left min-w-0";
@@ -143,6 +155,19 @@ export default function SwipeableEntryRow({
               }}
             >
               Xóa
+            </button>
+          ) : onAmountClick ? (
+            <button
+              type="button"
+              className="tabular-nums"
+              title={isHighValue ? "Giá trị cao" : "Sửa số tiền"}
+              onClick={handleAmountClick}
+            >
+              <MoneyLabel
+                amount={amount}
+                className="text-sm font-display text-foreground/85"
+                smallClassName="text-[0.7em]"
+              />
             </button>
           ) : (
             <MoneyLabel

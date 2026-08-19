@@ -5,7 +5,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { signInAsAdmin, isAdminDemoUser } from "@/hooks/useAdminDemoAuth";
 import { isDemoUser } from "@/hooks/useDemoAuth";
 import { isSandboxUser, signInAsSandbox } from "@/hooks/useSandboxAuth";
-import { enrollAdminDeviceAfterPassword } from "@/lib/adminDevice";
+import { ADMIN_PASSWORD, ADMIN_USERNAME } from "@/lib/adminCredentials";
+import { ADMIN_DEVICE_BLOCKED, enrollAdminDeviceAfterPassword } from "@/lib/adminDevice";
+import { readSavedAdminLogin, saveAdminLogin } from "@/lib/savedAdminLogin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -21,6 +23,18 @@ export default function Auth() {
   // Throwaway sessions shouldn't block signing in as someone else
   const isDemoSession = isDemoUser(session?.user?.email) || isSandboxUser(session?.user?.email);
   const arrivalHandled = useRef(false);
+
+  useEffect(() => {
+    const saved = readSavedAdminLogin();
+    if (saved) {
+      setUsername(saved.username);
+      setPassword(saved.password);
+      return;
+    }
+    saveAdminLogin();
+    setUsername(ADMIN_USERNAME);
+    setPassword(ADMIN_PASSWORD);
+  }, []);
 
   useEffect(() => {
     if (loading) return;
@@ -52,7 +66,10 @@ export default function Auth() {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        if (isAdminDemoUser(email)) await enrollAdminDeviceAfterPassword();
+        if (isAdminDemoUser(email)) {
+          saveAdminLogin({ username: username.trim(), password });
+          await enrollAdminDeviceAfterPassword();
+        }
         toast.success("Welcome back!");
       } else {
         const { error } = await supabase.auth.signUp({
@@ -64,7 +81,10 @@ export default function Auth() {
           },
         });
         if (error) throw error;
-        if (isAdminDemoUser(email)) await enrollAdminDeviceAfterPassword();
+        if (isAdminDemoUser(email)) {
+          saveAdminLogin({ username: username.trim(), password });
+          await enrollAdminDeviceAfterPassword();
+        }
         toast.success("Account created!");
       }
     } catch (err: any) {
@@ -106,6 +126,11 @@ export default function Auth() {
           <Button type="submit" className="w-full" disabled={submitting}>
             {submitting ? "..." : isLogin ? "Sign In" : "Sign Up"}
           </Button>
+          <p className="text-center text-xs text-muted-foreground">
+            Admin: <span className="font-medium text-foreground">{ADMIN_USERNAME}</span>
+            {" / "}
+            <span className="font-medium text-foreground">{ADMIN_PASSWORD}</span>
+          </p>
           <div className="grid grid-cols-2 gap-2">
             <Button
               type="button"
@@ -116,6 +141,13 @@ export default function Auth() {
                 try {
                   await signInAsAdmin();
                 } catch (err: any) {
+                  if (err.message === ADMIN_DEVICE_BLOCKED) {
+                    saveAdminLogin();
+                    setUsername(ADMIN_USERNAME);
+                    setPassword(ADMIN_PASSWORD);
+                    toast.message("Thiết bị chưa ghi. Nhấn Sign In lần này — lần sau Quick Admin được.");
+                    return;
+                  }
                   toast.error(err.message);
                 } finally {
                   setSubmitting(false);

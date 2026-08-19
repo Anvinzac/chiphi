@@ -34,6 +34,7 @@ interface PaymentGroupProps {
   highValueThreshold: number;
   onEntryClick: (entry: PaymentEntry) => void;
   onEntryNameClick?: (entry: PaymentEntry) => void;
+  onEntryAmountClick?: (entry: PaymentEntry) => void;
   onEntryDelete: (paymentId: string, entry: PaymentEntry, index: number) => void;
   onEntrySkip?: (paymentId: string, entry: PaymentEntry) => void;
 }
@@ -45,6 +46,7 @@ export default function PaymentGroup({
   highValueThreshold,
   onEntryClick,
   onEntryNameClick,
+  onEntryAmountClick,
   onEntryDelete,
   onEntrySkip,
 }: PaymentGroupProps) {
@@ -63,6 +65,7 @@ export default function PaymentGroup({
       isPending={entry.isPending}
       onClick={() => onEntryClick(entry)}
       onNameClick={onEntryNameClick ? () => onEntryNameClick(entry) : undefined}
+      onAmountClick={onEntryAmountClick ? () => onEntryAmountClick(entry) : undefined}
       onDelete={() => onEntryDelete(group.paymentId, entry, i)}
       onSkip={
         entry.isPending && entry.scheduleId && onEntrySkip

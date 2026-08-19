@@ -1,11 +1,10 @@
 import { useEffect, type RefObject } from "react";
 import { SEARCH_BAR_HEIGHT, SEARCH_PULL_OPEN_PX } from "@/components/daily/ListSearchBar";
 
-const MOVE_PX = 12;
-const SEARCH_PX = 8;
-const HORIZONTAL_PX = 18;
-const HORIZONTAL_RATIO = 1.15;
-const PAGE_FLIP_PX = 48;
+const MOVE_PX = 10;
+const SEARCH_PX = 16;
+const SEARCH_RATIO = 1.75;
+const PAGE_FLIP_PX = 36;
 
 export type SearchPullOptions = {
   enabled: boolean;
@@ -16,10 +15,8 @@ export type SearchPullOptions = {
 
 /**
  * Vertical list scrolling vs horizontal page snaps share one touch stream.
- * At the top of a week (or on the dots), a downward pull reveals search.
- *
- * Vertical pans must stay native: preventDefault, overflow changes, or
- * scrollLeft reads during a Y gesture make iOS scroll hitch in steps.
+ * Sideways paging wins over pull-to-search; search is only a clearly downward pull
+ * at the top of a week (or on the dots).
  */
 export function useSnapPagerAxisLock(
   scrollerRef: RefObject<HTMLElement | null>,
@@ -41,6 +38,7 @@ export function useSnapPagerAxisLock(
     let page: HTMLElement | null = null;
     let pullPx = 0;
     let pullNotified = false;
+    let snapType = "";
 
     const pages = () => scroller.querySelectorAll<HTMLElement>(".week-snap-page");
 
@@ -61,6 +59,16 @@ export function useSnapPagerAxisLock(
         pullNotified = true;
         searchPullRef?.current.onPull?.(px);
       }
+    };
+
+    const lockX = () => {
+      snapType = scroller.style.scrollSnapType;
+      scroller.style.scrollSnapType = "none";
+    };
+
+    const restoreSnap = () => {
+      scroller.style.scrollSnapType = snapType;
+      snapType = "";
     };
 
     const onStart = (e: TouchEvent) => {
@@ -100,20 +108,23 @@ export function useSnapPagerAxisLock(
       const atTop = fromDots || (startTop <= 1 && (page?.scrollTop ?? 0) <= 1);
 
       if (!axis) {
-        if (adx < SEARCH_PX && ady < SEARCH_PX) return;
-        if (
+        if (adx < MOVE_PX && ady < MOVE_PX) return;
+        // Paging first: a week swipe often starts on the first rows (atTop).
+        if (adx >= MOVE_PX && adx >= ady) {
+          axis = "x";
+          lockX();
+        } else if (
           pull?.enabled &&
           atTop &&
           dy >= SEARCH_PX &&
-          ady > adx * HORIZONTAL_RATIO
+          ady > adx * SEARCH_RATIO
         ) {
           axis = "search";
           if (page) page.scrollTop = startTop;
-        } else if (adx >= HORIZONTAL_PX && adx > ady * HORIZONTAL_RATIO) {
-          axis = "x";
-        } else if (ady >= MOVE_PX && ady >= adx) {
+        } else if (ady >= MOVE_PX && ady > adx) {
           axis = "y";
         } else {
+          if (adx > ady) e.preventDefault();
           return;
         }
       }
@@ -133,6 +144,7 @@ export function useSnapPagerAxisLock(
 
     const onEnd = () => {
       if (axis === "x") {
+        restoreSnap();
         const width = scroller.clientWidth || 1;
         const dx = scroller.scrollLeft - startLeft;
         const startIdx = Math.round(startLeft / width);
@@ -167,6 +179,7 @@ export function useSnapPagerAxisLock(
     root.addEventListener("touchcancel", onEnd, { capture: true });
     scroller.addEventListener("wheel", onWheel, { passive: true });
     return () => {
+      restoreSnap();
       root.removeEventListener("touchstart", onStart, { capture: true });
       root.removeEventListener("touchmove", onMove, { capture: true });
       root.removeEventListener("touchend", onEnd, { capture: true });

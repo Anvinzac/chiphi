@@ -1,15 +1,21 @@
 import MoneyLabel from "./MoneyLabel";
 import CategoryGlyph from "./CategoryGlyph";
+import {
+  amountHighlightLabelClass,
+  amountHighlightTitle,
+  amountHighlightWrapClass,
+  type AmountHighlight,
+} from "@/lib/highValueThresholds";
 
 interface EntryRowProps {
   item_name: string;
   amount: number;
   categoryName?: string;
   supplierName?: string;
-  isHighValue?: boolean;
+  highlight?: AmountHighlight;
 }
 
-export default function EntryRow({ item_name, amount, categoryName, supplierName, isHighValue }: EntryRowProps) {
+export default function EntryRow({ item_name, amount, categoryName, supplierName, highlight = "none" }: EntryRowProps) {
   return (
     <div className="flex items-start justify-between py-3 border-b border-border/40 gap-3">
       <CategoryGlyph categoryName={categoryName} />
@@ -31,12 +37,12 @@ export default function EntryRow({ item_name, amount, categoryName, supplierName
         )}
       </div>
       <span
-        className={`shrink-0 pt-0.5 ${isHighValue ? "border-b-2 border-destructive/70" : ""}`}
-        title={isHighValue ? "Giá trị cao" : undefined}
+        className={`shrink-0 pt-0.5 ${amountHighlightWrapClass(highlight)}`}
+        title={amountHighlightTitle(highlight)}
       >
         <MoneyLabel
           amount={amount}
-          className="text-sm font-display"
+          className={`text-sm font-display ${amountHighlightLabelClass(highlight)}`}
           smallClassName="text-[0.7em]"
         />
       </span>

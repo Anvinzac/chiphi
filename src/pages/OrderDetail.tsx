@@ -789,16 +789,29 @@ export default function OrderDetail() {
     }
   };
 
-  const openVendorPreview = () => {
-    const token = shareToken;
+  const openVendorPreview = async () => {
     const oid = orderIdRef.current;
-    if (!token) {
-      toast.error("Tạo link trước đã");
+    if (!oid) {
+      toast.error("Lưu đơn trước đã");
       return;
+    }
+    if (status !== "shared" && status !== "closed") {
+      const ok = await save("shared");
+      if (!ok) return;
+    }
+    let token = shareToken;
+    if (!token) {
+      token = generateShareToken();
+      const { error } = await supabase.from("orders").update({ share_token: token }).eq("id", oid);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      setShareToken(token);
     }
     markOrderPinUnlocked(token);
     setShareOpen(false);
-    navigate(`/o/${token}${oid ? `?from=${oid}` : ""}`);
+    navigate(`/o/${token}?from=${oid}`);
   };
 
   if (loading) {
@@ -831,10 +844,10 @@ export default function OrderDetail() {
               Danh mục: <span className="font-medium text-foreground/80">{lockedCatName}</span>
             </p>
           </div>
-          {shareToken && (
+          {orderId && (
             <button
               type="button"
-              onClick={openVendorPreview}
+              onClick={() => void openVendorPreview()}
               className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
               aria-label="Xem như nhà cung cấp"
             >
@@ -993,7 +1006,7 @@ export default function OrderDetail() {
                 <Copy className="h-4 w-4" />
                 Copy link
               </Button>
-              <Button type="button" variant="outline" onClick={openVendorPreview} className="w-full gap-2">
+              <Button type="button" variant="outline" onClick={() => void openVendorPreview()} className="w-full gap-2">
                 <Store className="h-4 w-4" />
                 Xem như nhà cung cấp
               </Button>

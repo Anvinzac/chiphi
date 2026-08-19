@@ -46,35 +46,60 @@ export default function SupplierOrder() {
   const [unlocked, setUnlocked] = useState(false);
   const [pinInput, setPinInput] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
+    setLoadError(null);
+
     const { data: orders, error } = await supabase.rpc("get_shared_order", {
       p_token: token,
     });
     if (error) {
       toast.error(error.message);
-      setLoading(false);
-      return;
+      setLoadError(error.message);
     }
-    const row = Array.isArray(orders) ? orders[0] : orders;
+
+    let row = (Array.isArray(orders) ? orders[0] : orders) as SharedOrder | null | undefined;
+    let itemRows: SharedItem[] | null = null;
+    let ownerPreview = false;
+
+    if (!row) {
+      let q = supabase.from("orders").select("id, title, status");
+      q = fromOrderId ? q.eq("id", fromOrderId) : q.eq("share_token", token);
+      const { data: own } = await q.maybeSingle();
+      if (own) {
+        row = own as SharedOrder;
+        ownerPreview = true;
+        const { data: rows } = await supabase
+          .from("order_items")
+          .select("id, name, quantity, unit, retail_price, fulfilled_qty, status, notice")
+          .eq("order_id", own.id)
+          .order("sort_order", { ascending: true });
+        itemRows = (rows as SharedItem[]) || [];
+      }
+    }
+
     if (!row) {
       setOrder(null);
       setItems([]);
       setLoading(false);
       return;
     }
-    setOrder(row as SharedOrder);
+    setOrder(row);
 
-    const { data: rows, error: itemsErr } = await supabase.rpc("get_shared_order_items", {
-      p_token: token,
-    });
-    if (itemsErr) toast.error(itemsErr.message);
-    setItems((rows as SharedItem[]) || []);
-    setUnlocked(isOrderPinUnlocked(token));
+    if (!itemRows) {
+      const { data: rows, error: itemsErr } = await supabase.rpc("get_shared_order_items", {
+        p_token: token,
+      });
+      if (itemsErr) toast.error(itemsErr.message);
+      itemRows = (rows as SharedItem[]) || [];
+    }
+    setItems(itemRows);
+    setUnlocked(ownerPreview || isOrderPinUnlocked(token));
     setLoading(false);
-  }, [token]);
+  }, [token, fromOrderId]);
 
   useEffect(() => {
     load();
@@ -151,9 +176,21 @@ export default function SupplierOrder() {
   if (!order) {
     return (
       <div className="min-h-screen flex items-center justify-center px-6 text-center">
-        <div>
-          <p className="font-display text-xl text-foreground mb-2">Không tìm thấy đơn</p>
+        <div className="space-y-3">
+          {fromOrderId && (
+            <Link
+              to={`/orders/${fromOrderId}`}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Quay lại đơn
+            </Link>
+          )}
+          <p className="font-display text-xl text-foreground">Không tìm thấy đơn</p>
           <p className="text-sm text-muted-foreground">Link có thể sai hoặc đơn đã đóng.</p>
+          {loadError && (
+            <p className="text-[11px] text-destructive/80 break-all">{loadError}</p>
+          )}
         </div>
       </div>
     );

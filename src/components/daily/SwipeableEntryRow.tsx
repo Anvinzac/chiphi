@@ -1,6 +1,12 @@
 import MoneyLabel from "./MoneyLabel";
 import CategoryGlyph from "./CategoryGlyph";
 import { useHoldToConfirm } from "@/hooks/useHoldToConfirm";
+import {
+  amountHighlightLabelClass,
+  amountHighlightTitle,
+  amountHighlightWrapClass,
+  type AmountHighlight,
+} from "@/lib/highValueThresholds";
 
 interface SwipeableEntryRowProps {
   item_name: string;
@@ -8,7 +14,7 @@ interface SwipeableEntryRowProps {
   notes?: string | null;
   categoryName?: string;
   supplierName?: string;
-  isHighValue?: boolean;
+  highlight?: AmountHighlight;
   isPending?: boolean;
   onDelete: () => void;
   onClick: () => void;
@@ -23,7 +29,7 @@ export default function SwipeableEntryRow({
   notes,
   categoryName,
   supplierName,
-  isHighValue,
+  highlight = "none",
   isPending = false,
   onDelete,
   onClick,
@@ -114,9 +120,9 @@ export default function SwipeableEntryRow({
         </div>
         <span
           className={`shrink-0 pt-0.5 pl-1 ${
-            !isPending && !confirming && isHighValue ? "border-b-2 border-destructive/70" : ""
+            !isPending && !confirming ? amountHighlightWrapClass(highlight) : ""
           }`}
-          title={!isPending && isHighValue ? "Giá trị cao" : undefined}
+          title={!isPending && !confirming ? amountHighlightTitle(highlight) : undefined}
         >
           {isPending ? (
             <span className="flex items-center gap-1.5">
@@ -160,19 +166,19 @@ export default function SwipeableEntryRow({
             <button
               type="button"
               className="tabular-nums"
-              title={isHighValue ? "Giá trị cao" : "Sửa số tiền"}
+              title={amountHighlightTitle(highlight) ?? "Sửa số tiền"}
               onClick={handleAmountClick}
             >
               <MoneyLabel
                 amount={amount}
-                className="text-sm font-display text-foreground/85"
+                className={`text-sm font-display text-foreground/85 ${amountHighlightLabelClass(highlight)}`}
                 smallClassName="text-[0.7em]"
               />
             </button>
           ) : (
             <MoneyLabel
               amount={amount}
-              className="text-sm font-display text-foreground/85"
+              className={`text-sm font-display text-foreground/85 ${amountHighlightLabelClass(highlight)}`}
               smallClassName="text-[0.7em]"
             />
           )}

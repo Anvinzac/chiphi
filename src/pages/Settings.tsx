@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Palette, FormInput, Store, Bell, HardDrive, Download } from "lucide-react";
+import { ArrowLeft, Palette, FormInput, Store, Bell, HardDrive, Download, Banknote } from "lucide-react";
 import { parseISO } from "date-fns";
 import { toast } from "sonner";
 import SnapshotBanner from "@/components/SnapshotBanner";
@@ -8,6 +8,8 @@ import { useLaggedSnapshot } from "@/hooks/useLaggedSnapshot";
 import { formatDayMonth } from "@/lib/formatDateVi";
 import { THOUSANDS_SUFFIX_OPTIONS } from "@/lib/thousandsSuffix";
 import { useThousandsSuffix } from "@/hooks/useThousandsSuffix";
+import { useHighValueThresholds } from "@/hooks/useHighValueThresholds";
+import { MILLION } from "@/lib/highValueThresholds";
 import type { SnapshotMeta } from "@/lib/laggedSnapshot";
 
 function metaLine(meta: SnapshotMeta | null, empty: string) {
@@ -25,6 +27,7 @@ export default function Settings() {
   const { todayMeta, yesterdayMeta, refresh, downloadSlot } = useLaggedSnapshot();
   const [saving, setSaving] = useState(false);
   const [mode, setMode] = useThousandsSuffix();
+  const [valueCuts, setValueCuts] = useHighValueThresholds();
 
   const backupNow = async () => {
     if (saving) return;
@@ -158,6 +161,56 @@ export default function Settings() {
                 </button>
               );
             })}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-border/60 bg-card p-4">
+          <div className="mb-2 flex items-center gap-2 text-foreground">
+            <Banknote className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold">Chi tiêu lớn</h2>
+          </div>
+          <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
+            Hai mức tô trên số tiền trong danh sách. Đơn vị triệu đồng.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="space-y-1">
+              <span className="block text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                Cao — gạch chân đỏ
+              </span>
+              <div className="flex items-center gap-1.5">
+                <input
+                  inputMode="decimal"
+                  value={String(valueCuts.high / MILLION)}
+                  onChange={e => {
+                    const n = Number(e.target.value.replace(",", "."));
+                    if (!Number.isFinite(n) || n <= 0) return;
+                    setValueCuts({ high: n * MILLION, veryHigh: valueCuts.veryHigh });
+                  }}
+                  className="h-9 w-full rounded-xl border border-border/60 bg-muted/40 px-3 text-sm tabular-nums outline-none focus:border-primary/45"
+                  aria-label="Mức cao, triệu đồng"
+                />
+                <span className="shrink-0 text-xs text-muted-foreground">triệu</span>
+              </div>
+            </label>
+            <label className="space-y-1">
+              <span className="block text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                Rất cao — chữ đỏ
+              </span>
+              <div className="flex items-center gap-1.5">
+                <input
+                  inputMode="decimal"
+                  value={String(valueCuts.veryHigh / MILLION)}
+                  onChange={e => {
+                    const n = Number(e.target.value.replace(",", "."));
+                    if (!Number.isFinite(n) || n <= 0) return;
+                    setValueCuts({ high: valueCuts.high, veryHigh: n * MILLION });
+                  }}
+                  className="h-9 w-full rounded-xl border border-border/60 bg-muted/40 px-3 text-sm tabular-nums outline-none focus:border-primary/45"
+                  aria-label="Mức rất cao, triệu đồng"
+                />
+                <span className="shrink-0 text-xs text-muted-foreground">triệu</span>
+              </div>
+            </label>
           </div>
         </section>
 

@@ -5,6 +5,7 @@ import SwipeableEntryRow from "./SwipeableEntryRow";
 import MoneyLabel from "./MoneyLabel";
 import { formatDayMonth } from "@/lib/formatDateVi";
 import type { ScheduleRepeat } from "@/lib/expenseSchedule";
+import { amountHighlight } from "@/lib/highValueThresholds";
 
 export interface PaymentEntry {
   item_name: string;
@@ -31,7 +32,8 @@ interface PaymentGroupProps {
   group: PaymentGroupData;
   getCategoryName: (id: string | null) => string | undefined;
   getSupplierName: (id: string | null) => string | undefined;
-  highValueThreshold: number;
+  high: number;
+  veryHigh: number;
   onEntryClick: (entry: PaymentEntry) => void;
   onEntryNameClick?: (entry: PaymentEntry) => void;
   onEntryAmountClick?: (entry: PaymentEntry) => void;
@@ -43,7 +45,8 @@ export default function PaymentGroup({
   group,
   getCategoryName,
   getSupplierName,
-  highValueThreshold,
+  high,
+  veryHigh,
   onEntryClick,
   onEntryNameClick,
   onEntryAmountClick,
@@ -61,7 +64,9 @@ export default function PaymentGroup({
       notes={entry.notes}
       categoryName={getCategoryName(entry.category_id)}
       supplierName={getSupplierName(entry.supplier_id)}
-      isHighValue={!entry.isPending && entry.amount >= highValueThreshold}
+      highlight={
+        entry.isPending ? "none" : amountHighlight(entry.amount, high, veryHigh)
+      }
       isPending={entry.isPending}
       onClick={() => onEntryClick(entry)}
       onNameClick={onEntryNameClick ? () => onEntryNameClick(entry) : undefined}

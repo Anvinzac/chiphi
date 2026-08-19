@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { createQuickSignIn } from "@/lib/quickAuth";
 import { assertAllowedAdminDevice, enrollAdminDeviceAfterQuickLogin } from "@/lib/adminDevice";
-import { ADMIN_EMAIL, ADMIN_PASSWORD } from "@/lib/adminCredentials";
+import { ADMIN_EMAIL, ADMIN_PASSWORD, LOCAL_ADMIN_LOGIN_VISIBLE } from "@/lib/adminCredentials";
 import { saveAdminLogin } from "@/lib/savedAdminLogin";
 
 export { ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_USERNAME } from "@/lib/adminCredentials";
@@ -25,7 +25,7 @@ async function ensureAdminRole() {
 async function afterAdminSignIn() {
   await ensureAdminRole();
   await enrollAdminDeviceAfterQuickLogin();
-  saveAdminLogin();
+  if (LOCAL_ADMIN_LOGIN_VISIBLE) saveAdminLogin();
 }
 
 export const signInAsAdmin = createQuickSignIn({

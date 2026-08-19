@@ -41,6 +41,8 @@ import { getAmountDefault, setAmountDefault } from "@/lib/expenseAmountDefaults"
 import { thousandsFromVnd } from "@/lib/vndThousands";
 import { paymentsWithSubsInRange, readLaggedSnapshot, type SnapshotPayload } from "@/lib/laggedSnapshot";
 import { useLaggedSnapshot } from "@/hooks/useLaggedSnapshot";
+import { useHighValueThresholds } from "@/hooks/useHighValueThresholds";
+import { amountHighlight } from "@/lib/highValueThresholds";
 import { isThrowawayAccount } from "@/lib/throwawayAccount";
 import { isSeedCategoryName } from "@/lib/seedData";
 import {
@@ -155,6 +157,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   const { user } = useAuth();
   const throwaway = isThrowawayAccount(user?.email);
   const { snapshot, scheduleRefresh } = useLaggedSnapshot();
+  const [{ high: highValue, veryHigh: veryHighValue }] = useHighValueThresholds();
   const [viewMode, setViewMode] = useState<ViewMode>("range");
   const [periodOffset, setPeriodOffset] = useState(() => getPeriodOffsetForDate(new Date()));
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -312,7 +315,6 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
 
-  const HIGH_VALUE_THRESHOLD = 200000;
   const CHIP_FREQ_PAGES: { key: CategoryFrequency; label: string }[] = [
     { key: "monthly", label: "Tháng" },
     { key: "daily", label: "Ngày" },
@@ -1734,7 +1736,8 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       group={viewMode === "range" && !hasListSearch ? { ...group, date: undefined } : group}
       getCategoryName={getCategoryName}
       getSupplierName={getSupplierName}
-      highValueThreshold={HIGH_VALUE_THRESHOLD}
+      high={highValue}
+      veryHigh={veryHighValue}
       onEntryClick={(entry) => openEntryDetails(entry)}
       onEntryNameClick={(entry) => {
         if (entry.isPending) openReminder(entry);
@@ -1943,7 +1946,11 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                         notes={item.entry.notes}
                         categoryName={getCategoryName(item.entry.category_id)}
                         supplierName={getSupplierName(item.entry.supplier_id)}
-                        isHighValue={!item.entry.isPending && item.entry.amount >= HIGH_VALUE_THRESHOLD}
+                        highlight={
+                          item.entry.isPending
+                            ? "none"
+                            : amountHighlight(item.entry.amount, highValue, veryHighValue)
+                        }
                         isPending={item.entry.isPending}
                         onNameClick={() => {
                           if (item.entry.isPending) openReminder(item.entry);

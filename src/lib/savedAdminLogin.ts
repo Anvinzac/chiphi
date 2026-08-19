@@ -1,4 +1,4 @@
-import { ADMIN_PASSWORD, ADMIN_USERNAME } from "@/lib/adminCredentials";
+import { ADMIN_PASSWORD, ADMIN_USERNAME, LOCAL_ADMIN_LOGIN_VISIBLE } from "@/lib/adminCredentials";
 
 const STORAGE_KEY = "mise.saved-admin-login";
 
@@ -7,10 +7,11 @@ export type SavedAdminLogin = {
   password: string;
 };
 
-/** Remember the built-in admin account on this browser for the next sign-in. */
+/** Remember the built-in admin account on this browser for the next sign-in. Local Vite only. */
 export function saveAdminLogin(
   login: SavedAdminLogin = { username: ADMIN_USERNAME, password: ADMIN_PASSWORD },
 ) {
+  if (!LOCAL_ADMIN_LOGIN_VISIBLE) return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(login));
   } catch {
@@ -19,6 +20,7 @@ export function saveAdminLogin(
 }
 
 export function readSavedAdminLogin(): SavedAdminLogin | null {
+  if (!LOCAL_ADMIN_LOGIN_VISIBLE) return null;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;

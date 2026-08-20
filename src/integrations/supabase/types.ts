@@ -476,6 +476,7 @@ export type Database = {
           status: string
           unit: string
           updated_at: string
+          vendor_notice: string | null
         }
         Insert: {
           created_at?: string
@@ -490,6 +491,7 @@ export type Database = {
           status?: string
           unit?: string
           updated_at?: string
+          vendor_notice?: string | null
         }
         Update: {
           created_at?: string
@@ -504,6 +506,7 @@ export type Database = {
           status?: string
           unit?: string
           updated_at?: string
+          vendor_notice?: string | null
         }
         Relationships: [
           {
@@ -812,6 +815,7 @@ export type Database = {
           status: string
           unit: string
           updated_at: string
+          vendor_notice: string | null
         }[]
         SetofOptions: {
           from: "*"
@@ -861,6 +865,7 @@ export type Database = {
           status: string
           unit: string
           updated_at: string
+          vendor_notice: string | null
         }
         SetofOptions: {
           from: "*"

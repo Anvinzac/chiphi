@@ -13,6 +13,7 @@ import VendorPhase from "./VendorPhase";
 import SchedulePhase from "./SchedulePhase";
 import PurchaseDetailDialog from "./PurchaseDetailDialog";
 import RangeDayPicker from "./RangeDayPicker";
+import MonthOverviewGrid, { type MonthMetric } from "./MonthOverviewGrid";
 import MoneyLabel from "./MoneyLabel";
 import DaySection from "./DaySection";
 import WeekPager, { type WeekPage } from "./WeekPager";
@@ -57,11 +58,14 @@ import {
   type ScheduleRepeat,
 } from "@/lib/expenseSchedule";
 
-type ViewMode = "range" | "daily";
+type ViewMode = "range" | "daily" | "month";
 
 interface DailyExpenseTableProps {
   isDemo?: boolean;
   onSignOut?: () => void;
+  monthOverview?: boolean;
+  onMonthOverviewChange?: (open: boolean) => void;
+  monthMetric?: MonthMetric;
 }
 
 /** Accounting periods: … → Jul 3–Aug 4 → Aug 5–Sep 3 → … */
@@ -153,14 +157,22 @@ interface QuickCategory {
   frequency: CategoryFrequency;
 }
 
-export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTableProps = {}) {
+export default function DailyExpenseTable({
+  isDemo,
+  onSignOut,
+  monthOverview = false,
+  onMonthOverviewChange,
+  monthMetric = "revenue",
+}: DailyExpenseTableProps = {}) {
   const { user } = useAuth();
   const throwaway = isThrowawayAccount(user?.email);
   const { snapshot, scheduleRefresh } = useLaggedSnapshot();
   const [{ high: highValue, veryHigh: veryHighValue }] = useHighValueThresholds();
   const [viewMode, setViewMode] = useState<ViewMode>("range");
+  const viewBeforeMonthRef = useRef<Exclude<ViewMode, "month">>("range");
   const [periodOffset, setPeriodOffset] = useState(() => getPeriodOffsetForDate(new Date()));
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [addForDate, setAddForDate] = useState<string | null>(null);
 
   const period = useMemo(() => getPeriodBounds(periodOffset), [periodOffset]);
   const periodStartStr = format(period.start, "yyyy-MM-dd");
@@ -171,13 +183,15 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   const canShiftForward = periodOffset < maxPeriodOffset;
   const periodIsPast = periodEndStr < todayStr;
   const periodIsFuture = periodStartStr > todayStr;
-  // Range: past periods → last day of kỳ; current → today. Never write a future date.
+  // Range: past periods → last day of kỳ; current → today. Per-day add overrides.
   const expenseDate =
-    viewMode === "daily"
-      ? selectedDate
-      : periodIsPast
-        ? periodEndStr
-        : todayStr;
+    addForDate && addForDate <= todayStr
+      ? addForDate
+      : viewMode === "daily"
+        ? selectedDate
+        : periodIsPast
+          ? periodEndStr
+          : todayStr;
   const canAddExpense =
     !periodIsFuture &&
     expenseDate <= todayStr &&
@@ -472,7 +486,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       setDayTotal(cached.total);
       setPaymentsReady(true);
       if (cached.groups.length > 0) {
-        if (viewMode === "range") {
+        if (viewMode !== "daily") {
           const endPayments = cached.groups.filter(
             g => g.date === periodEndStr && !isMockPaymentId(g.paymentId) && !isReminderPaymentId(g.paymentId),
           );
@@ -610,7 +624,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       }
 
       // Client-only sample spend — throwaway accounts only, never mixed into admin/real data
-      if (throwaway && viewMode === "range") {
+      if (throwaway && viewMode !== "daily") {
         const mocks = getMockGroupsForRange(periodStartStr, periodEndStr);
         if (mocks.length > 0) {
           const realIds = new Set(groups.map(g => g.paymentId));
@@ -658,7 +672,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       setDayTotal(total);
       setPaymentsReady(true);
       if (groups.length > 0) {
-        if (viewMode === "range") {
+        if (viewMode !== "daily") {
           const endPayments = groups.filter(g => g.date === periodEndStr && !isMockPaymentId(g.paymentId) && !isReminderPaymentId(g.paymentId));
           setActivePaymentId(
             endPayments.length > 0 ? endPayments[endPayments.length - 1].paymentId : null
@@ -786,6 +800,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     setTimeout(() => {
       setCardExpanded(false);
       setCardClosing(false);
+      setAddForDate(null);
     }, 300);
   }, [cardExpanded, cardClosing]);
 
@@ -1201,7 +1216,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
             paymentId: pid!,
             supplierName: match?.supplierName || null,
             total: amount,
-            date: viewMode === "range" ? expenseDate : undefined,
+            date: viewMode !== "daily" ? expenseDate : undefined,
             entries: newEntries,
           },
         ];
@@ -1247,13 +1262,30 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     }
     setSelectedDate(key);
     setViewMode("daily");
+    onMonthOverviewChange?.(false);
     setRangePickerOpen(false);
   };
 
   const handleViewFullRange = () => {
     setViewMode("range");
+    onMonthOverviewChange?.(false);
     setRangePickerOpen(false);
   };
+
+  useEffect(() => {
+    if (monthOverview) {
+      setViewMode(prev => {
+        if (prev !== "month") viewBeforeMonthRef.current = prev;
+        return "month";
+      });
+      setRangePickerOpen(false);
+      setSearchOpen(false);
+      setSearchPullPx(0);
+      setSearchPulling(false);
+      return;
+    }
+    setViewMode(prev => (prev === "month" ? viewBeforeMonthRef.current : prev));
+  }, [monthOverview]);
 
   useEffect(() => {
     if (periodOffset > maxPeriodOffset) setPeriodOffset(maxPeriodOffset);
@@ -1265,7 +1297,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       if (next > maxPeriodOffset) return prev;
       return next;
     });
-    setViewMode("range");
+    setViewMode(prev => (prev === "month" ? "month" : "range"));
     setRangePickerOpen(false);
   };
 
@@ -1274,6 +1306,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       toast.error("Không thể ghi chi tiêu trước ngày hôm nay");
       return;
     }
+    setAddForDate(null);
     setCardExpanded(true);
     // Blur any focused field so iOS doesn't zoom / scroll on open
     const active = document.activeElement;
@@ -1308,6 +1341,20 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       toast.error("Không thể ghi chi tiêu trước ngày hôm nay");
       return;
     }
+    setAddForDate(null);
+    openAddPanel();
+  };
+
+  const startNewPurchaseForDate = (dateStr: string) => {
+    if (dateStr > todayStr) {
+      toast.error("Không thể ghi chi tiêu trước ngày hôm nay");
+      return;
+    }
+    setAddForDate(dateStr);
+    openAddPanel();
+  };
+
+  const openAddPanel = () => {
     setActivePaymentId(null);
     setNameValue("");
     setAmountValue("");
@@ -1524,7 +1571,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     touchStartY.current = null;
     if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
 
-    if (viewMode === "range") {
+    if (viewMode !== "daily") {
       setPeriodOffset(prev => {
         const next = prev + (dx > 0 ? -1 : 1);
         if (next > maxPeriodOffset) return prev;
@@ -1543,9 +1590,19 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
     window.dispatchEvent(new Event("mise:page-slide"));
   }, [selectedDate, viewMode, period.start, period.end, maxPeriodOffset]);
 
-  const centerLabel = viewMode === "range"
-    ? formatDayMonthRange(period.start, period.end)
-    : `${format(new Date(selectedDate + "T00:00:00"), "EEE", { locale: vi })}, ${formatDayMonth(new Date(selectedDate + "T00:00:00"))}`;
+  const centerLabel = viewMode === "daily"
+    ? `${format(new Date(selectedDate + "T00:00:00"), "EEE", { locale: vi })}, ${formatDayMonth(new Date(selectedDate + "T00:00:00"))}`
+    : formatDayMonthRange(period.start, period.end);
+
+  const monthDayTotals = useMemo(() => {
+    const map = new Map<string, number>();
+    if (viewMode !== "month") return map;
+    for (const group of paymentGroups) {
+      if (!group.date) continue;
+      map.set(group.date, (map.get(group.date) ?? 0) + group.total);
+    }
+    return map;
+  }, [viewMode, paymentGroups]);
 
   const rangeDaySections = useMemo(() => {
     if (viewMode !== "range") return [];
@@ -1767,9 +1824,10 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
   // Fixed height for both phases — paging must not resize the panel
   const panelHeight = "min(80svh, 36rem)";
   const weekPagerOpen = viewMode === "range" && !hasListSearch;
+  const monthViewOpen = viewMode === "month";
   const listPadClass = cardExpanded
     ? "pb-[min(82svh,37rem)]"
-    : weekPagerOpen
+    : weekPagerOpen || monthViewOpen
       ? "pb-0"
       : "pb-24";
 
@@ -1799,20 +1857,39 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
             >
               <ChevronLeft className="h-4 w-4" strokeWidth={2.25} />
             </button>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className="flex w-[70%] min-w-0 flex-col items-center justify-center px-1 text-center transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-inset"
-                aria-label="Open day picker for this period"
-              >
-                <span className="block text-[10px] uppercase tracking-[0.18em] text-muted-foreground/80">
-                  {viewMode === "range" ? "Theo kỳ" : "Theo ngày"}
-                </span>
-                <span className="block max-w-full truncate text-sm font-display tabular-nums leading-tight text-foreground/90">
-                  {centerLabel}
-                </span>
-              </button>
-            </PopoverTrigger>
+            <div className="flex w-[70%] min-w-0 items-stretch">
+              {viewMode === "daily" && (
+                <span className="mb-[3px] ml-0.5 mt-auto inline-flex h-[1.15rem] w-[1.15rem] shrink-0" aria-hidden />
+              )}
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="flex min-w-0 flex-1 flex-col items-center justify-center px-1 text-center transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-inset"
+                  aria-label="Open day picker for this period"
+                >
+                  <span className="block text-[10px] uppercase tracking-[0.18em] text-muted-foreground/80">
+                    {viewMode === "range" ? "Theo kỳ" : viewMode === "month" ? "Theo tháng" : "Theo ngày"}
+                  </span>
+                  <span className="block max-w-full truncate text-sm font-display tabular-nums leading-tight text-foreground/90">
+                    {centerLabel}
+                  </span>
+                </button>
+              </PopoverTrigger>
+              {viewMode === "daily" && (
+                <button
+                  type="button"
+                  onClick={e => {
+                    e.stopPropagation();
+                    startNewPurchase();
+                  }}
+                  disabled={!canAddExpense}
+                  aria-label="Thêm chi tiêu cho ngày này"
+                  className="mb-[3px] mr-0.5 mt-auto inline-flex h-[1.15rem] w-[1.15rem] shrink-0 items-center justify-center rounded-full text-muted-foreground/70 transition-colors hover:bg-background/80 hover:text-foreground active:scale-90 disabled:pointer-events-none disabled:opacity-30"
+                >
+                  <Plus className="h-3 w-3" strokeWidth={2.5} />
+                </button>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => shiftPeriod(1)}
@@ -1853,10 +1930,10 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
 
       {/* Grouped entries */}
       <div
-        className={`flex-1 px-4 ${listPadClass} ${
+        className={`flex-1 ${monthViewOpen ? "px-0" : "px-4"} ${listPadClass} ${
           cardExpanded
             ? "overflow-hidden overscroll-none"
-            : viewMode === "range" || searchOpen || hasListSearch
+            : viewMode === "range" || viewMode === "month" || searchOpen || hasListSearch
               ? "flex min-h-0 flex-col overflow-hidden"
               : "overflow-auto"
         }`}
@@ -1883,7 +1960,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
           </div>
         )}
 
-        {hasListSearch && !searchOpen && (
+        {hasListSearch && !searchOpen && !monthViewOpen && (
           <div className="mb-3 flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2" data-no-double-tap>
             <button
               type="button"
@@ -1904,7 +1981,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
           </div>
         )}
 
-        {paymentsReady && paymentGroups.length === 0 && (
+        {paymentsReady && paymentGroups.length === 0 && !monthViewOpen && (
           <div className="text-center pt-12 text-muted-foreground text-sm">
             <p>Chưa có chi tiêu nào</p>
             {!cardExpanded && (
@@ -1913,7 +1990,22 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
           </div>
         )}
 
-        {filteredNameSections ? (
+        {monthViewOpen ? (
+          <MonthOverviewGrid
+            rangeStart={period.start}
+            rangeEnd={period.end}
+            totals={monthDayTotals}
+            todayStr={todayStr}
+            high={highValue}
+            veryHigh={veryHighValue}
+            metric={monthMetric}
+            onSelectDay={dateStr => {
+              setSelectedDate(dateStr);
+              setViewMode("daily");
+              onMonthOverviewChange?.(false);
+            }}
+          />
+        ) : filteredNameSections ? (
           <div className="min-h-0 flex-1 overflow-auto">
           {filteredNameSections.count === 0 ? (
             <div className="text-center pt-10 text-sm text-muted-foreground">
@@ -1937,6 +2029,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                     key={day.date}
                     title={formatDayHeading(day.date)}
                     total={day.total}
+                    onAdd={day.date <= todayStr ? () => startNewPurchaseForDate(day.date) : undefined}
                   >
                     {day.items.map(item => (
                       <SwipeableEntryRow
@@ -2023,6 +2116,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                 key={section.date}
                 title={formatDayHeading(section.date)}
                 total={section.total}
+                onAdd={section.date <= todayStr ? () => startNewPurchaseForDate(section.date) : undefined}
               >
                 {section.groups.map(renderPaymentGroup)}
               </DaySection>
@@ -2033,7 +2127,7 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
         )}
 
         {/* New purchase button */}
-        {paymentGroups.length > 0 && !hasListSearch && viewMode !== "range" && (
+        {paymentGroups.length > 0 && !hasListSearch && viewMode === "daily" && (
           <button
             onClick={startNewPurchase}
             className="w-full mt-2 py-2.5 text-xs text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:border-primary/40 transition-colors flex items-center justify-center gap-1.5"
@@ -2048,11 +2142,11 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
       <button
         type="button"
         onClick={expandCard}
-        disabled={cardExpanded || !canAddExpense}
-        tabIndex={cardExpanded || !canAddExpense ? -1 : 0}
-        aria-hidden={cardExpanded}
+        disabled={cardExpanded || !canAddExpense || monthViewOpen}
+        tabIndex={cardExpanded || !canAddExpense || monthViewOpen ? -1 : 0}
+        aria-hidden={cardExpanded || monthViewOpen}
         className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-14 h-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg active:scale-95 transition-opacity duration-200 ease-out ${
-          cardExpanded || !canAddExpense
+          cardExpanded || !canAddExpense || monthViewOpen
             ? "opacity-0 pointer-events-none"
             : "opacity-100"
         }`}
@@ -2121,14 +2215,9 @@ export default function DailyExpenseTable({ isDemo, onSignOut }: DailyExpenseTab
                 );
               })}
             </div>
-            {viewMode === "range" && periodIsPast && !justSaved && (
+            {viewMode === "range" && !justSaved && (
               <p className="px-5 pb-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground/75">
-                Lưu vào ngày cuối kỳ · {formatDayMonth(period.end)}
-              </p>
-            )}
-            {viewMode === "range" && !periodIsPast && !periodIsFuture && !justSaved && (
-              <p className="px-5 pb-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground/75">
-                Lưu vào hôm nay · {formatDayMonth(new Date())}
+                Lưu vào · {formatDayMonth(new Date(expenseDate + "T00:00:00"))}
               </p>
             )}
 

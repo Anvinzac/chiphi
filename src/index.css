@@ -55,6 +55,10 @@
 
     --gradient-topbar: linear-gradient(180deg, hsl(32 42% 93%) 0%, hsl(30 32% 96%) 62%, hsl(30 30% 96% / 0.92) 100%);
     --shadow-topbar: 0 6px 18px -12px hsl(25 30% 25% / 0.45);
+
+    --weekend-ink: #8a6a72;
+    --weekend-wash: #f3ecee;
+    --profit-ink: #5c7a58;
   }
 
   .dark {
@@ -80,6 +84,10 @@
 
     --gradient-topbar: linear-gradient(180deg, hsl(25 18% 15%) 0%, hsl(25 15% 12%) 62%, hsl(25 15% 10% / 0.92) 100%);
     --shadow-topbar: 0 6px 18px -12px hsl(0 0% 0% / 0.6);
+
+    --weekend-ink: #c4a8ae;
+    --weekend-wash: hsl(350 10% 16%);
+    --profit-ink: #9bb89a;
   }
 }
 
@@ -534,8 +542,8 @@
   }
 
   .week-snap-page-inner {
-    /* Clear the overlay FAB + bottom nav so the last rows can scroll up from behind them. */
-    padding-bottom: calc(8.75rem + env(safe-area-inset-bottom, 0px));
+    /* Clear the overlay FAB; bottom nav is in document flow. */
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
 
   .reminder-row {
@@ -543,12 +551,126 @@
     border-bottom-color: hsl(32 30% 80% / 0.45);
   }
 
+  .app-tabbar {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .app-month-metric-seg {
+    box-sizing: border-box;
+    padding-block: 0.35rem;
+    padding-inline: 5px;
+    overflow: hidden;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .period-month-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    flex: 1 1 0%;
+    min-height: 0;
+    gap: 1px;
+    overflow: hidden;
+    background: hsl(var(--border) / 0.75);
+    animation: periodMonthEnter 0.42s cubic-bezier(0.22, 1.12, 0.32, 1) both;
+  }
+
+  .period-month-cell {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 1.15rem 0.25rem 0.38rem;
+    background: hsl(var(--card));
+    text-align: center;
+    transition: background-color 0.18s ease, transform 0.18s cubic-bezier(0.22, 1.12, 0.32, 1);
+  }
+
+  button.period-month-cell:hover {
+    background: hsl(var(--muted) / 0.55);
+  }
+
+  button.period-month-cell:active {
+    transform: scale(0.985);
+  }
+
+  .period-month-cell-weekend {
+    background: var(--weekend-wash);
+  }
+
+  button.period-month-cell-weekend:hover {
+    background: color-mix(in srgb, var(--weekend-wash) 82%, hsl(var(--foreground)) 8%);
+  }
+
+  .period-month-cell-today {
+    box-shadow: inset 0 0 0 1.5px hsl(var(--primary) / 0.45);
+  }
+
+  .period-month-metric-profit {
+    color: var(--profit-ink);
+  }
+
+  .period-month-cell-future {
+    cursor: default;
+    opacity: 0.42;
+  }
+
+  .period-month-cell-pad {
+    pointer-events: none;
+  }
+
+  .period-month-day {
+    position: absolute;
+    top: 0.2rem;
+    left: 0.35rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.22rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: hsl(var(--muted-foreground) / 0.72);
+  }
+
+  .period-month-day-weekend {
+    color: var(--weekend-ink);
+    font-weight: 600;
+  }
+
+  .period-month-month {
+    font-size: 0.55rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: lowercase;
+    color: hsl(var(--muted-foreground) / 0.7);
+  }
+
+  .period-month-metrics {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0.65rem;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .period-month-amount {
+    flex: 0 0 auto;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .category-cell,
     .expense-card-enter,
     .expense-card-exit,
     .expense-scrim-enter,
-    .expense-scrim-exit {
+    .expense-scrim-exit,
+    .period-month-grid {
       animation: none;
     }
 
@@ -564,6 +686,21 @@
     transform: translateY(8px) scale(0.97);
   }
   to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes periodMonthEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  72% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.004);
+  }
+  100% {
     opacity: 1;
     transform: translateY(0) scale(1);
   }

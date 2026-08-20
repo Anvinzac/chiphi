@@ -27,6 +27,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  draftHasAmount,
+  draftMoneyVnd,
+  moneyAmountToDraft,
+  type OrderMode,
+} from "@/lib/formatOrderQty";
+import { customerNameFromUser, formatOrderDay, orderIdentityLine } from "@/lib/orderIdentity";
 
 type OrderItemDraft = {
   id?: string;
@@ -36,6 +43,9 @@ type OrderItemDraft = {
   sort_order: number;
   catalog_id?: string;
   reference_price?: number | null;
+  order_mode?: OrderMode;
+  money_amount?: string;
+  notice?: string;
 };
 
 type CatalogIngredient = {
@@ -73,6 +83,7 @@ function OrderFilledRow({
   chipCloud,
   onExpand,
   onUpdate,
+  onCommitNotice,
   onRemove,
 }: {
   row: OrderItemDraft;
@@ -81,6 +92,7 @@ function OrderFilledRow({
   chipCloud: ReactNode;
   onExpand: () => void;
   onUpdate: (patch: Partial<OrderItemDraft>) => void;
+  onCommitNotice: (notice: string) => void;
   onRemove: () => void;
 }) {
   const { confirming, cancelConfirm, consumeClick, rootRef, holdProps } = useHoldToConfirm({
@@ -97,73 +109,125 @@ function OrderFilledRow({
   };
 
   return (
-    <div
-      ref={rootRef}
-      className={`overflow-hidden rounded-2xl border transition-colors select-none [-webkit-touch-callout:none] ${
-        expanded ? "border-primary/30 bg-card shadow-sm" : "border-border/50 bg-card"
-      } ${confirming ? "bg-destructive/5" : ""}`}
-      {...holdProps}
-    >
+    <>
       <div
-        role="button"
-        tabIndex={0}
-        onClick={handleRowActivate}
-        onKeyDown={e => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            handleRowActivate();
-          }
-        }}
-        className={`flex w-full cursor-pointer items-center gap-2 px-3 py-2.5 text-left ${
-          expanded ? "bg-primary/5" : ""
-        }`}
+        ref={rootRef}
+        className={`select-none [-webkit-touch-callout:none] ${confirming ? "bg-destructive/5" : ""}`}
+        {...holdProps}
       >
-        <p className="min-w-0 flex-1 truncate text-sm font-medium leading-tight">
-          {row.name}
-        </p>
         <div
-          className="flex shrink-0 items-baseline justify-center gap-1"
-          onClick={e => e.stopPropagation()}
-          onPointerDown={e => e.stopPropagation()}
+          role="button"
+          tabIndex={0}
+          onClick={handleRowActivate}
+          onKeyDown={e => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              handleRowActivate();
+            }
+          }}
+          className={`grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 px-3 py-1.5 text-left ${
+            expanded ? "bg-primary/5" : "hover:bg-muted/30"
+          }`}
         >
-          <Input
-            value={row.quantity}
-            onFocus={() => onUpdate({ quantity: "" })}
-            onChange={e => onUpdate({ quantity: e.target.value.replace(/[^\d.]/g, "") })}
-            placeholder="0"
-            inputMode="decimal"
-            className="h-7 w-14 border-0 bg-muted/40 px-1.5 text-center text-sm tabular-nums shadow-none focus-visible:ring-1"
-            aria-label={`Số lượng ${row.name}`}
-          />
-          <span className="text-xs text-muted-foreground/45">{row.unit}</span>
-        </div>
-        <div className="min-w-[4.5rem] shrink-0 text-right">
-          {confirming ? (
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium leading-tight">{row.name}</p>
+            {expanded ? (
+              <input
+                value={row.notice ?? ""}
+                onChange={e => onUpdate({ notice: e.target.value })}
+                onBlur={e => onCommitNotice(e.target.value)}
+                onClick={e => e.stopPropagation()}
+                onPointerDown={e => e.stopPropagation()}
+                onKeyDown={e => {
+                  e.stopPropagation();
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                }}
+                placeholder="Ghi chú cho chợ…"
+                className="mt-0.5 h-5 w-full bg-transparent text-[11px] leading-tight text-muted-foreground outline-none placeholder:text-muted-foreground/35"
+                aria-label={`Ghi chú ${row.name}`}
+              />
+            ) : row.notice?.trim() ? (
+              <p className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">
+                {row.notice}
+              </p>
+            ) : null}
+          </div>
+          <div
+            className="flex shrink-0 items-baseline"
+            onClick={e => e.stopPropagation()}
+            onPointerDown={e => e.stopPropagation()}
+          >
+            {row.order_mode === "money" ? (
+              <Input
+                value={row.money_amount ?? ""}
+                onFocus={() => onUpdate({ money_amount: "" })}
+                onChange={e => onUpdate({ money_amount: e.target.value.replace(/[^\d.]/g, "") })}
+                placeholder="0"
+                inputMode="numeric"
+                className="h-7 w-8 border-0 bg-transparent px-0 text-right text-sm tabular-nums shadow-none focus-visible:ring-1"
+                aria-label={`Số tiền ${row.name}`}
+              />
+            ) : (
+              <Input
+                value={row.quantity}
+                onFocus={() => onUpdate({ quantity: "" })}
+                onChange={e => onUpdate({ quantity: e.target.value.replace(/[^\d.]/g, "") })}
+                placeholder="0"
+                inputMode="decimal"
+                className="h-7 w-8 border-0 bg-transparent px-0 text-right text-sm tabular-nums shadow-none focus-visible:ring-1"
+                aria-label={`Số lượng ${row.name}`}
+              />
+            )}
             <button
               type="button"
-              className="text-xs font-semibold px-3 py-1 rounded-full bg-destructive text-destructive-foreground active:brightness-90"
-              aria-label={`Xóa ${row.name}`}
-              onClick={e => {
-                e.stopPropagation();
-                onRemove();
-                cancelConfirm();
+              className="ml-0.5 text-xs text-muted-foreground/45 hover:text-foreground"
+              title={row.order_mode === "money" ? "Đổi sang đơn vị đo" : "Đặt theo số tiền"}
+              aria-label={row.order_mode === "money" ? "Đơn vị: đồng. Bấm để đổi sang đo lường" : `Đơn vị: ${row.unit}. Bấm để đặt theo tiền`}
+              onClick={() => {
+                if (row.order_mode === "money") {
+                  onUpdate({ order_mode: "measure" });
+                  return;
+                }
+                const qty = Number(row.quantity) || 0;
+                const price = Number(row.reference_price) || 0;
+                const seeded = qty > 0 && price > 0 ? qty * price : draftMoneyVnd(row);
+                onUpdate({
+                  order_mode: "money",
+                  money_amount: seeded ? moneyAmountToDraft(seeded) : row.money_amount || "",
+                });
               }}
             >
-              Xóa
+              {row.order_mode === "money" ? "₫" : row.unit}
             </button>
-          ) : estimate != null ? (
-            <MoneyLabel
-              amount={estimate}
-              className="text-sm font-display text-foreground/90"
-              smallClassName="text-[0.7em]"
-            />
-          ) : (
-            <span className="text-[11px] text-muted-foreground/40">—</span>
-          )}
+          </div>
+          <div className="w-[4.5rem] shrink-0 text-right">
+            {confirming ? (
+              <button
+                type="button"
+                className="text-xs font-semibold px-3 py-1 rounded-full bg-destructive text-destructive-foreground active:brightness-90"
+                aria-label={`Xóa ${row.name}`}
+                onClick={e => {
+                  e.stopPropagation();
+                  onRemove();
+                  cancelConfirm();
+                }}
+              >
+                Xóa
+              </button>
+            ) : estimate != null ? (
+              <MoneyLabel
+                amount={estimate}
+                className="text-sm font-display text-foreground/90"
+                smallClassName="text-[0.7em]"
+              />
+            ) : (
+              <span className="text-[11px] text-muted-foreground/40">—</span>
+            )}
+          </div>
         </div>
       </div>
       {expanded && chipCloud}
-    </div>
+    </>
   );
 }
 
@@ -198,6 +262,12 @@ export default function OrderDetail() {
   const persistingRef = useRef(false);
   const justCreatedIdRef = useRef<string | null>(null);
   const draftTitleReadyRef = useRef(false);
+  const [identity, setIdentity] = useState<{
+    customer_name?: string | null;
+    created_at?: string | null;
+    day_seq?: number | null;
+    mgmt_id?: string | null;
+  }>({});
 
   useEffect(() => {
     orderIdRef.current = orderId;
@@ -221,19 +291,33 @@ export default function OrderDetail() {
     setStatus(order.status);
     setShareToken(order.share_token);
     setOrderId(order.id);
+    setIdentity({
+      customer_name: order.customer_name,
+      created_at: order.created_at,
+      day_seq: order.day_seq,
+      mgmt_id: order.mgmt_id,
+    });
     const { data: rows } = await supabase
       .from("order_items")
       .select("*")
       .eq("order_id", existingId)
       .order("sort_order", { ascending: true });
     setItems(
-      (rows || []).map((r, i) => ({
-        id: r.id,
-        name: r.name,
-        quantity: String(r.quantity),
-        unit: r.unit,
-        sort_order: r.sort_order ?? i,
-      })),
+      (rows || [])
+        .filter(r => !r.is_alternate)
+        .map((r, i) => {
+        const money = r.order_mode === "money";
+        return {
+          id: r.id,
+          name: r.name,
+          quantity: String(r.quantity),
+          unit: r.unit,
+          sort_order: r.sort_order ?? i,
+          order_mode: money ? "money" : "measure",
+          money_amount: money ? moneyAmountToDraft(Number(r.money_amount) || 0) : "",
+          notice: r.notice ?? "",
+        };
+      }),
     );
     setLoading(false);
   }, [user, navigate]);
@@ -248,6 +332,7 @@ export default function OrderDetail() {
       setShareToken("");
       setStatus("draft");
       setTitle("");
+      setIdentity({});
       setExpandedKey("ph-0");
       setLoading(false);
       return;
@@ -392,6 +477,10 @@ export default function OrderDetail() {
   }, [catalog]);
 
   const lineEstimate = (row: OrderItemDraft) => {
+    if (row.order_mode === "money") {
+      const vnd = draftMoneyVnd(row);
+      return vnd > 0 ? vnd : null;
+    }
     const qty = Number(row.quantity) || 0;
     const price =
       row.reference_price != null && Number(row.reference_price) > 0
@@ -432,14 +521,22 @@ export default function OrderDetail() {
 
   const persistDraftRows = async (oid: string, rows: OrderItemDraft[]) => {
     const cleaned = rows
-      .map((row, i) => ({
-        name: row.name.trim(),
-        quantity: Number(row.quantity) || 0,
-        unit: row.unit || "kg",
-        sort_order: i,
-      }))
-      .filter(row => row.name && row.quantity > 0);
-    await supabase.from("order_items").delete().eq("order_id", oid);
+      .map((row, i) => {
+        const money = row.order_mode === "money";
+        return {
+          name: row.name.trim(),
+          order_mode: money ? "money" : "measure",
+          money_amount: money ? draftMoneyVnd(row) : null,
+          quantity: money ? 1 : Number(row.quantity) || 0,
+          unit: row.unit || "kg",
+          notice: row.notice?.trim() || null,
+          sort_order: i,
+        };
+      })
+      .filter(row =>
+        row.name && (row.order_mode === "money" ? (row.money_amount ?? 0) > 0 : row.quantity > 0),
+      );
+    await supabase.from("order_items").delete().eq("order_id", oid).eq("is_alternate", false);
     if (cleaned.length === 0) return;
     const { error } = await supabase.from("order_items").insert(
       cleaned.map(row => ({
@@ -449,6 +546,9 @@ export default function OrderDetail() {
         unit: row.unit,
         sort_order: row.sort_order,
         status: "pending",
+        order_mode: row.order_mode,
+        money_amount: row.money_amount,
+        notice: row.notice,
       })),
     );
     if (error) throw error;
@@ -459,7 +559,7 @@ export default function OrderDetail() {
     async (rows: OrderItemDraft[]) => {
       if (!user) return null;
       if (orderIdRef.current) return orderIdRef.current;
-      const cleaned = rows.filter(r => r.name.trim() && Number(r.quantity) > 0);
+      const cleaned = rows.filter(draftHasAmount);
       if (cleaned.length === 0) return null;
       if (persistingRef.current) return orderIdRef.current;
       persistingRef.current = true;
@@ -470,17 +570,24 @@ export default function OrderDetail() {
           .insert({
             user_id: user.id,
             title: title.trim() || `Đơn ${lockedCatName} · ${format(new Date(), "d/M HH:mm")}`,
+            customer_name: customerNameFromUser(user),
             status: "draft",
             share_token: token,
             supplier_pin_hash: await hashPin(pin || "1234"),
           })
-          .select("id, share_token")
+          .select("id, share_token, customer_name, created_at, day_seq, mgmt_id")
           .single();
         if (error) throw error;
         await persistDraftRows(data.id, rows);
         orderIdRef.current = data.id;
         setOrderId(data.id);
         setShareToken(data.share_token || token);
+        setIdentity({
+          customer_name: data.customer_name,
+          created_at: data.created_at,
+          day_seq: data.day_seq,
+          mgmt_id: data.mgmt_id,
+        });
         justCreatedIdRef.current = data.id;
         const catQ = preferredCatKey ? `?cat=${encodeURIComponent(preferredCatKey)}` : "";
         navigate(`/orders/${data.id}${catQ}`, { replace: true });
@@ -544,6 +651,9 @@ export default function OrderDetail() {
       sort_order: 0,
       catalog_id: ing.id,
       reference_price: ing.reference_price,
+      order_mode: "measure",
+      money_amount: "",
+      notice: "",
     };
 
     if (expandedKey.startsWith("item-")) {
@@ -582,7 +692,7 @@ export default function OrderDetail() {
   };
 
   const renderChipCloud = () => (
-    <div className="border-t border-border/50 px-3 py-2">
+    <div className="bg-muted/20 px-3 py-2">
       <div className="mb-2 flex items-center gap-2">
         <Input
           value={ingSearch}
@@ -706,14 +816,7 @@ export default function OrderDetail() {
 
   const save = async (nextStatus?: string, pinOverride?: string) => {
     if (!user) return false;
-    const cleaned = items
-      .map((row, i) => ({
-        ...row,
-        name: row.name.trim(),
-        quantity: Number(row.quantity) || 0,
-        sort_order: i,
-      }))
-      .filter(row => row.name && row.quantity > 0);
+    const cleaned = items.filter(draftHasAmount);
 
     if (cleaned.length === 0) {
       toast.error("Chọn ít nhất một nguyên liệu");
@@ -755,7 +858,7 @@ export default function OrderDetail() {
   };
 
   const openShareFlow = () => {
-    if (items.filter(r => r.name.trim() && Number(r.quantity) > 0).length === 0) {
+    if (items.filter(draftHasAmount).length === 0) {
       toast.error("Chọn ít nhất một nguyên liệu");
       return;
     }
@@ -834,14 +937,14 @@ export default function OrderDetail() {
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div className="min-w-0 flex-1">
-            <Input
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              className="h-8 border-0 bg-transparent px-0 font-display text-lg shadow-none focus-visible:ring-0"
-              aria-label="Tiêu đề đơn"
-            />
-            <p className="text-[11px] text-muted-foreground truncate">
-              Danh mục: <span className="font-medium text-foreground/80">{lockedCatName}</span>
+            <h1 className="truncate font-display text-lg text-foreground">
+              {identity.customer_name?.trim() || customerNameFromUser(user)}
+            </h1>
+            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+              {orderIdentityLine(identity) ||
+                [formatOrderDay(new Date().toISOString()), lockedCatName && `Danh mục: ${lockedCatName}`]
+                  .filter(Boolean)
+                  .join(" · ")}
             </p>
           </div>
           {orderId && (
@@ -857,7 +960,7 @@ export default function OrderDetail() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-lg space-y-2 px-4 py-4">
+      <div className="mx-auto max-w-lg px-4 py-4">
         {catalogCats.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border px-4 py-5 text-center space-y-3">
             <p className="text-xs text-muted-foreground">
@@ -868,63 +971,68 @@ export default function OrderDetail() {
             </Button>
           </div>
         ) : (
-          <>
-            {/* Filled rows — tap to expand chip cloud here */}
+          <div className="overflow-hidden rounded-xl border border-border/60 bg-card">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2 border-b border-border/50 px-3 py-1.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              <span>Nguyên liệu</span>
+              <span className="w-[3.25rem] text-right">SL</span>
+              <span className="w-[4.5rem] text-right">Ước tính</span>
+            </div>
             {items.map((row, index) => {
               const key = `item-${index}`;
               const expanded = expandedKey === key;
               return (
-                <OrderFilledRow
-                  key={row.id || key}
-                  row={row}
-                  expanded={expanded}
-                  estimate={lineEstimate(row)}
-                  chipCloud={expanded ? renderChipCloud() : null}
-                  onExpand={() => expandSlot(key)}
-                  onUpdate={patch => updateRow(index, patch)}
-                  onRemove={() => removeRow(index)}
-                />
+                <div key={row.id || key} className="border-b border-border/40 last:border-b-0">
+                  <OrderFilledRow
+                    row={row}
+                    expanded={expanded}
+                    estimate={lineEstimate(row)}
+                    chipCloud={expanded ? renderChipCloud() : null}
+                    onExpand={() => expandSlot(key)}
+                    onUpdate={patch => updateRow(index, patch)}
+                    onCommitNotice={notice => {
+                      setItems(prev => {
+                        const next = prev.map((row, i) =>
+                          i === index ? { ...row, notice } : row,
+                        );
+                        queueMicrotask(() => syncItemsSideEffects(next));
+                        return next;
+                      });
+                    }}
+                    onRemove={() => removeRow(index)}
+                  />
+                </div>
               );
             })}
-
-            {/* Empty placeholder rows — tap to expand picker */}
             {Array.from({ length: emptyPlaceholderCount }).map((_, i) => {
               const key = `ph-${i}`;
               const expanded = expandedKey === key;
               return (
-                <div
-                  key={key}
-                  className={`overflow-hidden rounded-2xl border transition-colors ${
-                    expanded
-                      ? "border-primary/30 bg-card shadow-sm"
-                      : "border-dashed border-border/60 bg-muted/15"
-                  }`}
-                >
+                <div key={key} className="border-b border-border/40 last:border-b-0">
                   <button
                     type="button"
                     onClick={() => expandSlot(key)}
-                    className={`flex w-full items-center gap-2 px-3 py-2.5 text-left ${
-                      expanded ? "bg-primary/5" : ""
+                    className={`grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 px-3 py-1.5 text-left ${
+                      expanded ? "bg-primary/5" : "hover:bg-muted/30"
                     }`}
                   >
-                    <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground/35">
+                    <p className="min-w-0 truncate text-sm text-muted-foreground/35">
                       Tên nguyên liệu
                     </p>
-                    <div className="flex shrink-0 items-baseline justify-center gap-1">
-                      <span className="inline-flex h-7 w-14 items-center justify-center text-sm tabular-nums text-muted-foreground/30">
+                    <div className="flex shrink-0 items-baseline">
+                      <span className="inline-flex h-7 w-8 items-center justify-end text-sm tabular-nums text-muted-foreground/30">
                         0
                       </span>
-                      <span className="text-xs text-muted-foreground/25">đv</span>
+                      <span className="ml-0.5 text-xs text-muted-foreground/25">đv</span>
                     </div>
                     <span className="w-[4.5rem] shrink-0 text-right text-[11px] text-muted-foreground/25">
-                      ước tính
+                      —
                     </span>
                   </button>
                   {expanded && renderChipCloud()}
                 </div>
               );
             })}
-          </>
+          </div>
         )}
       </div>
 

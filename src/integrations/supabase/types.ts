@@ -467,9 +467,13 @@ export type Database = {
           created_at: string
           fulfilled_qty: number | null
           id: string
+          is_alternate: boolean
+          money_amount: number | null
           name: string
           notice: string | null
           order_id: string
+          order_mode: string
+          vendor_notice: string | null
           quantity: number
           retail_price: number | null
           sort_order: number
@@ -482,9 +486,13 @@ export type Database = {
           created_at?: string
           fulfilled_qty?: number | null
           id?: string
+          is_alternate?: boolean
+          money_amount?: number | null
           name: string
           notice?: string | null
           order_id: string
+          order_mode?: string
+          vendor_notice?: string | null
           quantity?: number
           retail_price?: number | null
           sort_order?: number
@@ -497,9 +505,13 @@ export type Database = {
           created_at?: string
           fulfilled_qty?: number | null
           id?: string
+          is_alternate?: boolean
+          money_amount?: number | null
           name?: string
           notice?: string | null
           order_id?: string
+          order_mode?: string
+          vendor_notice?: string | null
           quantity?: number
           retail_price?: number | null
           sort_order?: number
@@ -521,10 +533,13 @@ export type Database = {
       orders: {
         Row: {
           created_at: string
+          customer_name: string | null
+          day_seq: number
           deduction: number
           id: string
           include_deduction: boolean
           include_shipping: boolean
+          mgmt_id: string | null
           share_token: string
           shipping_fee: number
           status: string
@@ -535,10 +550,13 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          customer_name?: string | null
+          day_seq?: number
           deduction?: number
           id?: string
           include_deduction?: boolean
           include_shipping?: boolean
+          mgmt_id?: string | null
           share_token: string
           shipping_fee?: number
           status?: string
@@ -549,10 +567,13 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          customer_name?: string | null
+          day_seq?: number
           deduction?: number
           id?: string
           include_deduction?: boolean
           include_shipping?: boolean
+          mgmt_id?: string | null
           share_token?: string
           shipping_fee?: number
           status?: string
@@ -802,11 +823,54 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_shared_order_alternate: {
+        Args: {
+          p_name?: string
+          p_quantity?: number
+          p_token: string
+          p_unit?: string
+        }
+        Returns: {
+          created_at: string
+          fulfilled_qty: number | null
+          id: string
+          is_alternate: boolean
+          money_amount: number | null
+          name: string
+          notice: string | null
+          order_id: string
+          order_mode: string
+          vendor_notice: string | null
+          quantity: number
+          retail_price: number | null
+          sort_order: number
+          status: string
+          unit: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "order_items"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      delete_shared_order_alternate: {
+        Args: { p_item_id: string; p_token: string }
+        Returns: undefined
+      }
       get_shared_order: {
         Args: { p_token: string }
         Returns: {
           created_at: string
+          customer_name: string | null
+          day_seq: number
+          deduction: number
           id: string
+          include_deduction: boolean
+          include_shipping: boolean
+          mgmt_id: string | null
+          shipping_fee: number
           status: string
           title: string
           updated_at: string
@@ -818,9 +882,13 @@ export type Database = {
           created_at: string
           fulfilled_qty: number | null
           id: string
+          is_alternate: boolean
+          money_amount: number | null
           name: string
           notice: string | null
           order_id: string
+          order_mode: string
+          vendor_notice: string | null
           quantity: number
           retail_price: number | null
           sort_order: number
@@ -868,9 +936,13 @@ export type Database = {
           created_at: string
           fulfilled_qty: number | null
           id: string
+          is_alternate: boolean
+          money_amount: number | null
           name: string
           notice: string | null
           order_id: string
+          order_mode: string
+          vendor_notice: string | null
           quantity: number
           retail_price: number | null
           sort_order: number
@@ -885,6 +957,53 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      update_shared_order_alternate: {
+        Args: {
+          p_fulfilled_qty: number
+          p_item_id: string
+          p_name: string
+          p_notice: string
+          p_quantity: number
+          p_retail_price: number
+          p_status: string
+          p_token: string
+          p_unit: string
+        }
+        Returns: {
+          created_at: string
+          fulfilled_qty: number | null
+          id: string
+          is_alternate: boolean
+          money_amount: number | null
+          name: string
+          notice: string | null
+          order_id: string
+          order_mode: string
+          vendor_notice: string | null
+          quantity: number
+          retail_price: number | null
+          sort_order: number
+          status: string
+          unit: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "order_items"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      update_shared_order_extras: {
+        Args: {
+          p_deduction: number
+          p_include_deduction: boolean
+          p_include_shipping: boolean
+          p_shipping_fee: number
+          p_token: string
+        }
+        Returns: undefined
       }
       verify_order_pin: {
         Args: { p_pin: string; p_token: string }

@@ -15,6 +15,7 @@ import {
 import { ensureMockOrders } from "@/lib/mockOrders";
 import { isThrowawayAccount } from "@/lib/throwawayAccount";
 import { formatDayMonth } from "@/lib/formatDateVi";
+import { orderIdentityLine } from "@/lib/orderIdentity";
 import DaySection from "@/components/daily/DaySection";
 import OrdersPager, { type OrdersPage } from "@/components/orders/OrdersPager";
 
@@ -25,6 +26,9 @@ type OrderRow = {
   created_at: string;
   updated_at: string;
   itemCount: number;
+  customer_name?: string | null;
+  day_seq?: number | null;
+  mgmt_id?: string | null;
 };
 
 type OrderCategory = {
@@ -77,9 +81,9 @@ function OrderCard({ order }: { order: OrderRow }) {
       className="mb-2 flex items-center gap-3 rounded-xl border border-border/60 bg-card px-4 py-3 transition-colors hover:bg-muted/40"
     >
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{order.title}</p>
+        <p className="truncate text-sm font-medium">{order.customer_name?.trim() || order.title}</p>
         <p className="text-[11px] text-muted-foreground">
-          {STATUS_LABEL[order.status] || order.status}
+          {orderIdentityLine(order) || STATUS_LABEL[order.status] || order.status}
           <span className="mx-1.5 text-border">·</span>
           {format(parseISO(order.created_at), "HH:mm")}
           <span className="mx-1.5 text-border">·</span>
@@ -115,7 +119,7 @@ export default function Orders() {
     const [ordersRes, catsRes] = await Promise.all([
       supabase
         .from("orders")
-        .select("id, title, status, created_at, updated_at, order_items(id)")
+        .select("id, title, status, created_at, updated_at, customer_name, day_seq, mgmt_id, order_items(id)")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false }),
       supabase

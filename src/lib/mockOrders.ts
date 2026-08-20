@@ -135,6 +135,7 @@ async function ensureMockOrdersOnce(userId: string): Promise<void> {
       .insert({
         user_id: userId,
         title: mock.title,
+        customer_name: "Mìsè",
         status: mock.status,
         share_token: generateShareToken(),
         supplier_pin_hash: pinHash,

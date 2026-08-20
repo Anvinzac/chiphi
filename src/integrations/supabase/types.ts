@@ -521,8 +521,12 @@ export type Database = {
       orders: {
         Row: {
           created_at: string
+          deduction: number
           id: string
+          include_deduction: boolean
+          include_shipping: boolean
           share_token: string
+          shipping_fee: number
           status: string
           supplier_pin_hash: string
           title: string
@@ -531,8 +535,12 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deduction?: number
           id?: string
+          include_deduction?: boolean
+          include_shipping?: boolean
           share_token: string
+          shipping_fee?: number
           status?: string
           supplier_pin_hash: string
           title?: string
@@ -541,8 +549,12 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deduction?: number
           id?: string
+          include_deduction?: boolean
+          include_shipping?: boolean
           share_token?: string
+          shipping_fee?: number
           status?: string
           supplier_pin_hash?: string
           title?: string

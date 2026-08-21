@@ -28,11 +28,53 @@ import {
   formatQtyNumber,
 } from "@/lib/formatOrderQty";
 import { thousandsFromVnd, vndFromThousands } from "@/lib/vndThousands";
-import { orderIdentityLine } from "@/lib/orderIdentity";
+import { formatOrderSessionDay } from "@/lib/orderIdentity";
 import {
   VENDOR_PRICE_STEP,
   effectiveVendorUnitPrice,
 } from "@/lib/mockVendorUnitPrice";
+
+const VENDOR_ORDER_SHOP = "Quán Chay Lá";
+
+function VendorOrderHeading({
+  orderTitle,
+  whenLabel,
+  size = "md",
+}: {
+  orderTitle?: string | null;
+  whenLabel: string;
+  size?: "md" | "lg";
+}) {
+  const subtitle = orderTitle?.trim() || "";
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end pl-1 pr-2">
+      <div className="min-w-0">
+        <h1
+          className={cn(
+            "truncate font-display leading-tight text-foreground",
+            size === "lg" ? "text-2xl" : "text-xl",
+          )}
+        >
+          Đơn{" "}
+          <span className="text-[#6aa8ad]">{VENDOR_ORDER_SHOP}</span>
+        </h1>
+        {subtitle ? (
+          <p className="mt-0.5 truncate text-sm leading-tight text-foreground/80">{subtitle}</p>
+        ) : null}
+      </div>
+      <div className="w-[5.75rem] shrink-0" aria-hidden />
+      {whenLabel ? (
+        <div className="flex w-full justify-end">
+          <span className="whitespace-nowrap pb-px text-right text-[11px] leading-tight text-muted-foreground">
+            {whenLabel}
+          </span>
+        </div>
+      ) : (
+        <span />
+      )}
+    </div>
+  );
+}
 
 type SharedOrder = {
   id: string;
@@ -689,6 +731,7 @@ function VendorLine({
 }
 
 function ExtraRow({
+  emoji,
   label,
   on,
   draft,
@@ -697,6 +740,7 @@ function ExtraRow({
   onDraft,
   onCommit,
 }: {
+  emoji: string;
   label: string;
   on: boolean;
   draft: string;
@@ -706,8 +750,11 @@ function ExtraRow({
   onCommit: () => void;
 }) {
   return (
-    <div className="flex items-center pl-2 pr-2 py-1.5">
-      <span className="flex h-7 min-w-0 flex-1 items-center text-sm">{label}</span>
+    <div className="flex items-center pl-1 pr-2 py-1.5">
+      <span className="flex h-7 w-[2.75rem] shrink-0 items-center justify-end text-sm leading-none" aria-hidden>
+        {emoji}
+      </span>
+      <span className="flex h-7 min-w-0 flex-1 items-center pl-2.5 text-sm">{label}</span>
       <div
         className={cn(
           "vendor-done-pill relative border text-slate-800",
@@ -1160,8 +1207,7 @@ export default function SupplierOrder() {
     );
   }
 
-  const headingName = order.customer_name?.trim() || order.title;
-  const headingMeta = orderIdentityLine(order);
+  const whenLabel = formatOrderSessionDay(order.created_at);
 
   if (!unlocked) {
     return (
@@ -1177,13 +1223,11 @@ export default function SupplierOrder() {
             </Link>
           )}
           <div className="text-center">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Mìsè đặt hàng</p>
-            <h1 className="font-display text-2xl text-foreground mt-1">
-              {headingName}
-            </h1>
-            {headingMeta ? (
-              <p className="text-xs text-muted-foreground mt-1">{headingMeta}</p>
-            ) : null}
+            <VendorOrderHeading
+              orderTitle={order.title}
+              whenLabel={whenLabel}
+              size="lg"
+            />
             <p className="text-xs text-muted-foreground mt-2">Nhập PIN để cập nhật đơn</p>
           </div>
           <Input
@@ -1247,27 +1291,22 @@ export default function SupplierOrder() {
 
   return (
     <div className="min-h-screen bg-background pb-28">
-      <div className="sticky top-0 z-10 border-b border-border/60 bg-background/95 px-4 py-3 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-lg items-start gap-3">
+      <div className="sticky top-0 z-10 border-b border-border/60 bg-background/95 py-3 backdrop-blur-sm">
+        <div className="relative mx-auto max-w-lg px-4">
           {fromOrderId && (
             <Link
               to={`/orders/${fromOrderId}`}
-              className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="absolute left-4 top-0 z-10 inline-flex h-9 w-9 -translate-x-full items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
               aria-label="Quay lại đơn"
             >
               <ArrowLeft className="h-4 w-4" />
             </Link>
           )}
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Đơn nhà cung cấp</p>
-            <h1 className="font-display text-xl text-foreground">
-              {headingName}
-            </h1>
-            {headingMeta ? (
-              <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                {headingMeta}
-              </p>
-            ) : null}
+          <div className="mx-px">
+            <VendorOrderHeading
+              orderTitle={order.title}
+              whenLabel={whenLabel}
+            />
           </div>
         </div>
       </div>
@@ -1280,7 +1319,7 @@ export default function SupplierOrder() {
               <span className="pl-2.5">Hàng</span>
             </div>
             <span className="text-center">Giá</span>
-            <span className="text-right">Xong</span>
+            <span className="block w-full text-right">Xong</span>
           </div>
           {items.map((item, index) => renderLine(item, index))}
           {!readOnly && (
@@ -1298,6 +1337,7 @@ export default function SupplierOrder() {
         </div>
         <div className="mt-2 overflow-hidden rounded-xl border border-border/60 bg-card">
           <ExtraRow
+            emoji="🛵"
             label="Phí ship"
             on={includeShipping}
             draft={shippingDraft}
@@ -1316,6 +1356,7 @@ export default function SupplierOrder() {
             onCommit={persistExtrasNow}
           />
           <ExtraRow
+            emoji="✂️"
             label="Khấu trừ"
             on={includeDeduction}
             draft={deductionDraft}

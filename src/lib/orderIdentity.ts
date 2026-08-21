@@ -23,6 +23,25 @@ export function formatOrderDay(iso?: string | null): string {
   }
 }
 
+/** Morning/afternoon/evening in Vietnam, combined with the short date: "sáng 21 th 8". */
+export function formatOrderSessionDay(iso?: string | null): string {
+  const day = formatOrderDay(iso);
+  if (!day || !iso) return day;
+  try {
+    const hour = Number(
+      new Intl.DateTimeFormat("en-GB", {
+        hour: "numeric",
+        hour12: false,
+        timeZone: "Asia/Ho_Chi_Minh",
+      }).format(parseISO(iso)),
+    );
+    const session = hour < 12 ? "sáng" : hour < 18 ? "chiều" : "tối";
+    return `${session} ${day}`;
+  } catch {
+    return day;
+  }
+}
+
 export function orderIdentityLine(order: {
   created_at?: string | null;
   day_seq?: number | null;

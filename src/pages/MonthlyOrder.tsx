@@ -1,11 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, CalendarDays, Check, Delete, LayoutGrid, X } from "lucide-react";
+import { ArrowLeft, CalendarDays, Check, Copy, Delete, LayoutGrid, Search, X } from "lucide-react";
 import { addDays, format, isValid, parseISO } from "date-fns";
+import { toast } from "sonner";
 import MonthlyOrderGrid, { type MonthlyOrderCol } from "@/components/orders/MonthlyOrderGrid";
 import MonthlyOrderTwoColPager from "@/components/orders/MonthlyOrderTwoColPager";
 import { mockMonthlyOrderByDate } from "@/lib/mockMonthlyOrderGrid";
 import type { MonthlyOrderLine } from "@/lib/mockMonthlyOrderGrid";
+import { googleSumExpr } from "@/lib/googleSumExpr";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 function toInputValue(d: Date): string {
   return format(d, "yyyy-MM-dd");
@@ -64,6 +73,7 @@ export default function MonthlyOrder() {
   const [startInput, setStartInput] = useState(() => toInputValue(defaultStart));
   const [endInput, setEndInput] = useState(() => toInputValue(defaultEnd));
   const [columns, setColumns] = useState<MonthlyOrderCol>(4);
+  const [totalOpen, setTotalOpen] = useState(false);
 
   const startRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLInputElement>(null);
@@ -101,13 +111,43 @@ export default function MonthlyOrder() {
     let daysWithItems = 0;
     let totalLines = 0;
     let totalSum = 0;
-    for (const lines of itemsByDate.values()) {
+    const dayTotals: { key: string; name: string; amount: number }[] = [];
+    for (const [dateStr, lines] of itemsByDate) {
       if (lines.length > 0) daysWithItems++;
       totalLines += lines.length;
-      for (const l of lines) totalSum += Number(l.num) || 0;
+      for (const l of lines) {
+        const amount = Number(l.num) || 0;
+        if (!amount) continue;
+        totalSum += amount;
+        const d = parseISO(dateStr);
+        dayTotals.push({
+          key: `${dateStr}-${l.num}`,
+          name: isValid(d) ? shortVi(d) : dateStr,
+          amount,
+        });
+      }
     }
-    return { daysWithItems, totalLines, totalSum };
+    return { daysWithItems, totalLines, totalSum, dayTotals };
   }, [itemsByDate]);
+  const googleExpr = googleSumExpr(stats.dayTotals);
+
+  const copyMonthTotal = async () => {
+    try {
+      await navigator.clipboard.writeText(String(stats.totalSum));
+      toast.success("Đã sao chép tổng");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Không copy được");
+    }
+  };
+
+  const searchTotalOnGoogle = () => {
+    const q = googleExpr || String(stats.totalSum);
+    window.open(
+      `https://www.google.com/search?q=${encodeURIComponent(q)}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+  };
 
   const setPreset = (kind: "month" | "30d" | "next30") => {
     if (kind === "month") {
@@ -438,13 +478,21 @@ export default function MonthlyOrder() {
             onSelectDay={handleDayClick}
           />
         )}
-        {/* Bottom total bar */}
-        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-card px-3 py-2.5 sm:px-4">
+        {/* Bottom total bar — with tappable total */}
+        <div className="relative flex shrink-0 items-center border-t border-border bg-card px-3 py-2.5 sm:px-4">
           <span className="shrink-0 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Tổng</span>
-          <span className="min-w-0 flex-1 text-center text-lg font-display font-bold leading-none tabular-nums">
-            {hasInvalidRange ? "—" : stats.totalSum}
-          </span>
-          <span className="shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
+          <button
+            type="button"
+            disabled={hasInvalidRange}
+            onClick={() => setTotalOpen(true)}
+            className="total-amount-hit absolute left-1/2 -translate-x-1/2 hover:bg-muted/50 disabled:pointer-events-none"
+            aria-label="Xem chi tiết tổng"
+          >
+            <span className="text-lg font-display font-bold leading-none tabular-nums">
+              {hasInvalidRange ? "—" : stats.totalSum}
+            </span>
+          </button>
+          <span className="ml-auto shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
             {hasInvalidRange ? "" : `${stats.daysWithItems}/${dayCount} ngày`}
           </span>
         </div>
@@ -557,6 +605,54 @@ export default function MonthlyOrder() {
           </div>
         </>
       )}
+
+      <Dialog open={totalOpen} onOpenChange={setTotalOpen}>
+        <DialogContent className="max-w-[92vw] rounded-xl sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display">Chi tiết tổng</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[50vh] space-y-1 overflow-y-auto pr-0.5">
+            {stats.dayTotals.length === 0 ? (
+              <p className="py-3 text-center text-xs text-muted-foreground">Chưa có số nào trong khoảng này</p>
+            ) : (
+              stats.dayTotals.map(line => (
+                <div key={line.key} className="flex items-center justify-between gap-3 py-1.5">
+                  <p className="min-w-0 truncate text-sm">{line.name}</p>
+                  <span className="shrink-0 text-sm tabular-nums">{line.amount}</span>
+                </div>
+              ))
+            )}
+          </div>
+          {googleExpr ? (
+            <p className="break-all font-mono text-[11px] leading-snug text-muted-foreground">{googleExpr}</p>
+          ) : null}
+          <div className="flex items-end justify-between gap-2 border-t border-border/50 pt-3">
+            <button
+              type="button"
+              onClick={() => void copyMonthTotal()}
+              className="min-w-0 rounded-lg px-1 py-0.5 text-left hover:bg-muted/50"
+              aria-label="Sao chép tổng"
+            >
+              <span className="flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                Tổng
+                <Copy className="h-3 w-3" strokeWidth={2.4} />
+              </span>
+              <span className="text-xl font-display font-bold tabular-nums">{stats.totalSum}</span>
+            </button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              disabled={!googleExpr && stats.totalSum <= 0}
+              onClick={searchTotalOnGoogle}
+            >
+              <Search className="h-3.5 w-3.5" strokeWidth={2.4} />
+              Google
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

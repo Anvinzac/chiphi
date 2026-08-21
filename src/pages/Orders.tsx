@@ -386,6 +386,24 @@ export default function Orders() {
           )}
         </section>
 
+        <section>
+          <Link
+            to="/orders/monthly"
+            className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary/[0.06] px-4 py-3.5 transition-colors hover:border-primary/30 hover:bg-primary/[0.09] active:scale-[0.99]"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <span className="text-[11px] font-bold tracking-wide">Th</span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold leading-tight text-foreground">Đơn tháng · lưới theo ngày</p>
+              <p className="truncate text-[11px] leading-tight text-muted-foreground">
+                Chọn khoảng ngày tùy ý · xem 2 / 3 / 4 cột · mỗi ô 1–3 món · mock layout
+              </p>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </Link>
+        </section>
+
         <section className="space-y-2">
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="text-sm font-semibold">Đơn</h2>

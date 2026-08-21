@@ -47,8 +47,8 @@ function VendorOrderHeading({
 }) {
   const subtitle = orderTitle?.trim() || "";
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end pl-1 pr-2">
-      <div className="min-w-0">
+    <div className="flex items-end justify-between gap-3 pl-1 pr-2">
+      <div className="min-w-0 max-w-[80%]">
         <h1
           className={cn(
             "truncate font-display leading-tight text-foreground",
@@ -62,16 +62,11 @@ function VendorOrderHeading({
           <p className="mt-0.5 truncate text-sm leading-tight text-foreground/80">{subtitle}</p>
         ) : null}
       </div>
-      <div className="w-[5.75rem] shrink-0" aria-hidden />
       {whenLabel ? (
-        <div className="flex w-full justify-end">
-          <span className="whitespace-nowrap pb-px text-right text-[11px] leading-tight text-muted-foreground">
-            {whenLabel}
-          </span>
-        </div>
-      ) : (
-        <span />
-      )}
+        <span className="shrink-0 whitespace-nowrap pb-px text-right text-[11px] leading-tight text-muted-foreground">
+          {whenLabel}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -548,6 +543,85 @@ function VendorDonePill({
   readOnly: boolean;
   onToggle: () => void;
 }) {
+  const notice = item.vendor_notice?.trim() || "";
+  const isHetHang = notice === "Hết hàng";
+  const isThayThe = notice === "Thay thế";
+  const isGiaoSau = notice === "Giao sau";
+  const isChiCon = notice === CHI_CON || notice === "Thiếu";
+
+  // Preset notices go directly into the pill
+  if (isHetHang) {
+    return (
+      <button
+        type="button"
+        aria-label={`Hết hàng ${item.name}`}
+        disabled={readOnly}
+        onClick={onToggle}
+        className="vendor-done-pill vendor-done-pill--oos justify-center border text-slate-800 disabled:opacity-40"
+      >
+        <span className="text-[10px] font-medium leading-none">Hết hàng</span>
+      </button>
+    );
+  }
+  if (isThayThe) {
+    return (
+      <button
+        type="button"
+        aria-label={`Thay thế ${item.name}`}
+        disabled={readOnly}
+        onClick={onToggle}
+        className="vendor-done-pill vendor-done-pill--partial justify-center border text-slate-800 disabled:opacity-40"
+      >
+        <span className="text-[10px] font-medium leading-none">Thay thế</span>
+      </button>
+    );
+  }
+  if (isGiaoSau) {
+    return (
+      <button
+        type="button"
+        aria-label={`Giao sau ${item.name}`}
+        disabled={readOnly}
+        onClick={onToggle}
+        className="vendor-done-pill vendor-done-pill--done justify-center border text-slate-800 disabled:opacity-40"
+      >
+        <span className="text-[10px] font-medium leading-none">Giao sau</span>
+      </button>
+    );
+  }
+  if (isChiCon) {
+    const amount = lineAmount(item);
+    const hasQty = item.fulfilled_qty != null && Number(item.fulfilled_qty) !== 0;
+    return (
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={asStatus(item.status) === "done"}
+        aria-label={`Chỉ còn ${item.name}`}
+        disabled={readOnly}
+        onClick={onToggle}
+        className="vendor-done-pill vendor-done-pill--partial justify-between border text-slate-800 disabled:opacity-40"
+      >
+        {hasQty ? (
+          <>
+            <span className="text-[10px] leading-none" aria-hidden>
+              ❓
+            </span>
+            <MoneyLabel
+              amount={amount}
+              className="min-w-0 text-right text-xs font-medium"
+              smallClassName="text-[0.72em]"
+            />
+          </>
+        ) : (
+          <span className="mx-auto text-[11px] leading-none" aria-hidden>
+            ❓
+          </span>
+        )}
+      </button>
+    );
+  }
+
   const oos = isOutOfStock(item);
   const done = asStatus(item.status) === "done";
   const partial = asStatus(item.status) === "partial" && !oos;
@@ -696,6 +770,18 @@ function VendorLine({
                 {item.notice}
               </p>
             ) : null}
+            {(() => {
+              const v = item.vendor_notice?.trim() || "";
+              const isCustom = v && !isVendorPreset(v) && v !== "Thiếu";
+              return isCustom ? (
+                <p
+                  className="-mt-0.5 truncate text-[11px] leading-tight text-[#6aa8ad]"
+                  title={v}
+                >
+                  {v}
+                </p>
+              ) : null;
+            })()}
           </div>
         </div>
         <div className="flex h-7 items-center">
@@ -707,15 +793,7 @@ function VendorLine({
           />
         </div>
         <div className="flex h-7 items-center justify-end">
-          <div className="mr-2.5 flex h-7 items-center gap-0.5">
-            {item.vendor_notice?.trim() ? (
-              <span
-                title={item.vendor_notice}
-                className="max-w-[4.75rem] truncate text-[10px] leading-none text-muted-foreground"
-              >
-                {item.vendor_notice}
-              </span>
-            ) : null}
+          <div className="mr-2.5 flex h-7 items-center">
             <VendorNoteMenu
               item={item}
               readOnly={readOnly}
@@ -963,6 +1041,14 @@ export default function SupplierOrder() {
             p_notice: item.vendor_notice ?? "",
           });
       if (error) {
+        const isMissingFn =
+          (error as { code?: string })?.code === "PGRST202" ||
+          String((error as { message?: string })?.message || "").includes("Could not find the function");
+        if (isMissingFn && item.is_alternate) {
+          throw new Error(
+            "Chưa bật cập nhật hàng thay trên DB — chạy supabase/migrations/20260821170000_order_item_alternate.sql rồi thử lại.",
+          );
+        }
         const patch: {
           retail_price: number;
           fulfilled_qty: number;
@@ -1029,6 +1115,15 @@ export default function SupplierOrder() {
       });
       let row = (Array.isArray(data) ? data[0] : data) as SharedItem | null;
       if (error || !row) {
+        // Missing RPC on remote DB → PGRST202 schema cache miss (migration not deployed)
+        const isMissingFn =
+          (error as { code?: string; message?: string })?.code === "PGRST202" ||
+          String((error as { message?: string })?.message || "").includes("Could not find the function");
+        if (isMissingFn) {
+          throw new Error(
+            "Chưa bật hàng thay trên DB — chạy supabase/migrations/20260821170000_order_item_alternate.sql trong Supabase Dashboard > SQL Editor rồi thử lại.",
+          );
+        }
         const oid = fromOrderId || order?.id;
         if (!oid) throw error || new Error("Không thêm được hàng thay");
         const { data: inserted, error: insertErr } = await supabase
@@ -1062,6 +1157,14 @@ export default function SupplierOrder() {
         p_item_id: id,
       });
       if (error) {
+        const isMissingFn =
+          (error as { code?: string })?.code === "PGRST202" ||
+          String((error as { message?: string })?.message || "").includes("Could not find the function");
+        if (isMissingFn) {
+          throw new Error(
+            "Chưa bật xóa hàng thay trên DB — chạy supabase/migrations/20260821170000_order_item_alternate.sql rồi thử lại.",
+          );
+        }
         const { error: directErr } = await supabase.from("order_items").delete().eq("id", id);
         if (directErr) throw error;
       }

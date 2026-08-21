@@ -749,13 +749,307 @@
     overflow: hidden;
   }
 
+  .order-month-grid {
+    display: grid;
+    flex: 1 1 0%;
+    min-height: 0;
+    gap: 1px;
+    overflow: hidden;
+    background: hsl(var(--border) / 0.75);
+    animation: periodMonthEnter 0.42s cubic-bezier(0.22, 1.12, 0.32, 1) both;
+  }
+
+  .order-month-cell {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: 1.25rem 0.35rem 0.35rem;
+    background: hsl(var(--card));
+    text-align: center;
+    overflow: hidden;
+    transition: background-color 0.18s ease, transform 0.18s cubic-bezier(0.22, 1.12, 0.32, 1);
+  }
+
+  button.order-month-cell:hover {
+    background: hsl(var(--muted) / 0.55);
+  }
+
+  button.order-month-cell:active {
+    transform: scale(0.985);
+  }
+
+  .order-month-cell-weekend {
+    background: var(--weekend-wash);
+  }
+
+  button.order-month-cell-weekend:hover {
+    background: color-mix(in srgb, var(--weekend-wash) 82%, hsl(var(--foreground)) 8%);
+  }
+
+  .order-month-cell-today {
+    box-shadow: inset 0 0 0 1.5px hsl(var(--primary) / 0.45);
+  }
+
+  .order-month-cell-future {
+    cursor: default;
+    opacity: 0.42;
+  }
+
+  .order-month-cell-pad {
+    pointer-events: none;
+  }
+
+  .order-month-day {
+    position: absolute;
+    top: 0.2rem;
+    left: 0.35rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.22rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: hsl(var(--muted-foreground) / 0.72);
+  }
+
+  .order-month-day-weekend {
+    color: var(--weekend-ink);
+    font-weight: 600;
+  }
+
+  .order-month-month {
+    font-size: 0.55rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: lowercase;
+    color: hsl(var(--muted-foreground) / 0.7);
+  }
+
+  .order-month-lines {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 0.2rem;
+    padding-top: 0.15rem;
+  }
+
+  .order-month-line {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.08rem;
+    min-width: 0;
+    line-height: 1.15;
+  }
+
+  .order-month-num {
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    tabular-nums: tabular-nums;
+    color: hsl(var(--foreground));
+  }
+
+  .order-month-line-simple {
+    flex-direction: row;
+    justify-content: center;
+    gap: 0.3rem;
+  }
+
+  .order-month-emoji {
+    font-size: 1rem;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .order-month-nums {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    tabular-nums: tabular-nums;
+    color: hsl(var(--foreground));
+    white-space: nowrap;
+  }
+
+  .order-month-line-name {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: hsl(var(--foreground));
+  }
+
+  .order-month-line-qty {
+    font-size: 0.62rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: hsl(var(--muted-foreground));
+    white-space: nowrap;
+  }
+
+  .order-month-empty {
+    font-size: 0.78rem;
+    line-height: 1;
+    color: hsl(var(--muted-foreground) / 0.35);
+  }
+
+  .order-month-num {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Column-density tuning — 2 cols = airier, 4 cols = compact */
+  .order-month-cell-2 {
+    padding: 1.35rem 0.5rem 0.45rem;
+  }
+
+  .order-month-cell-2 .order-month-num {
+    font-size: 1.55rem;
+  }
+
+  .order-month-cell-2 .order-month-line-name {
+    font-size: 0.78rem;
+  }
+
+  .order-month-cell-2 .order-month-line-qty {
+    font-size: 0.68rem;
+  }
+
+  .order-month-cell-2 .order-month-emoji {
+    font-size: 1.15rem;
+  }
+
+  .order-month-cell-2 .order-month-nums {
+    font-size: 0.9rem;
+  }
+
+  .order-month-cell-2 .order-month-lines {
+    gap: 0.28rem;
+  }
+
+  .order-month-cell-3 .order-month-num {
+    font-size: 1.4rem;
+  }
+
+  .order-month-cell-3 .order-month-line-name {
+    font-size: 0.71rem;
+  }
+
+  .order-month-cell-3 .order-month-emoji {
+    font-size: 1.02rem;
+  }
+
+  .order-month-cell-3 .order-month-nums {
+    font-size: 0.82rem;
+  }
+
+  .order-month-cell-4 .order-month-num {
+    font-size: 1.22rem;
+  }
+
+  .order-month-cell-4 .order-month-line-name {
+    font-size: 0.64rem;
+  }
+
+  .order-month-cell-4 .order-month-line-qty {
+    font-size: 0.585rem;
+  }
+
+  .order-month-cell-4 .order-month-emoji {
+    font-size: 0.9rem;
+  }
+
+  .order-month-cell-4 .order-month-nums {
+    font-size: 0.72rem;
+  }
+
+  .monthly-two-col-scroller {
+    scrollbar-width: none;
+  }
+
+  .monthly-two-col-scroller::-webkit-scrollbar {
+    display: none;
+  }
+
+  .monthly-two-col-page {
+    height: 100%;
+    min-height: 0;
+    flex-shrink: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    background: hsl(var(--border) / 0.75);
+    animation: periodMonthEnter 0.32s cubic-bezier(0.22, 1.12, 0.32, 1) both;
+  }
+
+  .monthly-two-col-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    flex: 1 1 0%;
+    min-height: 0;
+    gap: 1px;
+    background: hsl(var(--border) / 0.75);
+  }
+
+  .monthly-two-col-week {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    gap: 1px;
+    background: hsl(var(--border) / 0.75);
+  }
+
+  .monthly-two-col-week-pad {
+    background: hsl(var(--card));
+    pointer-events: none;
+  }
+
+  .monthly-two-col-week-head {
+    background: hsl(var(--muted) / 55%);
+    text-align: center;
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: hsl(var(--muted-foreground));
+    padding: 0.32rem 0.25rem;
+    border-bottom: 1px solid hsl(var(--border) / 0.6);
+  }
+
+  .monthly-two-col-week-body {
+    display: grid;
+    grid-template-rows: repeat(7, minmax(0, 1fr));
+    gap: 1px;
+    flex: 1 1 0%;
+    min-height: 0;
+    background: hsl(var(--border) / 0.75);
+  }
+
+  .order-month-cell-outofrange {
+    opacity: 0.28;
+    background: hsl(var(--muted) / 35%);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .category-cell,
     .expense-card-enter,
     .expense-card-exit,
     .expense-scrim-enter,
     .expense-scrim-exit,
-    .period-month-grid {
+    .period-month-grid,
+    .order-month-grid,
+    .monthly-two-col-page {
       animation: none;
     }
 

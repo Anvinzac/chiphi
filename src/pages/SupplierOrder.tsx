@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Check, ChevronDown, Minus, Plus, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Copy, Minus, Plus, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -29,6 +29,7 @@ import {
 } from "@/lib/formatOrderQty";
 import { thousandsFromVnd, vndFromThousands } from "@/lib/vndThousands";
 import { formatOrderSessionDay } from "@/lib/orderIdentity";
+import { googleSumExpr } from "@/lib/googleSumExpr";
 import {
   VENDOR_PRICE_STEP,
   effectiveVendorUnitPrice,
@@ -127,6 +128,14 @@ function countsInTotal(item: SharedItem) {
   const status = asStatus(item.status);
   if (status === "done") return true;
   return status === "partial" && !isOutOfStock(item);
+}
+
+function lineQtyDetail(item: SharedItem): string | undefined {
+  if (isMoneyOrder(item)) return undefined;
+  const qty = Number(item.fulfilled_qty ?? item.quantity) || 0;
+  const shown = formatOrderQty(qty, item.unit, item.quantity);
+  const price = effectiveVendorUnitPrice(item.name, item.retail_price);
+  return `${shown.value} ${shown.unit} × ${Math.round(price).toLocaleString("vi-VN")}₫`;
 }
 
 function VendorQty({ item }: { item: SharedItem }) {
@@ -890,6 +899,7 @@ export default function SupplierOrder() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [holdItemId, setHoldItemId] = useState<string | null>(null);
   const [holdQty, setHoldQty] = useState("");
+  const [totalOpen, setTotalOpen] = useState(false);
   const [includeShipping, setIncludeShipping] = useState(false);
   const [includeDeduction, setIncludeDeduction] = useState(false);
   const [shippingDraft, setShippingDraft] = useState("");
@@ -1278,6 +1288,51 @@ export default function SupplierOrder() {
   const shippingVnd = includeShipping ? vndFromThousands(shippingDraft) : 0;
   const deductionVnd = includeDeduction ? vndFromThousands(deductionDraft) : 0;
   const grandTotal = Math.max(0, itemsSubtotal + shippingVnd - deductionVnd);
+  const totalLines = useMemo(() => {
+    const lines: {
+      key: string;
+      name: string;
+      detail?: string;
+      amount: number;
+      sign: 1 | -1;
+    }[] = [];
+    for (const item of items) {
+      if (!countsInTotal(item)) continue;
+      lines.push({
+        key: item.id,
+        name: item.name.trim() || "Hàng thay",
+        detail: lineQtyDetail(item),
+        amount: lineAmount(item),
+        sign: 1,
+      });
+    }
+    if (includeShipping && shippingVnd > 0) {
+      lines.push({ key: "ship", name: "Phí ship", amount: shippingVnd, sign: 1 });
+    }
+    if (includeDeduction && deductionVnd > 0) {
+      lines.push({ key: "deduct", name: "Khấu trừ", amount: deductionVnd, sign: -1 });
+    }
+    return lines;
+  }, [items, includeShipping, shippingVnd, includeDeduction, deductionVnd]);
+  const googleExpr = googleSumExpr(totalLines);
+
+  const copyGrandTotal = async () => {
+    try {
+      await navigator.clipboard.writeText(String(grandTotal));
+      toast.success("Đã sao chép tổng");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Không copy được");
+    }
+  };
+
+  const searchTotalOnGoogle = () => {
+    const q = googleExpr || String(grandTotal);
+    window.open(
+      `https://www.google.com/search?q=${encodeURIComponent(q)}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+  };
 
   if (loading) {
     return (
@@ -1477,9 +1532,16 @@ export default function SupplierOrder() {
             }}
             onCommit={persistExtrasNow}
           />
-          <div className="flex items-center justify-between border-t border-border/50 px-2 py-2">
+          <div className="flex items-center justify-between gap-2 border-t border-border/50 px-2 py-2">
             <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Tổng</span>
-            <MoneyLabel amount={grandTotal} className="text-base font-display" smallClassName="text-[0.7em]" />
+            <button
+              type="button"
+              onClick={() => setTotalOpen(true)}
+              className="total-amount-hit hover:bg-muted/50"
+              aria-label="Xem chi tiết tổng"
+            >
+              <MoneyLabel amount={grandTotal} className="text-base font-display" smallClassName="text-[0.7em]" />
+            </button>
           </div>
         </div>
       </div>
@@ -1534,14 +1596,86 @@ export default function SupplierOrder() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={totalOpen} onOpenChange={setTotalOpen}>
+        <DialogContent className="max-w-[92vw] rounded-xl sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display">Chi tiết tổng</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[50vh] space-y-1 overflow-y-auto pr-0.5">
+            {totalLines.length === 0 ? (
+              <p className="py-3 text-center text-xs text-muted-foreground">Chưa có khoản nào trong tổng</p>
+            ) : (
+              totalLines.map(line => (
+                <div key={line.key} className="flex items-start justify-between gap-3 py-1.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm">{line.name}</p>
+                    {line.detail ? (
+                      <p className="truncate text-[11px] text-muted-foreground">{line.detail}</p>
+                    ) : null}
+                  </div>
+                  <span className="flex shrink-0 items-baseline text-sm">
+                    {line.sign < 0 ? <span className="text-[#8a6a72]">−</span> : null}
+                    <MoneyLabel
+                      amount={line.amount}
+                      className={cn("text-sm", line.sign < 0 && "text-[#8a6a72]")}
+                      smallClassName="text-[0.7em]"
+                    />
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+          {googleExpr ? (
+            <p className="break-all font-mono text-[11px] leading-snug text-muted-foreground">{googleExpr}</p>
+          ) : null}
+          <div className="flex items-end justify-between gap-2 border-t border-border/50 pt-3">
+            <button
+              type="button"
+              onClick={() => void copyGrandTotal()}
+              className="min-w-0 rounded-lg px-1 py-0.5 text-left hover:bg-muted/50"
+              aria-label="Sao chép tổng"
+            >
+              <span className="flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                Tổng
+                <Copy className="h-3 w-3" strokeWidth={2.4} />
+              </span>
+              <MoneyLabel
+                amount={grandTotal}
+                className="text-xl font-display"
+                smallClassName="text-[0.65em]"
+              />
+            </button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              disabled={!googleExpr && grandTotal <= 0}
+              onClick={searchTotalOnGoogle}
+            >
+              <Search className="h-3.5 w-3.5" strokeWidth={2.4} />
+              Google
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-card/95 px-4 py-3 backdrop-blur-sm safe-area-bottom">
-        <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
+        <div className="mx-auto flex max-w-lg items-center gap-2">
           <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Tổng đơn</span>
-          <MoneyLabel
-            amount={grandTotal}
-            className="text-xl font-display"
-            smallClassName="text-[0.65em]"
-          />
+          <button
+            type="button"
+            onClick={() => setTotalOpen(true)}
+            className="total-amount-hit hover:bg-muted/50"
+            aria-label="Xem chi tiết tổng"
+          >
+            <MoneyLabel
+              amount={grandTotal}
+              className="text-xl font-display"
+              smallClassName="text-[0.65em]"
+            />
+          </button>
+          <div className="min-w-0 flex-1" />
         </div>
       </div>
     </div>

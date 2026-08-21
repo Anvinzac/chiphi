@@ -8,7 +8,7 @@ interface Props {
   rangeEnd: Date;
   itemsByDate: Map<string, MonthlyOrderLine[]>;
   todayStr: string;
-  onSelectDay?: (dateStr: string) => void;
+  onSelectDay?: (info: { dateStr: string; rect: DOMRect; row: number; col: number; columns: number }) => void;
 }
 
 function shortRange(a: Date, b: Date): string {
@@ -112,7 +112,7 @@ export default function MonthlyOrderTwoColPager({
                     {shortRange(week.start, week.end)}
                   </div>
                   <div className="monthly-two-col-week-body">
-                    {eachDayOfInterval({ start: week.start, end: week.end }).map(day => {
+                    {eachDayOfInterval({ start: week.start, end: week.end }).map((day, dayIdx) => {
                       const dateStr = format(day, "yyyy-MM-dd");
                       const outOfRange = day < rangeStart || day > rangeEnd;
                       const lines = outOfRange ? [] : itemsByDate.get(dateStr) ?? [];
@@ -121,6 +121,9 @@ export default function MonthlyOrderTwoColPager({
                       const isFuture = dateStr > todayStr;
                       const isToday = dateStr === todayStr;
                       const monthBreak = day.getDate() === 1 && !isSameDay(day, rangeStart);
+                      const row = dayIdx;
+                      const col = colIdx;
+                      const columns = 2;
 
                       const inner = (
                         <>
@@ -164,7 +167,10 @@ export default function MonthlyOrderTwoColPager({
                         <button
                           key={dateStr}
                           type="button"
-                          onClick={() => onSelectDay(dateStr)}
+                          onClick={e => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            onSelectDay({ dateStr, rect, row, col, columns });
+                          }}
                           aria-label={`${format(day, "PPP", { locale: vi })} · ${hasNum ? lines[0].num : "không có số"}`}
                           className={baseClass}
                         >

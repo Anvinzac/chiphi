@@ -1,11 +1,11 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, CalendarDays, LayoutGrid } from "lucide-react";
+import { ArrowLeft, CalendarDays, Check, Delete, LayoutGrid, X } from "lucide-react";
 import { addDays, format, isValid, parseISO } from "date-fns";
-import { toast } from "sonner";
 import MonthlyOrderGrid, { type MonthlyOrderCol } from "@/components/orders/MonthlyOrderGrid";
 import MonthlyOrderTwoColPager from "@/components/orders/MonthlyOrderTwoColPager";
 import { mockMonthlyOrderByDate } from "@/lib/mockMonthlyOrderGrid";
+import type { MonthlyOrderLine } from "@/lib/mockMonthlyOrderGrid";
 
 function toInputValue(d: Date): string {
   return format(d, "yyyy-MM-dd");
@@ -33,6 +33,17 @@ const COL_OPTIONS: { value: MonthlyOrderCol; label: string }[] = [
   { value: 3, label: "3 cột" },
   { value: 4, label: "4 cột" },
 ];
+
+const POPOVER_W = 280;
+const POPOVER_H = 310;
+const GAP = 10;
+
+type AnchorInfo = {
+  rect: DOMRect;
+  row: number;
+  col: number;
+  columns: number;
+} | null;
 
 export default function MonthlyOrder() {
   const today = useMemo(() => new Date(), []);
@@ -71,10 +82,20 @@ export default function MonthlyOrder() {
     [rangeStart, rangeEnd],
   );
 
-  const itemsByDate = useMemo(
-    () => mockMonthlyOrderByDate(rangeStart, rangeEnd),
-    [rangeStart, rangeEnd],
-  );
+  const baseItems = useMemo(() => mockMonthlyOrderByDate(rangeStart, rangeEnd), [rangeStart, rangeEnd]);
+  const [overrides, setOverrides] = useState<Map<string, MonthlyOrderLine[]>>(new Map());
+  const [editingDate, setEditingDate] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState("");
+  const [anchor, setAnchor] = useState<AnchorInfo>(null);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number; arrow: "top" | "left" | "right"; arrowOffset: number } | null>(null);
+
+  const itemsByDate = useMemo(() => {
+    const m = new Map(baseItems);
+    for (const [k, v] of overrides) {
+      if (m.has(k)) m.set(k, v);
+    }
+    return m;
+  }, [baseItems, overrides]);
 
   const stats = useMemo(() => {
     let daysWithItems = 0;
@@ -110,21 +131,134 @@ export default function MonthlyOrder() {
     }
   };
 
-  const handleDayClick = (dateStr: string) => {
-    const lines = itemsByDate.get(dateStr);
-    if (!lines || lines.length === 0) {
-      toast.message(`${dateStr}: không có món`);
+  const handleDayClick = (info: { dateStr: string; rect: DOMRect; row: number; col: number; columns: number }) => {
+    const lines = itemsByDate.get(info.dateStr) ?? [];
+    const current = lines.length > 0 ? lines[0].num : "";
+    setEditingDate(info.dateStr);
+    setEditingValue(current);
+    setAnchor({ rect: info.rect, row: info.row, col: info.col, columns: info.columns });
+  };
+
+  const closeNumpad = () => {
+    setEditingDate(null);
+    setEditingValue("");
+    setAnchor(null);
+    setPopoverPos(null);
+  };
+
+  // Compute popover position: top row -> below, lower rows -> sideways
+  useEffect(() => {
+    if (!editingDate || !anchor) {
+      setPopoverPos(null);
       return;
     }
-    toast.message(`${dateStr}: ${lines[0].num}`);
+    const compute = () => {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const rect = anchor.rect;
+      const isTopRow = anchor.row === 0;
+      if (isTopRow) {
+        // Below cell
+        let left = rect.left + rect.width / 2 - POPOVER_W / 2;
+        left = Math.max(8, Math.min(left, vw - POPOVER_W - 8));
+        let top = rect.bottom + GAP;
+        // If not enough space below, flip above (rare for top row)
+        if (top + POPOVER_H > vh - 8) top = rect.top - POPOVER_H - GAP;
+        top = Math.max(8, Math.min(top, vh - POPOVER_H - 8));
+        const arrowOffset = rect.left + rect.width / 2 - left;
+        setPopoverPos({ top, left, arrow: "top", arrowOffset: Math.max(12, Math.min(POPOVER_W - 12, arrowOffset)) });
+      } else {
+        // Sideways: left col -> right, right col -> left
+        const showRight = anchor.col < anchor.columns / 2;
+        let top = rect.top + rect.height / 2 - POPOVER_H / 2;
+        top = Math.max(8, Math.min(top, vh - POPOVER_H - 8));
+        let left: number;
+        let arrow: "left" | "right";
+        if (showRight) {
+          left = rect.right + GAP;
+          if (left + POPOVER_W > vw - 8) left = rect.left - POPOVER_W - GAP; // fallback flip
+          arrow = "left";
+        } else {
+          left = rect.left - POPOVER_W - GAP;
+          if (left < 8) left = rect.right + GAP;
+          arrow = "right";
+        }
+        left = Math.max(8, Math.min(left, vw - POPOVER_W - 8));
+        const arrowOffset = rect.top + rect.height / 2 - top;
+        setPopoverPos({ top, left, arrow, arrowOffset: Math.max(12, Math.min(POPOVER_H - 12, arrowOffset)) });
+      }
+    };
+    compute();
+    const onResize = () => compute();
+    const onScroll = () => closeNumpad();
+    window.addEventListener("resize", onResize);
+    // Close on scroll of any scrollable parent (grid scroller)
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [editingDate, anchor]);
+
+  const handleDigit = (d: string) => {
+    setEditingValue(prev => {
+      if (prev.length >= 4) return prev;
+      if (prev === "0") return d;
+      return prev + d;
+    });
   };
+
+  const handleBackspace = () => setEditingValue(prev => prev.slice(0, -1));
+  const handleClear = () => setEditingValue("");
+  const handleSave = () => {
+    if (!editingDate) return;
+    const v = editingValue.trim();
+    const next: MonthlyOrderLine[] = v === "" ? [] : [{ num: v.replace(/^0+(?=\d)/, "") || "0" }];
+    setOverrides(prev => {
+      const m = new Map(prev);
+      m.set(editingDate, next);
+      return m;
+    });
+    closeNumpad();
+  };
+  const handleDelete = () => {
+    if (!editingDate) return;
+    setOverrides(prev => {
+      const m = new Map(prev);
+      m.set(editingDate, []);
+      return m;
+    });
+    closeNumpad();
+  };
+
+  useEffect(() => {
+    if (!editingDate) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeNumpad();
+      if (e.key === "Enter") handleSave();
+      if (e.key === "Backspace") {
+        e.preventDefault();
+        handleBackspace();
+      }
+      if (/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        handleDigit(e.key);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    // Don't lock body for inline popover — keep grid scrollable but backdrop handles close
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [editingDate, editingValue]);
 
   const hasInvalidRange = !parsed;
 
   const openPicker = (ref: React.RefObject<HTMLInputElement>) => {
     const el = ref.current;
     if (!el) return;
-    // modern browsers
     const anyEl = el as unknown as { showPicker?: () => void };
     if (typeof anyEl.showPicker === "function") {
       try {
@@ -304,7 +438,7 @@ export default function MonthlyOrder() {
             onSelectDay={handleDayClick}
           />
         )}
-        {/* Bottom total bar — replaces wasted notice */}
+        {/* Bottom total bar */}
         <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-card px-3 py-2.5 sm:px-4">
           <span className="shrink-0 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Tổng</span>
           <span className="min-w-0 flex-1 text-center text-lg font-display font-bold leading-none tabular-nums">
@@ -315,6 +449,114 @@ export default function MonthlyOrder() {
           </span>
         </div>
       </div>
+
+      {/* Inline numpad popover — anchored to tapped cell with arrow */}
+      {editingDate && popoverPos && (
+        <>
+          <button type="button" aria-label="Đóng bàn phím" onClick={closeNumpad} className="fixed inset-0 z-40 bg-black/10" />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Sửa số ngày ${editingDate}`}
+            className="fixed z-50 flex w-[280px] flex-col rounded-2xl border bg-card shadow-[0_8px_30px_-8px_rgba(0,0,0,0.22)]"
+            style={{ top: popoverPos.top, left: popoverPos.left }}
+          >
+            {/* Arrow — no outline, adjacent to panel */}
+            <div
+              aria-hidden
+              className="absolute h-3 w-3 rotate-45 bg-card"
+              style={
+                popoverPos.arrow === "top"
+                  ? { top: -6, left: popoverPos.arrowOffset - 6 }
+                  : popoverPos.arrow === "left"
+                    ? { left: -6, top: popoverPos.arrowOffset - 6 }
+                    : { right: -6, top: popoverPos.arrowOffset - 6 }
+              }
+            />
+            <div className="flex items-center justify-between px-3 pb-1 pt-3">
+              <span className="text-xs font-semibold tabular-nums">
+                {editingDate ? format(parseISO(editingDate), "EEEE, d 'th' M") : ""}
+              </span>
+              <button
+                type="button"
+                onClick={closeNumpad}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Đóng"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="mx-3 flex h-10 items-center justify-center rounded-xl border bg-muted/30 px-3 text-xl font-bold tabular-nums">
+              {editingValue !== "" ? editingValue : <span className="text-muted-foreground/40 text-sm">— trống —</span>}
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 p-3 pb-2">
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map(d => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => handleDigit(d)}
+                  className="keypad-key rounded-xl border border-border/60 bg-card py-2 text-base font-medium shadow-sm active:scale-95"
+                  style={{ minHeight: "2.5rem" }}
+                >
+                  {d}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={handleClear}
+                className="keypad-key rounded-xl border border-border/60 bg-muted/40 py-2 text-xs font-medium text-muted-foreground"
+                style={{ minHeight: "2.5rem" }}
+              >
+                C
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDigit("0")}
+                className="keypad-key rounded-xl border border-border/60 bg-card py-2 text-base font-medium shadow-sm active:scale-95"
+                style={{ minHeight: "2.5rem" }}
+              >
+                0
+              </button>
+              <button
+                type="button"
+                onClick={handleBackspace}
+                className="keypad-key rounded-xl border border-border/60 bg-muted/40 py-2 text-muted-foreground active:scale-95"
+                style={{ minHeight: "2.5rem" }}
+                aria-label="Xóa"
+              >
+                <Delete className="mx-auto h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 px-3 pb-3">
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="rounded-xl border border-destructive/30 bg-destructive/5 py-2.5 text-xs font-medium text-destructive hover:bg-destructive/10"
+              >
+                Xóa
+              </button>
+              <button
+                type="button"
+                onClick={closeNumpad}
+                className="rounded-xl border border-border bg-background py-2.5 text-xs font-medium hover:bg-muted"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                className="inline-flex items-center justify-center gap-1 rounded-xl bg-primary py-2.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
+              >
+                <Check className="h-3.5 w-3.5" />
+                Lưu
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

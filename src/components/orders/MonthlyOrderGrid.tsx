@@ -11,7 +11,7 @@ interface MonthlyOrderGridProps {
   columns: MonthlyOrderCol;
   itemsByDate: Map<string, MonthlyOrderLine[]>;
   todayStr: string;
-  onSelectDay?: (dateStr: string) => void;
+  onSelectDay?: (info: { dateStr: string; rect: DOMRect; row: number; col: number; columns: number }) => void;
 }
 
 function lineLabel(line: MonthlyOrderLine): string {
@@ -44,7 +44,7 @@ export default function MonthlyOrderGrid({
       }}
       data-no-double-tap
     >
-      {days.map(day => {
+      {days.map((day, idx) => {
         const dateStr = format(day, "yyyy-MM-dd");
         const lines = itemsByDate.get(dateStr) ?? [];
         const weekend = getDay(day) === 0 || getDay(day) === 6;
@@ -52,6 +52,8 @@ export default function MonthlyOrderGrid({
         const isToday = dateStr === todayStr;
         const monthBreak = day.getDate() === 1 && !isSameDay(day, rangeStart);
         const hasLines = lines.length > 0;
+        const row = Math.floor(idx / columns);
+        const col = idx % columns;
 
         const inner = (
           <>
@@ -106,7 +108,10 @@ export default function MonthlyOrderGrid({
           <button
             key={dateStr}
             type="button"
-            onClick={() => onSelectDay(dateStr)}
+            onClick={e => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              onSelectDay({ dateStr, rect, row, col, columns });
+            }}
             aria-label={`${format(day, "PPP", { locale: vi })} · ${hasLines ? lines.map(lineLabel).join(", ") : "không có món"}`}
             className={[
               "order-month-cell",

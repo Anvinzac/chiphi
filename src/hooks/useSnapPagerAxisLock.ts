@@ -4,7 +4,7 @@ import { SEARCH_BAR_HEIGHT, SEARCH_PULL_OPEN_PX } from "@/components/daily/ListS
 const MOVE_PX = 10;
 const SEARCH_PX = 16;
 const SEARCH_RATIO = 1.75;
-const PAGE_FLIP_PX = 36;
+const PAGE_FLIP_PX = 18;
 
 export type SearchPullOptions = {
   enabled: boolean;

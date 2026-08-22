@@ -1569,7 +1569,7 @@ export default function DailyExpenseTable({
     const dy = e.changedTouches[0].clientY - touchStartY.current;
     touchStartX.current = null;
     touchStartY.current = null;
-    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
+    if (Math.abs(dx) < 28 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
 
     if (viewMode !== "daily") {
       setPeriodOffset(prev => {

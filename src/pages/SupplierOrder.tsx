@@ -2029,19 +2029,6 @@ export default function SupplierOrder() {
                           p_quantity: Number(line.quantity) || 1,
                           p_unit: line.unit || "kg",
                         });
-                        if (!line.matched) {
-                          // try to add to catalog for future matching
-                          try {
-                            await supabase.from("order_ingredients").insert({
-                              name: line.name,
-                              unit: line.unit || "kg",
-                              category_id: expCatalog[0]?.id || catalogCats[0]?.id || "",
-                              user_id: user?.id,
-                            } as any);
-                          } catch {
-                            /* ignore */
-                          }
-                        }
                       } catch {
                         /* ignore */
                       }

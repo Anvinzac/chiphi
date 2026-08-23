@@ -467,9 +467,11 @@ export type Database = {
           created_at: string
           fulfilled_qty: number | null
           id: string
+          money_amount: number | null
           name: string
           notice: string | null
           order_id: string
+          order_mode: string
           quantity: number
           retail_price: number | null
           sort_order: number
@@ -482,9 +484,11 @@ export type Database = {
           created_at?: string
           fulfilled_qty?: number | null
           id?: string
+          money_amount?: number | null
           name: string
           notice?: string | null
           order_id: string
+          order_mode?: string
           quantity?: number
           retail_price?: number | null
           sort_order?: number
@@ -497,9 +501,11 @@ export type Database = {
           created_at?: string
           fulfilled_qty?: number | null
           id?: string
+          money_amount?: number | null
           name?: string
           notice?: string | null
           order_id?: string
+          order_mode?: string
           quantity?: number
           retail_price?: number | null
           sort_order?: number
@@ -834,9 +840,11 @@ export type Database = {
           created_at: string
           fulfilled_qty: number | null
           id: string
+          money_amount: number | null
           name: string
           notice: string | null
           order_id: string
+          order_mode: string
           quantity: number
           retail_price: number | null
           sort_order: number
@@ -884,9 +892,11 @@ export type Database = {
           created_at: string
           fulfilled_qty: number | null
           id: string
+          money_amount: number | null
           name: string
           notice: string | null
           order_id: string
+          order_mode: string
           quantity: number
           retail_price: number | null
           sort_order: number

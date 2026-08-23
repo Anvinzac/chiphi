@@ -79,7 +79,7 @@ function defaultQty(ing: CatalogIngredient): string {
 function OrderFilledRow({
   row,
   expanded,
-  estimate,
+  unitPrice,
   chipCloud,
   onExpand,
   onUpdate,
@@ -88,7 +88,7 @@ function OrderFilledRow({
 }: {
   row: OrderItemDraft;
   expanded: boolean;
-  estimate: number | null;
+  unitPrice: number | null;
   chipCloud: ReactNode;
   onExpand: () => void;
   onUpdate: (patch: Partial<OrderItemDraft>) => void;
@@ -125,11 +125,11 @@ function OrderFilledRow({
               handleRowActivate();
             }
           }}
-          className={`grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 px-3 py-1.5 text-left ${
+          className={`grid w-full cursor-pointer grid-cols-[minmax(0,40%)_auto_1fr] items-center gap-2 px-3 py-1.5 text-left ${
             expanded ? "bg-primary/5" : "hover:bg-muted/30"
           }`}
         >
-          <div className="min-w-0">
+          <div className="min-w-0 max-w-[40%]">
             <p className="truncate text-sm font-medium leading-tight">{row.name}</p>
             {expanded ? (
               <input
@@ -200,7 +200,7 @@ function OrderFilledRow({
               {row.order_mode === "money" ? "₫" : row.unit}
             </button>
           </div>
-          <div className="w-[4.5rem] shrink-0 text-right">
+          <div className="w-[4.5rem] shrink-0 justify-self-end text-right ml-2">
             {confirming ? (
               <button
                 type="button"
@@ -214,9 +214,9 @@ function OrderFilledRow({
               >
                 Xóa
               </button>
-            ) : estimate != null ? (
+            ) : unitPrice != null ? (
               <MoneyLabel
-                amount={estimate}
+                amount={unitPrice}
                 className="text-sm font-display text-foreground/90"
                 smallClassName="text-[0.7em]"
               />
@@ -256,6 +256,10 @@ export default function OrderDetail() {
   /** Which list slot shows the ingredient cloud: item index, or `ph-${n}` for empty slots. */
   const [expandedKey, setExpandedKey] = useState<string>("ph-0");
   const chipPagerRef = useRef<HTMLDivElement>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
+  const [bulkAmounts, setBulkAmounts] = useState<Map<string, string>>(new Map());
+  const [bulkStep, setBulkStep] = useState<"choose" | "amounts">("choose");
   /** Real DB id once the first ingredient was saved; null while UI-only draft. */
   const [orderId, setOrderId] = useState<string | null>(isNewSession ? null : routeId || null);
   const orderIdRef = useRef<string | null>(orderId);
@@ -276,12 +280,22 @@ export default function OrderDetail() {
   const loadExisting = useCallback(async (existingId: string) => {
     if (!user) return;
     setLoading(true);
-    const { data: order, error } = await supabase
-      .from("orders")
-      .select("*")
-      .eq("id", existingId)
-      .eq("user_id", user.id)
-      .maybeSingle();
+    let order: any = null;
+    let error: any = null;
+    // Try with customer_name etc., fallback if columns missing (migration not yet applied)
+    const trySelect = async (cols: string) => {
+      const res = await supabase.from("orders").select(cols).eq("id", existingId).eq("user_id", user.id).maybeSingle();
+      return res;
+    };
+    const resAll = await trySelect("*");
+    if (resAll.error && String(resAll.error.message).includes("customer_name")) {
+      const fallback = await trySelect("id, title, status, share_token, created_at");
+      order = fallback.data;
+      error = fallback.error;
+    } else {
+      order = resAll.data;
+      error = resAll.error;
+    }
     if (error || !order) {
       toast.error(error?.message || "Không tìm thấy đơn");
       navigate("/orders");
@@ -292,10 +306,10 @@ export default function OrderDetail() {
     setShareToken(order.share_token);
     setOrderId(order.id);
     setIdentity({
-      customer_name: order.customer_name,
+      customer_name: order.customer_name ?? null,
       created_at: order.created_at,
-      day_seq: order.day_seq,
-      mgmt_id: order.mgmt_id,
+      day_seq: order.day_seq ?? null,
+      mgmt_id: order.mgmt_id ?? null,
     });
     const { data: rows } = await supabase
       .from("order_items")
@@ -490,10 +504,30 @@ export default function OrderDetail() {
     return qty * price;
   };
 
+  const unitPriceForRow = (row: OrderItemDraft) => {
+    if (row.reference_price != null && Number(row.reference_price) > 0)
+      return Number(row.reference_price);
+    const byName = priceByName.get(row.name.trim().toLowerCase());
+    if (byName != null && byName > 0) return byName;
+    return null;
+  };
+
   // Keep spare empty rows under the list; always at least one so you can add more
   const emptyPlaceholderCount = Math.max(1, PLACEHOLDER_SLOTS - items.length);
-
+  const prevLenRef = useRef(items.length);
   useEffect(() => {
+    const prev = prevLenRef.current;
+    prevLenRef.current = items.length;
+    // Collapse placeholder after 3 rows to save space — only small "new item" button
+    if (prev < 3 && items.length >= 3 && expandedKey === "ph-0") {
+      setExpandedKey("");
+      return;
+    }
+    if (items.length < 3 && expandedKey === "") {
+      setExpandedKey("ph-0");
+      return;
+    }
+    if (expandedKey === "") return; // collapsed is valid when >=3
     // Keep expansion on a valid slot after items / placeholder count change
     if (expandedKey.startsWith("item-")) {
       const idx = Number(expandedKey.slice(5));
@@ -516,6 +550,18 @@ export default function OrderDetail() {
     setChipPage(0);
     requestAnimationFrame(() => {
       chipPagerRef.current?.scrollTo({ left: 0, behavior: "auto" });
+    });
+  }, []);
+
+  const toggleSlot = useCallback((key: string) => {
+    setExpandedKey(prev => {
+      if (prev === key) return "";
+      setIngSearch("");
+      setChipPage(0);
+      requestAnimationFrame(() => {
+        chipPagerRef.current?.scrollTo({ left: 0, behavior: "auto" });
+      });
+      return key;
     });
   }, []);
 
@@ -565,28 +611,42 @@ export default function OrderDetail() {
       persistingRef.current = true;
       try {
         const token = generateShareToken();
-        const { data, error } = await supabase
-          .from("orders")
-          .insert({
+        let data: any = null;
+        let error: any = null;
+        // Try with customer_name etc., fallback if columns missing (migration not applied)
+        const tryInsert = async (withCustomer: boolean) => {
+          const payload: Record<string, unknown> = {
             user_id: user.id,
             title: title.trim() || `Đơn ${lockedCatName} · ${format(new Date(), "d/M HH:mm")}`,
-            customer_name: customerNameFromUser(user),
             status: "draft",
             share_token: token,
             supplier_pin_hash: await hashPin(pin || "1234"),
-          })
-          .select("id, share_token, customer_name, created_at, day_seq, mgmt_id")
-          .single();
+          };
+          if (withCustomer) payload.customer_name = customerNameFromUser(user);
+          const cols = withCustomer
+            ? "id, share_token, customer_name, created_at, day_seq, mgmt_id"
+            : "id, share_token, created_at";
+          return await supabase.from("orders").insert(payload as any).select(cols).single();
+        };
+        const res1 = await tryInsert(true);
+        if (res1.error && String(res1.error.message).includes("customer_name")) {
+          const res2 = await tryInsert(false);
+          data = res2.data;
+          error = res2.error;
+        } else {
+          data = res1.data;
+          error = res1.error;
+        }
         if (error) throw error;
         await persistDraftRows(data.id, rows);
         orderIdRef.current = data.id;
         setOrderId(data.id);
         setShareToken(data.share_token || token);
         setIdentity({
-          customer_name: data.customer_name,
+          customer_name: data.customer_name ?? customerNameFromUser(user),
           created_at: data.created_at,
-          day_seq: data.day_seq,
-          mgmt_id: data.mgmt_id,
+          day_seq: data.day_seq ?? null,
+          mgmt_id: data.mgmt_id ?? null,
         });
         justCreatedIdRef.current = data.id;
         const catQ = preferredCatKey ? `?cat=${encodeURIComponent(preferredCatKey)}` : "";
@@ -689,6 +749,59 @@ export default function OrderDetail() {
       });
       return next;
     });
+  };
+
+  const toggleBulkSelect = (id: string) => {
+    setBulkSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkContinue = () => {
+    if (bulkSelected.size === 0) {
+      toast.error("Chọn ít nhất một nguyên liệu");
+      return;
+    }
+    const init = new Map<string, string>();
+    for (const id of bulkSelected) {
+      const ing = catalog.find(c => c.id === id);
+      if (ing) init.set(id, defaultQty(ing));
+    }
+    setBulkAmounts(init);
+    setBulkStep("amounts");
+  };
+
+  const handleBulkAdd = () => {
+    const selected = Array.from(bulkSelected)
+      .map(id => catalog.find(c => c.id === id))
+      .filter(Boolean) as CatalogIngredient[];
+    if (selected.length === 0) return;
+    const toAdd: OrderItemDraft[] = selected.map(ing => ({
+      name: ing.name,
+      quantity: bulkAmounts.get(ing.id) || defaultQty(ing),
+      unit: ing.unit || "kg",
+      sort_order: 0,
+      catalog_id: ing.id,
+      reference_price: ing.reference_price,
+      order_mode: "measure" as const,
+      money_amount: "",
+      notice: "",
+    }));
+    setItems(prev => {
+      const existingNames = new Set(prev.map(r => r.name.trim().toLowerCase()));
+      const filtered = toAdd.filter(t => !existingNames.has(t.name.trim().toLowerCase()));
+      const next = [...prev, ...filtered].map((r, i) => ({ ...r, sort_order: i }));
+      queueMicrotask(() => syncItemsSideEffects(next));
+      return next;
+    });
+    setBulkOpen(false);
+    setBulkSelected(new Set());
+    setBulkAmounts(new Map());
+    setBulkStep("choose");
+    toast.success(`Đã thêm ${selected.length} món`);
   };
 
   const renderChipCloud = () => (
@@ -971,12 +1084,172 @@ export default function OrderDetail() {
             </Button>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-border/60 bg-card">
-            <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2 border-b border-border/50 px-3 py-1.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-              <span>Nguyên liệu</span>
-              <span className="w-[3.25rem] text-right">SL</span>
-              <span className="w-[4.5rem] text-right">Ước tính</span>
+          <>
+            <div className="mb-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setBulkOpen(!bulkOpen);
+                  if (!bulkOpen) {
+                    setBulkStep("choose");
+                    setBulkSelected(new Set());
+                  }
+                }}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium ${bulkOpen ? "border-primary bg-primary text-primary-foreground" : "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15"}`}
+              >
+                {bulkOpen ? "Đóng sỉ" : "Đặt sỉ"}
+              </button>
             </div>
+            {bulkOpen && (
+              <div className="mb-3 overflow-hidden rounded-xl border border-primary/20 bg-card">
+                {bulkStep === "choose" ? (
+                  <div className="p-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <Input
+                        value={ingSearch}
+                        onChange={e => setIngSearch(e.target.value)}
+                        placeholder="Chọn nhiều — lọc…"
+                        className="h-8 flex-1 text-xs"
+                      />
+                      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{bulkSelected.size} chọn</span>
+                    </div>
+                    <div className="max-h-[38vh] space-y-3 overflow-auto pr-1">
+                      {groupedIngredients.length === 0 ? (
+                        <p className="py-6 text-center text-xs text-muted-foreground">Không có nguyên liệu</p>
+                      ) : (
+                        groupedIngredients.map(([sub, ings]) => (
+                          <div key={sub || "_all"}>
+                            {sub && <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{sub}</p>}
+                            <div className="grid grid-cols-1 gap-1">
+                              {ings.map(ing => {
+                                const selected = bulkSelected.has(ing.id);
+                                const alreadyInOrder = addedByName.has(ing.name.trim().toLowerCase());
+                                return (
+                                  <label
+                                    key={ing.id}
+                                    className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-sm transition-colors ${
+                                      selected
+                                        ? "border-primary bg-primary/10"
+                                        : alreadyInOrder
+                                          ? "border-border/50 bg-muted/30 opacity-50"
+                                          : "border-border/60 bg-card hover:border-primary/30"
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={selected}
+                                      disabled={alreadyInOrder}
+                                      onChange={() => {
+                                        const willSelect = !selected;
+                                        toggleBulkSelect(ing.id);
+                                        // immediately reflect on table above
+                                        if (willSelect) {
+                                          const entry: OrderItemDraft = {
+                                            name: ing.name,
+                                            quantity: defaultQty(ing),
+                                            unit: ing.unit || "kg",
+                                            sort_order: items.length,
+                                            catalog_id: ing.id,
+                                            reference_price: ing.reference_price,
+                                            order_mode: "measure",
+                                            money_amount: "",
+                                            notice: "",
+                                          };
+                                          setItems(prev => {
+                                            if (prev.some(r => r.name.trim().toLowerCase() === ing.name.trim().toLowerCase())) return prev;
+                                            const next = [...prev, entry].map((r, i) => ({ ...r, sort_order: i }));
+                                            queueMicrotask(() => syncItemsSideEffects(next));
+                                            return next;
+                                          });
+                                        } else {
+                                          setItems(prev => {
+                                            const next = prev.filter(r => r.name.trim().toLowerCase() !== ing.name.trim().toLowerCase()).map((r, i) => ({ ...r, sort_order: i }));
+                                            queueMicrotask(() => syncItemsSideEffects(next));
+                                            return next;
+                                          });
+                                        }
+                                      }}
+                                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                                    />
+                                    <span className="min-w-0 flex-1 truncate">{ing.name}</span>
+                                    <span className="shrink-0 text-[11px] text-muted-foreground">{ing.unit}</span>
+                                    {alreadyInOrder && !selected && <span className="shrink-0 text-[10px] text-muted-foreground">đã có</span>}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <div className="mt-3 flex justify-end">
+                      <Button type="button" size="sm" disabled={bulkSelected.size === 0} onClick={() => { const m = new Map<string, string>(); for (const id of bulkSelected) { const ing = catalog.find(c => c.id === id); if (ing) m.set(id, defaultQty(ing)); } setBulkAmounts(m); setBulkStep("amounts"); }}>
+                        Xong — nhập SL
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3">
+                    <p className="mb-2 text-xs font-medium">Nhập số lượng cho {bulkSelected.size} món đã chọn (đã hiện trên bảng trên)</p>
+                    <div className="max-h-[40vh] space-y-2 overflow-auto pr-1">
+                      {Array.from(bulkSelected).map(id => {
+                        const ing = catalog.find(c => c.id === id);
+                        if (!ing) return null;
+                        const qty = bulkAmounts.get(id) || "";
+                        // also sync to table row if edited here
+                        return (
+                          <div key={id} className="flex items-center gap-2 rounded-lg border border-border/60 bg-card px-2.5 py-2">
+                            <span className="min-w-0 flex-1 truncate text-sm font-medium">{ing.name}</span>
+                            <span className="shrink-0 text-[11px] text-muted-foreground">{ing.unit}</span>
+                            <Input
+                              value={qty}
+                              onChange={e => {
+                                const v = e.target.value.replace(/[^\d.]/g, "");
+                                setBulkAmounts(prev => { const m = new Map(prev); m.set(id, v); return m; });
+                                // live update table row quantity
+                                setItems(prev => prev.map(r => r.name.trim().toLowerCase() === ing.name.trim().toLowerCase() ? { ...r, quantity: v } : r));
+                              }}
+                              onBlur={() => {
+                                const v = bulkAmounts.get(id) || defaultQty(ing);
+                                setItems(prev => {
+                                  const next = prev.map(r => r.name.trim().toLowerCase() === ing.name.trim().toLowerCase() ? { ...r, quantity: v } : r);
+                                  queueMicrotask(() => syncItemsSideEffects(next));
+                                  return next;
+                                });
+                              }}
+                              placeholder={defaultQty(ing)}
+                              inputMode="decimal"
+                              className="h-8 w-20 border-0 bg-muted/40 px-2 text-right text-sm tabular-nums focus-visible:ring-1"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <Button type="button" variant="outline" className="flex-1" onClick={() => setBulkStep("choose")}>Quay lại</Button>
+                      <Button
+                        type="button"
+                        className="flex-1"
+                        onClick={() => {
+                          // finalize quantities already synced via onBlur, just collapse
+                          setBulkOpen(false);
+                          setBulkStep("choose");
+                          toast.success(`Đã cập nhật ${bulkSelected.size} món`);
+                        }}
+                      >
+                        Xong
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="overflow-hidden rounded-xl border border-border/60 bg-card">
+              <div className="grid grid-cols-[minmax(0,40%)_auto_minmax(0,1fr)] gap-2 border-b border-border/50 px-3 py-1.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                <span className="max-w-[40%] truncate">Nguyên liệu</span>
+                <span className="w-[3.25rem] text-right">SL</span>
+                <span className="w-[4.5rem] justify-self-end text-right">Đơn giá</span>
+              </div>
             {items.map((row, index) => {
               const key = `item-${index}`;
               const expanded = expandedKey === key;
@@ -985,9 +1258,9 @@ export default function OrderDetail() {
                   <OrderFilledRow
                     row={row}
                     expanded={expanded}
-                    estimate={lineEstimate(row)}
+                    unitPrice={unitPriceForRow(row)}
                     chipCloud={expanded ? renderChipCloud() : null}
-                    onExpand={() => expandSlot(key)}
+                    onExpand={() => toggleSlot(key)}
                     onUpdate={patch => updateRow(index, patch)}
                     onCommitNotice={notice => {
                       setItems(prev => {
@@ -1003,17 +1276,13 @@ export default function OrderDetail() {
                 </div>
               );
             })}
-            {Array.from({ length: emptyPlaceholderCount }).map((_, i) => {
-              const key = `ph-${i}`;
-              const expanded = expandedKey === key;
-              return (
-                <div key={key} className="border-b border-border/40 last:border-b-0">
+            {items.length >= 3 ? (
+              expandedKey === "ph-0" ? (
+                <div className="border-b border-border/40">
                   <button
                     type="button"
-                    onClick={() => expandSlot(key)}
-                    className={`grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 px-3 py-1.5 text-left ${
-                      expanded ? "bg-primary/5" : "hover:bg-muted/30"
-                    }`}
+                    onClick={() => toggleSlot("ph-0")}
+                    className="grid w-full grid-cols-[minmax(0,40%)_auto_1fr] items-center gap-2 bg-primary/5 px-3 py-1.5 text-left"
                   >
                     <p className="min-w-0 truncate text-sm text-muted-foreground/35">
                       Tên nguyên liệu
@@ -1024,15 +1293,54 @@ export default function OrderDetail() {
                       </span>
                       <span className="ml-0.5 text-xs text-muted-foreground/25">đv</span>
                     </div>
-                    <span className="w-[4.5rem] shrink-0 text-right text-[11px] text-muted-foreground/25">
+                    <span className="w-[4.5rem] shrink-0 justify-self-end text-right ml-2 text-[11px] text-muted-foreground/25">
                       —
                     </span>
                   </button>
-                  {expanded && renderChipCloud()}
+                  {renderChipCloud()}
                 </div>
-              );
-            })}
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => expandSlot("ph-0")}
+                  className="flex w-full items-center justify-center gap-1.5 border-t border-dashed border-border/60 bg-card px-3 py-2.5 text-xs font-medium text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                >
+                  <span className="text-base leading-none">+</span> Thêm món mới
+                </button>
+              )
+            ) : (
+              Array.from({ length: emptyPlaceholderCount }).map((_, i) => {
+                const key = `ph-${i}`;
+                const expanded = expandedKey === key;
+                return (
+                  <div key={key} className="border-b border-border/40 last:border-b-0">
+                    <button
+                      type="button"
+                      onClick={() => toggleSlot(key)}
+                      className={`grid w-full grid-cols-[minmax(0,40%)_auto_1fr] items-center gap-2 px-3 py-1.5 text-left ${
+                        expanded ? "bg-primary/5" : "hover:bg-muted/30"
+                      }`}
+                    >
+                      <p className="min-w-0 truncate text-sm text-muted-foreground/35">
+                        Tên nguyên liệu
+                      </p>
+                      <div className="flex shrink-0 items-baseline">
+                        <span className="inline-flex h-7 w-8 items-center justify-end text-sm tabular-nums text-muted-foreground/30">
+                          0
+                        </span>
+                        <span className="ml-0.5 text-xs text-muted-foreground/25">đv</span>
+                      </div>
+                      <span className="w-[4.5rem] shrink-0 justify-self-end text-right ml-2 text-[11px] text-muted-foreground/25">
+                        —
+                      </span>
+                    </button>
+                    {expanded && renderChipCloud()}
+                  </div>
+                );
+              })
+            )}
           </div>
+            </>
         )}
       </div>
 

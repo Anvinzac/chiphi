@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { formatVndParts } from "@/lib/thousandsSuffix";
+import { formatVndParts, type ThousandsSuffixMode } from "@/lib/thousandsSuffix";
 import { useThousandsSuffix } from "@/hooks/useThousandsSuffix";
 
 interface MoneyLabelProps {
@@ -12,6 +12,7 @@ interface MoneyLabelProps {
   locale?: string;
   /** When amount is 0, render this instead (e.g. "0.000.000") to reserve layout width. */
   zeroDisplay?: string;
+  thousandsMode?: ThousandsSuffixMode;
 }
 
 export default function MoneyLabel({
@@ -23,8 +24,10 @@ export default function MoneyLabel({
   suffixClassName,
   locale = "vi-VN",
   zeroDisplay,
+  thousandsMode,
 }: MoneyLabelProps) {
-  const [mode] = useThousandsSuffix();
+  const [hookMode] = useThousandsSuffix();
+  const mode = thousandsMode ?? hookMode;
   const usePlaceholder = amount === 0 && zeroDisplay && mode === "000";
   const { main, small } = usePlaceholder
     ? { main: zeroDisplay.slice(0, zeroDisplay.lastIndexOf(".")), small: `.${zeroDisplay.slice(zeroDisplay.lastIndexOf(".") + 1)}` }

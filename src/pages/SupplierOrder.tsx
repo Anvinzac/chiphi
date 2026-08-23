@@ -30,6 +30,7 @@ import {
 import { thousandsFromVnd, vndFromThousands } from "@/lib/vndThousands";
 import { formatOrderSessionDay } from "@/lib/orderIdentity";
 import { googleSumExpr } from "@/lib/googleSumExpr";
+import type { ThousandsSuffixMode } from "@/lib/thousandsSuffix";
 import {
   VENDOR_PRICE_STEP,
   effectiveVendorUnitPrice,
@@ -47,6 +48,83 @@ function VendorOrderHeading({
   size?: "md" | "lg";
 }) {
   const subtitle = orderTitle?.trim() || "";
+  const [restaurants, setRestaurantsState] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem("mise.restaurants");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      /* ignore */
+    }
+    return [VENDOR_ORDER_SHOP];
+  });
+  const [current, setCurrentState] = useState<string>(() => {
+    try {
+      const raw = localStorage.getItem("mise.current-restaurant");
+      if (raw && typeof raw === "string" && raw.trim()) return raw.trim();
+    } catch {
+      /* ignore */
+    }
+    return VENDOR_ORDER_SHOP;
+  });
+  const [addOpen, setAddOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [dropOpen, setDropOpen] = useState(false);
+
+  useEffect(() => {
+    const sync = () => {
+      try {
+        const raw = localStorage.getItem("mise.restaurants");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) setRestaurantsState(parsed);
+        }
+        const cur = localStorage.getItem("mise.current-restaurant");
+        if (cur) setCurrentState(cur);
+      } catch {
+        /* ignore */
+      }
+    };
+    window.addEventListener("mise:restaurants", sync);
+    window.addEventListener("mise:current-restaurant", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("mise:restaurants", sync);
+      window.removeEventListener("mise:current-restaurant", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
+
+  const handleAdd = () => {
+    const trimmed = newName.trim();
+    if (!trimmed) {
+      toast.error("Nhập tên quán");
+      return;
+    }
+    const next = Array.from(new Set([...restaurants, trimmed]));
+    localStorage.setItem("mise.restaurants", JSON.stringify(next));
+    localStorage.setItem("mise.current-restaurant", trimmed);
+    window.dispatchEvent(new Event("mise:restaurants"));
+    window.dispatchEvent(new Event("mise:current-restaurant"));
+    setRestaurantsState(next);
+    setCurrentState(trimmed);
+    setNewName("");
+    setAddOpen(false);
+    toast.success(`Đã thêm ${trimmed} — tạo đơn mới`);
+    // Navigate to new order draft for this restaurant
+    window.location.href = `/orders/new?restaurant=${encodeURIComponent(trimmed)}`;
+  };
+
+  const handleSwitch = (name: string) => {
+    localStorage.setItem("mise.current-restaurant", name);
+    window.dispatchEvent(new Event("mise:current-restaurant"));
+    setCurrentState(name);
+    setDropOpen(false);
+    toast.message(`Đang xem ${name}`);
+  };
+
   return (
     <div className="flex items-end justify-between gap-3 pl-1 pr-2">
       <div className="min-w-0 max-w-[80%]">
@@ -57,7 +135,43 @@ function VendorOrderHeading({
           )}
         >
           Đơn{" "}
-          <span className="text-[#6aa8ad]">{VENDOR_ORDER_SHOP}</span>
+          <Popover open={dropOpen} onOpenChange={setDropOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-[#6aa8ad] hover:opacity-80"
+                aria-label="Chọn quán"
+              >
+                <span className="truncate">{current}</span>
+                <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-56 p-2">
+              <div className="space-y-1">
+                {restaurants.map(name => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => handleSwitch(name)}
+                    className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-sm hover:bg-muted ${
+                      name === current ? "bg-primary/10 text-primary" : "text-foreground"
+                    }`}
+                  >
+                    <span className="truncate">{name}</span>
+                    {name === current && <Check className="h-3 w-3 shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            className="ml-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/60 bg-card text-muted-foreground hover:border-primary/30 hover:text-primary"
+            aria-label="Thêm quán mới"
+          >
+            <Plus className="h-3 w-3" />
+          </button>
         </h1>
         {subtitle ? (
           <p className="mt-0.5 truncate text-sm leading-tight text-foreground/80">{subtitle}</p>
@@ -68,6 +182,34 @@ function VendorOrderHeading({
           {whenLabel}
         </span>
       ) : null}
+
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="max-w-[92vw] rounded-xl sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display">Thêm quán mới</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <Input
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              placeholder="Tên quán, ví dụ: Quán Chay An"
+              className="h-10"
+              autoFocus
+              onKeyDown={e => {
+                if (e.key === "Enter") handleAdd();
+              }}
+            />
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setAddOpen(false)}>
+                Hủy
+              </Button>
+              <Button type="button" className="flex-1" onClick={handleAdd} disabled={!newName.trim()}>
+                Tạo đơn
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -138,7 +280,7 @@ function lineQtyDetail(item: SharedItem): string | undefined {
   return `${shown.value} ${shown.unit} × ${Math.round(price).toLocaleString("vi-VN")}₫`;
 }
 
-function VendorQty({ item }: { item: SharedItem }) {
+function VendorQty({ item, thousandsMode }: { item: SharedItem; thousandsMode?: ThousandsSuffixMode }) {
   const oos = isOutOfStock(item);
   const money = isMoneyOrder(item);
   const partial =
@@ -153,13 +295,13 @@ function VendorQty({ item }: { item: SharedItem }) {
     if (partial) {
       return (
         <span className="inline-flex items-baseline gap-0.5">
-          <MoneyLabel
+          <MoneyLabel thousandsMode={thousandsMode}
             amount={Number(item.fulfilled_qty) || 0}
             className="text-sm text-foreground"
             smallClassName="text-[0.7em]"
           />
           <span className="text-muted-foreground/50">/</span>
-          <MoneyLabel
+          <MoneyLabel thousandsMode={thousandsMode}
             amount={ordered}
             className="text-sm text-muted-foreground/70"
             smallClassName="text-[0.7em]"
@@ -168,7 +310,7 @@ function VendorQty({ item }: { item: SharedItem }) {
       );
     }
     return (
-      <MoneyLabel
+      <MoneyLabel thousandsMode={thousandsMode}
         amount={ordered}
         className="text-sm"
         smallClassName="text-[0.7em]"
@@ -201,11 +343,13 @@ function VendorPriceStepper({
   price,
   readOnly,
   onStep,
+  thousandsMode,
 }: {
   name: string;
   price: number;
   readOnly: boolean;
   onStep: (delta: number) => void;
+  thousandsMode?: ThousandsSuffixMode;
 }) {
   return (
     <div className="flex items-center">
@@ -218,7 +362,7 @@ function VendorPriceStepper({
       >
         <Minus className="h-3 w-3" strokeWidth={2.4} />
       </button>
-      <MoneyLabel
+      <MoneyLabel thousandsMode={thousandsMode}
         amount={price}
         className="min-w-[2.75rem] text-center text-xs"
         smallClassName="text-[0.7em]"
@@ -547,10 +691,12 @@ function VendorDonePill({
   item,
   readOnly,
   onToggle,
+  thousandsMode,
 }: {
   item: SharedItem;
   readOnly: boolean;
   onToggle: () => void;
+  thousandsMode?: ThousandsSuffixMode;
 }) {
   const notice = item.vendor_notice?.trim() || "";
   const isHetHang = notice === "Hết hàng";
@@ -616,7 +762,7 @@ function VendorDonePill({
             <span className="text-[10px] leading-none" aria-hidden>
               ❓
             </span>
-            <MoneyLabel
+            <MoneyLabel thousandsMode={thousandsMode}
               amount={amount}
               className="min-w-0 text-right text-xs font-medium"
               smallClassName="text-[0.72em]"
@@ -656,18 +802,18 @@ function VendorDonePill({
       {done ? (
         <>
           <Check className="h-2.5 w-2.5 shrink-0 opacity-80" strokeWidth={2.8} />
-          <MoneyLabel
+          <MoneyLabel thousandsMode={thousandsMode}
             amount={lineAmount(item)}
             className="min-w-0 text-right text-xs font-medium"
             smallClassName="text-[0.72em]"
           />
         </>
       ) : partial ? (
-        <MoneyLabel
-          amount={lineAmount(item)}
-          className="min-w-0 text-right text-xs font-medium"
-          smallClassName="text-[0.72em]"
-        />
+            <MoneyLabel thousandsMode={thousandsMode}
+              amount={lineAmount(item)}
+              className="min-w-0 text-right text-xs font-medium"
+              smallClassName="text-[0.72em]"
+            />
       ) : oos ? (
         <span className="text-[10px] font-medium">Hết</span>
       ) : null}
@@ -688,6 +834,7 @@ function VendorLine({
   onNameChange,
   onQtyChange,
   onRemove,
+  thousandsMode,
 }: {
   item: SharedItem;
   striped: boolean;
@@ -701,6 +848,7 @@ function VendorLine({
   onNameChange?: (name: string) => void;
   onQtyChange?: (qty: number) => void;
   onRemove?: () => void;
+  thousandsMode?: ThousandsSuffixMode;
 }) {
   const { confirming, cancelConfirm, consumeClick, rootRef, holdProps } = useHoldToConfirm({
     enabled: !readOnly,
@@ -757,7 +905,7 @@ function VendorLine({
                 aria-label={`Số lượng ${item.name || "hàng thay"}`}
               />
             ) : (
-              <VendorQty item={item} />
+              <VendorQty item={item} thousandsMode={thousandsMode} />
             )}
           </div>
           <div className="min-w-0 flex-1 pl-2.5">
@@ -799,6 +947,7 @@ function VendorLine({
             price={effectiveVendorUnitPrice(item.name, item.retail_price)}
             readOnly={readOnly}
             onStep={onPriceStep}
+            thousandsMode={thousandsMode}
           />
         </div>
         <div className="flex h-7 items-center justify-end">
@@ -810,7 +959,7 @@ function VendorLine({
               onRemove={onRemove}
             />
           </div>
-          <VendorDonePill item={item} readOnly={readOnly} onToggle={onToggleDone} />
+          <VendorDonePill item={item} readOnly={readOnly} onToggle={onToggleDone} thousandsMode={thousandsMode} />
         </div>
       </div>
     </div>
@@ -904,6 +1053,25 @@ export default function SupplierOrder() {
   const [includeDeduction, setIncludeDeduction] = useState(false);
   const [shippingDraft, setShippingDraft] = useState("");
   const [deductionDraft, setDeductionDraft] = useState("");
+  const [vendorThousands, setVendorThousands] = useState<ThousandsSuffixMode>(() => {
+    try {
+      const raw = localStorage.getItem("mise.vendor-thousands-suffix");
+      if (raw === "k" || raw === "none") return raw as ThousandsSuffixMode;
+    } catch {
+      /* ignore */
+    }
+    return "k";
+  });
+  const [expOpen, setExpOpen] = useState(false);
+  const [expMode, setExpMode] = useState<"single" | "bulk" | "paste">("single");
+  const [expSingleName, setExpSingleName] = useState("");
+  const [expSingleQty, setExpSingleQty] = useState("1");
+  const [expSingleUnit, setExpSingleUnit] = useState("kg");
+  const [expSinglePrice, setExpSinglePrice] = useState("");
+  const [expBulkSelected, setExpBulkSelected] = useState<Set<string>>(new Set());
+  const [expPasteText, setExpPasteText] = useState("");
+  const [expParsed, setExpParsed] = useState<import("@/lib/parseOrderText").ParsedOrderLine[]>([]);
+  const [expCatalog, setExpCatalog] = useState<CatalogIngredient[]>([]);
   const itemsRef = useRef<SharedItem[]>([]);
   const saveTimersRef = useRef(new Map<string, number>());
   const extrasTimerRef = useRef<number | null>(null);
@@ -1426,6 +1594,7 @@ export default function SupplierOrder() {
         alternate={alternate}
         readOnly={readOnly}
         saving={savingId === item.id}
+        thousandsMode={vendorThousands}
         onToggleDone={() =>
           persistNow(
             item.id,
@@ -1540,7 +1709,54 @@ export default function SupplierOrder() {
               className="total-amount-hit hover:bg-muted/50"
               aria-label="Xem chi tiết tổng"
             >
-              <MoneyLabel amount={grandTotal} className="text-base font-display" smallClassName="text-[0.7em]" />
+              <MoneyLabel thousandsMode={vendorThousands} amount={grandTotal} className="text-base font-display" smallClassName="text-[0.7em]" />
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-dashed border-primary/30 bg-primary/5 p-3">
+          <p className="mb-2 text-xs font-medium text-primary">🧪 Thử nghiệm: Tạo đơn từ đầu</p>
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setExpMode("single");
+                setExpOpen(true);
+              }}
+              className="rounded-lg border border-border/60 bg-card px-2 py-2 text-center text-xs hover:border-primary/30"
+            >
+              Từng món
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setExpMode("bulk");
+                setExpOpen(true);
+                // Load catalog for bulk
+                void (async () => {
+                  try {
+                    const { data } = await supabase.from("order_ingredients").select("id, name, unit, reference_price").limit(100);
+                    if (data) setExpCatalog(data as any);
+                  } catch {
+                    /* ignore */
+                  }
+                })();
+              }}
+              className="rounded-lg border border-border/60 bg-card px-2 py-2 text-center text-xs hover:border-primary/30"
+            >
+              Chọn sỉ
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setExpMode("paste");
+                setExpOpen(true);
+                setExpPasteText("");
+                setExpParsed([]);
+              }}
+              className="rounded-lg border border-border/60 bg-card px-2 py-2 text-center text-xs hover:border-primary/30"
+            >
+              Dán tin
             </button>
           </div>
         </div>
@@ -1557,7 +1773,7 @@ export default function SupplierOrder() {
                 {holdMoney ? (
                   <>
                     Đặt{" "}
-                    <MoneyLabel
+                    <MoneyLabel thousandsMode={vendorThousands}
                       amount={orderedAmount(holdItem)}
                       className="text-xs"
                       smallClassName="text-[0.7em]"
@@ -1615,7 +1831,7 @@ export default function SupplierOrder() {
                   </div>
                   <span className="flex shrink-0 items-baseline text-sm">
                     {line.sign < 0 ? <span className="text-[#8a6a72]">−</span> : null}
-                    <MoneyLabel
+                    <MoneyLabel thousandsMode={vendorThousands}
                       amount={line.amount}
                       className={cn("text-sm", line.sign < 0 && "text-[#8a6a72]")}
                       smallClassName="text-[0.7em]"
@@ -1639,7 +1855,7 @@ export default function SupplierOrder() {
                 Tổng
                 <Copy className="h-3 w-3" strokeWidth={2.4} />
               </span>
-              <MoneyLabel
+              <MoneyLabel thousandsMode={vendorThousands}
                 amount={grandTotal}
                 className="text-xl font-display"
                 smallClassName="text-[0.65em]"
@@ -1660,6 +1876,229 @@ export default function SupplierOrder() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={expOpen} onOpenChange={setExpOpen}>
+        <DialogContent className="max-w-[92vw] rounded-xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display">Tạo đơn từ đầu (thử nghiệm)</DialogTitle>
+          </DialogHeader>
+          <div className="mb-3 flex gap-1 rounded-full bg-muted/40 p-1">
+            {(["single", "bulk", "paste"] as const).map(m => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setExpMode(m)}
+                className={`flex-1 rounded-full px-2 py-1.5 text-xs font-medium ${expMode === m ? "bg-card shadow text-foreground" : "text-muted-foreground"}`}
+              >
+                {m === "single" ? "Từng món" : m === "bulk" ? "Chọn sỉ" : "Dán tin"}
+              </button>
+            ))}
+          </div>
+
+          {expMode === "single" && (
+            <div className="space-y-3">
+              <Input value={expSingleName} onChange={e => setExpSingleName(e.target.value)} placeholder="Tên nguyên liệu" className="h-9" />
+              <div className="grid grid-cols-3 gap-2">
+                <Input value={expSingleQty} onChange={e => setExpSingleQty(e.target.value.replace(/[^\d.]/g, ""))} placeholder="SL" inputMode="decimal" className="h-9 text-center" />
+                <Input value={expSingleUnit} onChange={e => setExpSingleUnit(e.target.value)} placeholder="đv" className="h-9 text-center" />
+                <Input value={expSinglePrice} onChange={e => setExpSinglePrice(e.target.value.replace(/[^\d]/g, ""))} placeholder="Đơn giá" inputMode="numeric" className="h-9 text-right" />
+              </div>
+              <Button
+                type="button"
+                className="w-full"
+                disabled={!expSingleName.trim()}
+                onClick={async () => {
+                  const qty = Number(expSingleQty) || 1;
+                  const price = Number(expSinglePrice) || 0;
+                  try {
+                    const { data, error } = await supabase.rpc("add_shared_order_alternate", {
+                      p_token: token,
+                      p_name: expSingleName.trim(),
+                      p_quantity: qty,
+                      p_unit: expSingleUnit.trim() || "kg",
+                    });
+                    if (error) throw error;
+                    let row = (Array.isArray(data) ? data[0] : data) as SharedItem | null;
+                    if (!row) {
+                      const { data: inserted } = await supabase
+                        .from("order_ingredients")
+                        .insert({
+                          name: expSingleName.trim(),
+                          unit: expSingleUnit.trim() || "kg",
+                          reference_price: price || null,
+                          category_id: expCatalog[0]?.id || catalogCats[0]?.id || "",
+                          user_id: user?.id,
+                        } as any)
+                        .select()
+                        .single();
+                      void inserted;
+                    }
+                    if (row) {
+                      const next = [...itemsRef.current, { ...row, is_alternate: true }];
+                      itemsRef.current = next;
+                      setItems(next);
+                    }
+                    setExpSingleName("");
+                    setExpSingleQty("1");
+                    setExpSinglePrice("");
+                    toast.success("Đã thêm");
+                  } catch (err: any) {
+                    toast.error(err.message || "Không thêm được");
+                  }
+                }}
+              >
+                Thêm món
+              </Button>
+            </div>
+          )}
+
+          {expMode === "bulk" && (
+            <div className="space-y-3">
+              <div className="max-h-[40vh] space-y-2 overflow-auto pr-1">
+                {(expCatalog.length > 0 ? expCatalog : catalog).slice(0, 50).map(ing => {
+                  const selected = expBulkSelected.has(ing.id);
+                  return (
+                    <label key={ing.id} className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-sm ${selected ? "border-primary bg-primary/10" : "border-border/60 bg-card"}`}>
+                      <input type="checkbox" checked={selected} onChange={() => setExpBulkSelected(prev => { const n = new Set(prev); if (n.has(ing.id)) n.delete(ing.id); else n.add(ing.id); return n; })} className="h-4 w-4" />
+                      <span className="flex-1 truncate">{ing.name}</span>
+                      <span className="text-[11px] text-muted-foreground">{ing.unit}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <Button
+                type="button"
+                className="w-full"
+                disabled={expBulkSelected.size === 0}
+                onClick={async () => {
+                  for (const id of expBulkSelected) {
+                    const ing = (expCatalog.length > 0 ? expCatalog : catalog).find(c => c.id === id);
+                    if (!ing) continue;
+                    try {
+                      await supabase.rpc("add_shared_order_alternate", {
+                        p_token: token,
+                        p_name: ing.name,
+                        p_quantity: 1,
+                        p_unit: ing.unit,
+                      });
+                    } catch {
+                      /* ignore */
+                    }
+                  }
+                  toast.success(`Đã thêm ${expBulkSelected.size} món`);
+                  setExpBulkSelected(new Set());
+                  // reload
+                  const { data: rows } = await supabase.rpc("get_shared_order_items", { p_token: token });
+                  if (rows) {
+                    const next = rows as SharedItem[];
+                    itemsRef.current = next;
+                    setItems(next);
+                  }
+                }}
+              >
+                Thêm {expBulkSelected.size} món
+              </Button>
+            </div>
+          )}
+
+          {expMode === "paste" && (
+            <div className="space-y-3">
+              <textarea
+                value={expPasteText}
+                onChange={e => setExpPasteText(e.target.value)}
+                placeholder={"2kg cà chua\n1.5kg rau muống\n3 gói đậu hũ"}
+                className="min-h-[100px] w-full rounded-xl border border-border bg-background p-3 text-sm outline-none focus:border-primary/40"
+              />
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    import("@/lib/parseOrderText").then(({ parseOrderText }) => {
+                      const parsed = parseOrderText(expPasteText, expCatalog.length > 0 ? expCatalog : (catalog as any));
+                      setExpParsed(parsed);
+                    });
+                  }}
+                >
+                  Phân tích
+                </Button>
+                <Button
+                  type="button"
+                  className="flex-1"
+                  disabled={expParsed.length === 0}
+                  onClick={async () => {
+                    for (const line of expParsed) {
+                      try {
+                        await supabase.rpc("add_shared_order_alternate", {
+                          p_token: token,
+                          p_name: line.name,
+                          p_quantity: Number(line.quantity) || 1,
+                          p_unit: line.unit || "kg",
+                        });
+                        if (!line.matched) {
+                          // try to add to catalog for future matching
+                          try {
+                            await supabase.from("order_ingredients").insert({
+                              name: line.name,
+                              unit: line.unit || "kg",
+                              category_id: expCatalog[0]?.id || catalogCats[0]?.id || "",
+                              user_id: user?.id,
+                            } as any);
+                          } catch {
+                            /* ignore */
+                          }
+                        }
+                      } catch {
+                        /* ignore */
+                      }
+                    }
+                    toast.success(`Đã thêm ${expParsed.length} dòng`);
+                    const { data: rows } = await supabase.rpc("get_shared_order_items", { p_token: token });
+                    if (rows) {
+                      const next = rows as SharedItem[];
+                      itemsRef.current = next;
+                      setItems(next);
+                    }
+                    setExpParsed([]);
+                    setExpPasteText("");
+                  }}
+                >
+                  Thêm tất cả
+                </Button>
+              </div>
+              {expParsed.length > 0 && (
+                <div className="max-h-[35vh] overflow-auto rounded-xl border border-border/60">
+                  <div className="grid grid-cols-[auto_1fr_auto] gap-px bg-border/60">
+                    <div className="bg-muted/40 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">SL</div>
+                    <div className="bg-muted/40 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Tên</div>
+                    <div className="bg-muted/40 px-2 py-1 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Đơn giá</div>
+                    {expParsed.map((line, idx) => (
+                      <div key={idx} className={`contents ${!line.matched ? "bg-amber-50" : ""}`}>
+                        <div className={`bg-card px-2 py-1.5 text-center text-xs tabular-nums ${!line.matched ? "bg-amber-50 text-amber-700" : ""}`}>
+                          {line.quantity} {line.unit}
+                        </div>
+                        <div className={`bg-card px-2 py-1.5 text-xs ${!line.matched ? "bg-amber-50 text-amber-700 font-medium" : "text-foreground"}`}>
+                          {line.name}
+                          {!line.matched && <span className="ml-1 text-[10px] text-amber-600">• chưa có</span>}
+                        </div>
+                        <div className={`bg-card px-2 py-1.5 text-right text-xs tabular-nums ${!line.matched ? "bg-amber-50" : ""}`}>
+                          {line.matched?.reference_price ? (
+                            <MoneyLabel thousandsMode={vendorThousands} amount={line.matched.reference_price} className="text-xs" smallClassName="text-[0.7em]" />
+                          ) : (
+                            <span className="text-muted-foreground/40">—</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground">Chưa khớp sẽ tô vàng — bấm “Thêm tất cả” sẽ tạo món và lưu tên vào DB để lần sau nhớ giá.</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-card/95 px-4 py-3 backdrop-blur-sm safe-area-bottom">
         <div className="mx-auto flex max-w-lg items-center gap-2">
           <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Tổng đơn</span>
@@ -1669,13 +2108,29 @@ export default function SupplierOrder() {
             className="total-amount-hit hover:bg-muted/50"
             aria-label="Xem chi tiết tổng"
           >
-            <MoneyLabel
+            <MoneyLabel thousandsMode={vendorThousands}
               amount={grandTotal}
               className="text-xl font-display"
               smallClassName="text-[0.65em]"
             />
           </button>
-          <div className="min-w-0 flex-1" />
+          <button
+            type="button"
+            onClick={() => {
+              const next = vendorThousands === "k" ? "none" : "k";
+              setVendorThousands(next);
+              try {
+                localStorage.setItem("mise.vendor-thousands-suffix", next);
+              } catch {
+                /* ignore */
+              }
+            }}
+            className="ml-auto shrink-0 rounded-full border border-border/60 bg-muted/40 px-2.5 py-1 text-[10px] font-medium tabular-nums text-muted-foreground hover:border-primary/30 hover:text-foreground"
+            aria-pressed={vendorThousands === "k"}
+            aria-label={vendorThousands === "k" ? "Đang hiện k, bấm để ẩn" : "Đang ẩn, bấm để hiện k"}
+          >
+            {vendorThousands === "k" ? "k" : "Ẩn"}
+          </button>
         </div>
       </div>
     </div>

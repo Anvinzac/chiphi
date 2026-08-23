@@ -521,10 +521,13 @@ export type Database = {
       orders: {
         Row: {
           created_at: string
+          customer_name: string | null
+          day_seq: number
           deduction: number
           id: string
           include_deduction: boolean
           include_shipping: boolean
+          mgmt_id: string | null
           share_token: string
           shipping_fee: number
           status: string
@@ -535,10 +538,13 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          customer_name?: string | null
+          day_seq?: number
           deduction?: number
           id?: string
           include_deduction?: boolean
           include_shipping?: boolean
+          mgmt_id?: string | null
           share_token: string
           shipping_fee?: number
           status?: string
@@ -549,10 +555,13 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          customer_name?: string | null
+          day_seq?: number
           deduction?: number
           id?: string
           include_deduction?: boolean
           include_shipping?: boolean
+          mgmt_id?: string | null
           share_token?: string
           shipping_fee?: number
           status?: string
@@ -806,7 +815,14 @@ export type Database = {
         Args: { p_token: string }
         Returns: {
           created_at: string
+          customer_name: string
+          day_seq: number
+          deduction: number
           id: string
+          include_deduction: boolean
+          include_shipping: boolean
+          mgmt_id: string
+          shipping_fee: number
           status: string
           title: string
           updated_at: string

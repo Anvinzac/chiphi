@@ -956,6 +956,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      update_shared_order_extras: {
+        Args: {
+          p_deduction: number
+          p_include_deduction: boolean
+          p_include_shipping: boolean
+          p_shipping_fee: number
+          p_token: string
+        }
+        Returns: undefined
+      }
       update_shared_order_item: {
         Args: {
           p_fulfilled_qty: number

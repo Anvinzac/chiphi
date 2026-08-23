@@ -3,7 +3,15 @@
 **Project:** `xmijxukmucuufocblxuz` (see `supabase/config.toml`)
 **Local migrations dir:** `supabase/migrations/` (SQL, ordered by timestamp prefix)
 
-## What is pending on remote (2026-08-23)
+## Status: APPLIED (2026-08-23)
+
+All pending migrations below have been applied to remote via the Lovable migration tool, plus
+`20260821120000_order_item_money_amount.sql` (order_mode/money_amount columns) and the
+`update_shared_order_extras` function from `20260821150000_order_shipping_deduction.sql`.
+Verified: `get_shared_order` returns 200, `add_shared_order_alternate` / `update_shared_order_extras`
+return 400 (function exists, token rejected) instead of 404 PGRST202.
+
+## What was pending on remote (2026-08-23)
 
 Remote PostgREST schema cache currently missing:
 

@@ -467,6 +467,7 @@ export type Database = {
           created_at: string
           fulfilled_qty: number | null
           id: string
+          is_alternate: boolean
           money_amount: number | null
           name: string
           notice: string | null
@@ -484,6 +485,7 @@ export type Database = {
           created_at?: string
           fulfilled_qty?: number | null
           id?: string
+          is_alternate?: boolean
           money_amount?: number | null
           name: string
           notice?: string | null
@@ -501,6 +503,7 @@ export type Database = {
           created_at?: string
           fulfilled_qty?: number | null
           id?: string
+          is_alternate?: boolean
           money_amount?: number | null
           name?: string
           notice?: string | null
@@ -817,6 +820,42 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_shared_order_alternate: {
+        Args: {
+          p_name?: string
+          p_quantity?: number
+          p_token: string
+          p_unit?: string
+        }
+        Returns: {
+          created_at: string
+          fulfilled_qty: number | null
+          id: string
+          is_alternate: boolean
+          money_amount: number | null
+          name: string
+          notice: string | null
+          order_id: string
+          order_mode: string
+          quantity: number
+          retail_price: number | null
+          sort_order: number
+          status: string
+          unit: string
+          updated_at: string
+          vendor_notice: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "order_items"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      delete_shared_order_alternate: {
+        Args: { p_item_id: string; p_token: string }
+        Returns: undefined
+      }
       get_shared_order: {
         Args: { p_token: string }
         Returns: {
@@ -840,6 +879,7 @@ export type Database = {
           created_at: string
           fulfilled_qty: number | null
           id: string
+          is_alternate: boolean
           money_amount: number | null
           name: string
           notice: string | null
@@ -879,6 +919,43 @@ export type Database = {
         }
         Returns: boolean
       }
+      update_shared_order_alternate: {
+        Args: {
+          p_fulfilled_qty: number
+          p_item_id: string
+          p_name: string
+          p_notice: string
+          p_quantity: number
+          p_retail_price: number
+          p_status: string
+          p_token: string
+          p_unit: string
+        }
+        Returns: {
+          created_at: string
+          fulfilled_qty: number | null
+          id: string
+          is_alternate: boolean
+          money_amount: number | null
+          name: string
+          notice: string | null
+          order_id: string
+          order_mode: string
+          quantity: number
+          retail_price: number | null
+          sort_order: number
+          status: string
+          unit: string
+          updated_at: string
+          vendor_notice: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "order_items"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       update_shared_order_item: {
         Args: {
           p_fulfilled_qty: number
@@ -892,6 +969,7 @@ export type Database = {
           created_at: string
           fulfilled_qty: number | null
           id: string
+          is_alternate: boolean
           money_amount: number | null
           name: string
           notice: string | null

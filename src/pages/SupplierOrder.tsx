@@ -228,6 +228,13 @@ type SharedOrder = {
   mgmt_id?: string | null;
 };
 
+type CatalogIngredient = {
+  id: string;
+  name: string;
+  unit: string;
+  reference_price?: number | null;
+};
+
 type SharedItem = {
   id: string;
   name: string;
@@ -1917,21 +1924,8 @@ export default function SupplierOrder() {
                       p_unit: expSingleUnit.trim() || "kg",
                     });
                     if (error) throw error;
-                    let row = (Array.isArray(data) ? data[0] : data) as SharedItem | null;
-                    if (!row) {
-                      const { data: inserted } = await supabase
-                        .from("order_ingredients")
-                        .insert({
-                          name: expSingleName.trim(),
-                          unit: expSingleUnit.trim() || "kg",
-                          reference_price: price || null,
-                          category_id: expCatalog[0]?.id || catalogCats[0]?.id || "",
-                          user_id: user?.id,
-                        } as any)
-                        .select()
-                        .single();
-                      void inserted;
-                    }
+                    void price;
+                    const row = (Array.isArray(data) ? data[0] : data) as SharedItem | null;
                     if (row) {
                       const next = [...itemsRef.current, { ...row, is_alternate: true }];
                       itemsRef.current = next;
@@ -1954,7 +1948,7 @@ export default function SupplierOrder() {
           {expMode === "bulk" && (
             <div className="space-y-3">
               <div className="max-h-[40vh] space-y-2 overflow-auto pr-1">
-                {(expCatalog.length > 0 ? expCatalog : catalog).slice(0, 50).map(ing => {
+                {expCatalog.slice(0, 50).map(ing => {
                   const selected = expBulkSelected.has(ing.id);
                   return (
                     <label key={ing.id} className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-sm ${selected ? "border-primary bg-primary/10" : "border-border/60 bg-card"}`}>
@@ -1971,7 +1965,7 @@ export default function SupplierOrder() {
                 disabled={expBulkSelected.size === 0}
                 onClick={async () => {
                   for (const id of expBulkSelected) {
-                    const ing = (expCatalog.length > 0 ? expCatalog : catalog).find(c => c.id === id);
+                    const ing = expCatalog.find(c => c.id === id);
                     if (!ing) continue;
                     try {
                       await supabase.rpc("add_shared_order_alternate", {
@@ -2015,7 +2009,7 @@ export default function SupplierOrder() {
                   className="flex-1"
                   onClick={() => {
                     import("@/lib/parseOrderText").then(({ parseOrderText }) => {
-                      const parsed = parseOrderText(expPasteText, expCatalog.length > 0 ? expCatalog : (catalog as any));
+                      const parsed = parseOrderText(expPasteText, expCatalog as any);
                       setExpParsed(parsed);
                     });
                   }}
@@ -2035,19 +2029,6 @@ export default function SupplierOrder() {
                           p_quantity: Number(line.quantity) || 1,
                           p_unit: line.unit || "kg",
                         });
-                        if (!line.matched) {
-                          // try to add to catalog for future matching
-                          try {
-                            await supabase.from("order_ingredients").insert({
-                              name: line.name,
-                              unit: line.unit || "kg",
-                              category_id: expCatalog[0]?.id || catalogCats[0]?.id || "",
-                              user_id: user?.id,
-                            } as any);
-                          } catch {
-                            /* ignore */
-                          }
-                        }
                       } catch {
                         /* ignore */
                       }

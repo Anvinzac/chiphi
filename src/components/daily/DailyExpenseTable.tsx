@@ -427,6 +427,21 @@ export default function DailyExpenseTable({
           name: category.name,
           frequency: (category.frequency as CategoryFrequency) || "daily",
         }));
+      const iceName = "Đá";
+      const iceKey = foldCategoryName(iceName);
+      const iceRenames = nextCategories.filter(
+        category => foldCategoryName(category.name) === iceKey && category.name !== iceName,
+      );
+      if (iceRenames.length > 0) {
+        await Promise.all(
+          iceRenames.map(category =>
+            supabase.from("categories").update({ name: iceName }).eq("id", category.id),
+          ),
+        );
+        nextCategories = nextCategories.map(category =>
+          iceRenames.some(row => row.id === category.id) ? { ...category, name: iceName } : category,
+        );
+      }
       const have = new Set(nextCategories.map(c => foldCategoryName(c.name)));
       const missing = EXTRA_WEEKLY_CATEGORIES.filter(name => !have.has(foldCategoryName(name)));
       if (missing.length > 0) {
@@ -882,7 +897,7 @@ export default function DailyExpenseTable({
 
   const handleQuickCategory = useCallback(async (categoryName: string) => {
     if (!user) return;
-    const existing = categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
+    const existing = categories.find(c => foldCategoryName(c.name) === foldCategoryName(categoryName));
     let categoryId = existing?.id || null;
 
     if (!categoryId) {

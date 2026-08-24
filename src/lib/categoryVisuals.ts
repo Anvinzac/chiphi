@@ -11,6 +11,7 @@ export function foldCategoryName(name: string) {
   return name
     .trim()
     .toLowerCase()
+    .replace(/đ/g, "d")
     .normalize("NFD")
     .replace(/\p{M}/gu, "");
 }
@@ -29,7 +30,7 @@ export const QUICK_CATEGORY_DETAILS: CategoryVisual[] = [
   { name: "Gạo", emoji: "🌾", gradient: "linear-gradient(160deg, #efe6d4 0%, #d8c8a8 100%)", frequency: "weekly" },
   { name: "Nước dừa", emoji: "🥥", gradient: "linear-gradient(160deg, #d9e6e6 0%, #b7cbcc 100%)", frequency: "weekly" },
   { name: "Muối", emoji: "🧂", gradient: "linear-gradient(160deg, #e2e6ea 0%, #c5cbd2 100%)", frequency: "weekly" },
-  { name: "Da", emoji: "🧊", gradient: "linear-gradient(160deg, #dce8f0 0%, #b8cddc 100%)", frequency: "weekly" },
+  { name: "Đá", emoji: "🧊", gradient: "linear-gradient(160deg, #dce8f0 0%, #b8cddc 100%)", frequency: "weekly" },
   { name: "Gia vị", emoji: "🌶️", gradient: "linear-gradient(160deg, #eadfd4 0%, #d4c0b0 100%)", frequency: "weekly" },
   { name: "Mang về", emoji: "🥡", gradient: "linear-gradient(160deg, #e4e0d8 0%, #ccc4b8 100%)", frequency: "weekly" },
   { name: "Shopee", emoji: "🛍️", gradient: "linear-gradient(160deg, #eeddd8 0%, #d6b8b0 100%)", frequency: "daily" },
@@ -44,7 +45,7 @@ export const QUICK_CATEGORY_DETAILS: CategoryVisual[] = [
   { name: "Khác", emoji: "✦", gradient: "linear-gradient(160deg, #e8dde6 0%, #d0bac8 100%)", frequency: "daily" },
 ];
 
-export const EXTRA_WEEKLY_CATEGORIES = ["Da", "Gia vị", "Mang về"] as const;
+export const EXTRA_WEEKLY_CATEGORIES = ["Đá", "Gia vị", "Mang về"] as const;
 
 const BY_NAME = new Map(QUICK_CATEGORY_DETAILS.map(d => [foldCategoryName(d.name), d]));
 

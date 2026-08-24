@@ -1381,6 +1381,7 @@ export default function DailyExpenseTable({
   // Swipe between days (daily, within period) or periods (range)
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
+  const touchStartTime = useRef<number | null>(null);
 
   const goToNamePhase = useCallback(() => {
     setNoteValue("");
@@ -1561,15 +1562,20 @@ export default function DailyExpenseTable({
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
+    touchStartTime.current = Date.now();
   }, []);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     if (touchStartX.current === null || touchStartY.current === null) return;
     const dx = e.changedTouches[0].clientX - touchStartX.current;
     const dy = e.changedTouches[0].clientY - touchStartY.current;
+    const dt = Date.now() - (touchStartTime.current ?? Date.now());
+    const velocity = dt > 0 ? dx / dt : 0;
+    const isFlick = Math.abs(velocity) > 0.35 && dt < 300 && Math.abs(dx) > 8;
     touchStartX.current = null;
     touchStartY.current = null;
-    if (Math.abs(dx) < 28 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
+    touchStartTime.current = null;
+    if ((Math.abs(dx) < 28 && !isFlick) || Math.abs(dy) > Math.abs(dx) * 0.7) return;
 
     if (viewMode !== "daily") {
       setPeriodOffset(prev => {

@@ -34,6 +34,7 @@ import {
   type OrderMode,
 } from "@/lib/formatOrderQty";
 import { customerNameFromUser, formatOrderDay, orderIdentityLine } from "@/lib/orderIdentity";
+import BulkIngredientPager from "@/components/orders/BulkIngredientPager";
 
 type OrderItemDraft = {
   id?: string;
@@ -760,6 +761,40 @@ export default function OrderDetail() {
     });
   };
 
+  const handleBulkIngredientToggle = useCallback((
+    ing: CatalogIngredient,
+    willSelect: boolean
+  ) => {
+    toggleBulkSelect(ing.id);
+    if (willSelect) {
+      const entry: OrderItemDraft = {
+        name: ing.name,
+        quantity: defaultQty(ing),
+        unit: ing.unit || "kg",
+        sort_order: items.length,
+        catalog_id: ing.id,
+        reference_price: ing.reference_price,
+        order_mode: "measure",
+        money_amount: "",
+        notice: "",
+      };
+      setItems(prev => {
+        if (prev.some(r => r.name.trim().toLowerCase() === ing.name.trim().toLowerCase())) return prev;
+        const next = [...prev, entry].map((r, i) => ({ ...r, sort_order: i }));
+        queueMicrotask(() => syncItemsSideEffects(next));
+        return next;
+      });
+    } else {
+      setItems(prev => {
+        const next = prev
+          .filter(r => r.name.trim().toLowerCase() !== ing.name.trim().toLowerCase())
+          .map((r, i) => ({ ...r, sort_order: i }));
+        queueMicrotask(() => syncItemsSideEffects(next));
+        return next;
+      });
+    }
+  }, [items.length, toggleBulkSelect, syncItemsSideEffects]);
+
   const handleBulkContinue = () => {
     if (bulkSelected.size === 0) {
       toast.error("Chọn ít nhất một nguyên liệu");
@@ -1113,77 +1148,14 @@ export default function OrderDetail() {
                       />
                       <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{bulkSelected.size} chọn</span>
                     </div>
-                    <div className="max-h-[38vh] space-y-3 overflow-auto pr-1">
-                      {groupedIngredients.length === 0 ? (
-                        <p className="py-6 text-center text-xs text-muted-foreground">Không có nguyên liệu</p>
-                      ) : (
-                        groupedIngredients.map(([sub, ings]) => (
-                          <div key={sub || "_all"}>
-                            {sub && <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{sub}</p>}
-                            <div className="grid grid-cols-1 gap-1">
-                              {ings.map(ing => {
-                                const selected = bulkSelected.has(ing.id);
-                                const alreadyInOrder = addedByName.has(ing.name.trim().toLowerCase());
-                                return (
-                                  <label
-                                    key={ing.id}
-                                    className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-sm transition-colors ${
-                                      selected
-                                        ? "border-primary bg-primary/10"
-                                        : alreadyInOrder
-                                          ? "border-border/50 bg-muted/30 opacity-50"
-                                          : "border-border/60 bg-card hover:border-primary/30"
-                                    }`}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={selected}
-                                      disabled={alreadyInOrder}
-                                      onChange={() => {
-                                        const willSelect = !selected;
-                                        toggleBulkSelect(ing.id);
-                                        // immediately reflect on table above
-                                        if (willSelect) {
-                                          const entry: OrderItemDraft = {
-                                            name: ing.name,
-                                            quantity: defaultQty(ing),
-                                            unit: ing.unit || "kg",
-                                            sort_order: items.length,
-                                            catalog_id: ing.id,
-                                            reference_price: ing.reference_price,
-                                            order_mode: "measure",
-                                            money_amount: "",
-                                            notice: "",
-                                          };
-                                          setItems(prev => {
-                                            if (prev.some(r => r.name.trim().toLowerCase() === ing.name.trim().toLowerCase())) return prev;
-                                            const next = [...prev, entry].map((r, i) => ({ ...r, sort_order: i }));
-                                            queueMicrotask(() => syncItemsSideEffects(next));
-                                            return next;
-                                          });
-                                        } else {
-                                          setItems(prev => {
-                                            const next = prev.filter(r => r.name.trim().toLowerCase() !== ing.name.trim().toLowerCase()).map((r, i) => ({ ...r, sort_order: i }));
-                                            queueMicrotask(() => syncItemsSideEffects(next));
-                                            return next;
-                                          });
-                                        }
-                                      }}
-                                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
-                                    />
-                                    <span className="min-w-0 flex-1 truncate">{ing.name}</span>
-                                    <span className="shrink-0 text-[11px] text-muted-foreground">{ing.unit}</span>
-                                    {alreadyInOrder && !selected && <span className="shrink-0 text-[10px] text-muted-foreground">đã có</span>}
-                                  </label>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
+                    <BulkIngredientPager
+                      pages={ingredientPages}
+                      selected={bulkSelected}
+                      alreadyInOrder={name => addedByName.has(name.trim().toLowerCase())}
+                      onToggle={handleBulkIngredientToggle}
+                    />
                     <div className="mt-3 flex justify-end">
-                      <Button type="button" size="sm" disabled={bulkSelected.size === 0} onClick={() => { const m = new Map<string, string>(); for (const id of bulkSelected) { const ing = catalog.find(c => c.id === id); if (ing) m.set(id, defaultQty(ing)); } setBulkAmounts(m); setBulkStep("amounts"); }}>
+                      <Button type="button" size="sm" disabled={bulkSelected.size === 0} onClick={handleBulkContinue}>
                         Xong — nhập SL
                       </Button>
                     </div>

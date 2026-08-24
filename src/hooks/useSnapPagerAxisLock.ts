@@ -34,6 +34,9 @@ export function useSnapPagerAxisLock(
     let startY = 0;
     let startLeft = 0;
     let startTop = 0;
+    let startTime = 0;
+    let lastX = 0;
+    let lastTime = 0;
     let fromDots = false;
     let page: HTMLElement | null = null;
     let pullPx = 0;
@@ -81,6 +84,9 @@ export function useSnapPagerAxisLock(
       startY = t.clientY;
       startLeft = scroller.scrollLeft;
       startTop = page?.scrollTop ?? 0;
+      startTime = Date.now();
+      lastX = t.clientX;
+      lastTime = startTime;
       axis = null;
       pullPx = 0;
       pullNotified = false;
@@ -104,6 +110,8 @@ export function useSnapPagerAxisLock(
       const dy = t.clientY - startY;
       const adx = Math.abs(dx);
       const ady = Math.abs(dy);
+      lastX = t.clientX;
+      lastTime = Date.now();
       const pull = searchPullRef?.current;
       const atTop = fromDots || (startTop <= 1 && (page?.scrollTop ?? 0) <= 1);
 
@@ -147,10 +155,14 @@ export function useSnapPagerAxisLock(
         restoreSnap();
         const width = scroller.clientWidth || 1;
         const dx = scroller.scrollLeft - startLeft;
+        const dt = Date.now() - startTime;
+        const fingerDx = lastX - startX;
+        const velocity = dt > 0 ? fingerDx / dt : 0;
+        const isFlick = Math.abs(velocity) > 0.35 && dt < 300 && Math.abs(fingerDx) > 8;
         const startIdx = Math.round(startLeft / width);
         let idx = startIdx;
-        if (dx > PAGE_FLIP_PX) idx = startIdx + 1;
-        else if (dx < -PAGE_FLIP_PX) idx = startIdx - 1;
+        if (dx > PAGE_FLIP_PX || (isFlick && velocity < -0.35)) idx = startIdx + 1;
+        else if (dx < -PAGE_FLIP_PX || (isFlick && velocity > 0.35)) idx = startIdx - 1;
         else idx = Math.round(scroller.scrollLeft / width);
         const max = Math.max(0, pages().length - 1);
         idx = Math.max(0, Math.min(max, idx));

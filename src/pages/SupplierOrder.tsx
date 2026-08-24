@@ -884,13 +884,13 @@ function VendorLine({
       {...holdProps}
     >
       <div
-        className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start pl-1 pr-2 py-1.5"
+        className="grid grid-cols-[minmax(0,1.15fr)_auto_minmax(0,1fr)] items-start pl-1 pr-2 py-1.5"
         onClick={() => {
           if (consumeClick()) return;
         }}
       >
         <div className="flex min-w-0 items-start">
-          <div className="flex h-7 w-[2.75rem] shrink-0 items-center justify-end text-sm tabular-nums leading-none">
+          <div className="flex min-h-7 w-[2.75rem] shrink-0 items-center justify-end pt-1 text-sm tabular-nums leading-none">
             {alternate && !readOnly && onQtyChange ? (
               <Input
                 inputMode="decimal"
@@ -918,8 +918,12 @@ function VendorLine({
                 aria-label="Tên hàng thay"
               />
             ) : (
-              <p className="flex h-7 min-w-0 items-center truncate text-sm font-medium leading-none">
-                {item.name}
+              <p
+                className="flex min-h-7 min-w-0 items-center break-words text-sm font-medium leading-tight"
+                style={{ fontSize: "clamp(11px, 3.2vw, 14px)", overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal" }}
+                title={item.name}
+              >
+                <span className="w-full">{item.name}</span>
               </p>
             )}
             {item.notice?.trim() ? (
@@ -1640,7 +1644,7 @@ export default function SupplierOrder() {
 
       <div className="mx-auto max-w-lg px-4 py-4">
         <div className="overflow-hidden rounded-xl border border-border/60 bg-card">
-          <div className="grid h-7 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center border-b border-border/50 pl-1 pr-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+          <div className="grid h-7 grid-cols-[minmax(0,1.15fr)_auto_minmax(0,1fr)] items-center border-b border-border/50 pl-1 pr-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
             <div className="flex min-w-0 items-center">
               <span className="w-[2.75rem] shrink-0 text-right">SL</span>
               <span className="pl-2.5">Hàng</span>

@@ -288,9 +288,9 @@ export default function MonthlyOrder() {
     setEditingValue("");
     setHasStartedTyping(false);
   };
-  const handleSave = () => {
+  const handleSave = (value?: string) => {
     if (!editingDate) return;
-    const v = editingValue.trim();
+    const v = value ?? editingValue.trim();
     const next: MonthlyOrderLine[] = v === "" ? [] : [{ num: v.replace(/^0+(?=\d)/, "") || "0" }];
     setOverrides(prev => {
       const m = new Map(prev);
@@ -571,9 +571,7 @@ export default function MonthlyOrder() {
                       onClick={e => {
                         e.stopPropagation();
                         e.preventDefault();
-                        setEditingValue(String(val));
-                        handleSave();
-                        closeNumpad();
+                        handleSave(String(val));
                       }}
                       className="h-8 rounded-lg border border-border/60 bg-card px-2 py-1 text-sm font-medium tabular-nums shadow-sm hover:bg-muted active:scale-95"
                     >

@@ -102,6 +102,8 @@ export default function MonthlyOrder() {
   // Range picker state: single global range with default values 16-24
   const [rangeMin, setRangeMin] = useState("16");
   const [rangeMax, setRangeMax] = useState("24");
+  // State for range editor dialog
+  const [rangeEditorOpen, setRangeEditorOpen] = useState(false);
 
   const itemsByDate = useMemo(() => {
     const m = new Map(baseItems);
@@ -381,31 +383,16 @@ export default function MonthlyOrder() {
               );
             })}
           </div>
-          <div
-            className="inline-flex shrink-0 rounded-full border border-border/60 bg-muted/40 p-0.5 ml-2"
-            role="tablist"
-            aria-label="Dãy số"
+          <button
+            type="button"
+            onClick={() => setRangeEditorOpen(true)}
+            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border/60 bg-muted/40 px-2 py-1.5 ml-2 text-[11px] font-medium leading-none hover:bg-muted/60 transition-colors"
+            style={{ width: "30%" }}
+            aria-label="Chỉnh dãy số"
           >
-            <div className="flex items-center gap-1 px-2">
-              <input
-                type="number"
-                value={rangeMin}
-                onChange={e => setRangeMin(e.target.value)}
-                className="h-7 w-14 rounded-lg border-0 bg-transparent px-1 text-center text-[11px] font-medium tabular-nums focus:outline-none focus:ring-1 focus:ring-primary/30"
-                inputMode="numeric"
-                placeholder="16"
-              />
-              <span className="text-[10px] text-muted-foreground">–</span>
-              <input
-                type="number"
-                value={rangeMax}
-                onChange={e => setRangeMax(e.target.value)}
-                className="h-7 w-14 rounded-lg border-0 bg-transparent px-1 text-center text-[11px] font-medium tabular-nums focus:outline-none focus:ring-1 focus:ring-primary/30"
-                inputMode="numeric"
-                placeholder="24"
-              />
-            </div>
-          </div>
+            <LayoutGrid className="h-3 w-3 opacity-70" />
+            {rangeMin}–{rangeMax}
+          </button>
         </div>
       </div>
 
@@ -714,6 +701,49 @@ export default function MonthlyOrder() {
             >
               <Search className="h-3.5 w-3.5" strokeWidth={2.4} />
               Google
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Range editor dialog */}
+      <Dialog open={rangeEditorOpen} onOpenChange={setRangeEditorOpen}>
+        <DialogContent className="max-w-[90vw] rounded-xl sm:max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="font-display">Dãy số</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-medium mb-1">Từ</label>
+                <Input
+                  type="number"
+                  value={rangeMin}
+                  onChange={e => setRangeMin(e.target.value)}
+                  placeholder="16"
+                  className="h-9 text-sm"
+                  inputMode="numeric"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1">Đến</label>
+                <Input
+                  type="number"
+                  value={rangeMax}
+                  onChange={e => setRangeMax(e.target.value)}
+                  placeholder="24"
+                  className="h-9 text-sm"
+                  inputMode="numeric"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setRangeEditorOpen(false)} className="flex-1">
+              Hủy
+            </Button>
+            <Button size="sm" onClick={() => setRangeEditorOpen(false)} className="flex-1">
+              Lưu
             </Button>
           </div>
         </DialogContent>

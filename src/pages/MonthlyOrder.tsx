@@ -560,29 +560,35 @@ export default function MonthlyOrder() {
             </div>
 
             {/* Main value field - shows either range quick-pick buttons or typed value */}
-            <div className="mx-3 flex h-10 items-center justify-center rounded-xl border bg-muted/30 px-1 py-1 text-xl font-bold tabular-nums transition-all duration-200 ease-out overflow-hidden">
+            <div className="mx-3 h-auto min-h-[40px] rounded-xl border bg-muted/30 px-1 py-1 text-xl font-bold tabular-nums transition-all duration-200 ease-out">
               {currentRange && currentRange.length > 0 && !hasStartedTyping ? (
-                // Show range quick-pick buttons in place of the value field
-                <div className="grid grid-flow-col auto-cols-[minmax(40px,1fr)] gap-1 w-full h-full" onScroll={e => e.stopPropagation()}>
+                // Show range quick-pick buttons - wraps to multiple rows, no overflow
+                <div className="grid grid-flow-row grid-cols-[repeat(auto-fill,minmax(40px,1fr))] gap-1 w-full" onScroll={e => e.stopPropagation()}>
                   {currentRange.map(val => (
                     <button
                       key={val}
                       type="button"
-                      onClick={() => {
+                      onClick={e => {
+                        e.stopPropagation();
+                        e.preventDefault();
                         setEditingValue(String(val));
                         handleSave();
                         closeNumpad();
                       }}
-                      className="rounded-lg border border-border/60 bg-card px-2 py-1 text-sm font-medium tabular-nums shadow-sm hover:bg-muted active:scale-95"
+                      className="h-8 rounded-lg border border-border/60 bg-card px-2 py-1 text-sm font-medium tabular-nums shadow-sm hover:bg-muted active:scale-95"
                     >
                       {val}
                     </button>
                   ))}
                 </div>
               ) : editingValue !== "" ? (
-                editingValue
+                <div className="flex h-10 items-center justify-center">
+                  {editingValue}
+                </div>
               ) : (
-                <span className="text-muted-foreground/40 text-sm">— trống —</span>
+                <div className="flex h-10 items-center justify-center">
+                  <span className="text-muted-foreground/40 text-sm">— trống —</span>
+                </div>
               )}
             </div>
 

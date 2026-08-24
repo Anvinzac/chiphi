@@ -385,42 +385,6 @@ export default function MonthlyOrder() {
       {/* Controls: custom short pills */}
       <div className="shrink-0 border-b border-border/50 bg-card/70 px-3 py-2.5 sm:px-4">
         <div className="mx-auto max-w-lg space-y-2.5">
-          {/* Column and range customizers */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <div
-              className="inline-flex shrink-0 rounded-full border border-border/60 bg-muted/40 p-0.5"
-              role="tablist"
-              aria-label="Số cột"
-            >
-              {COL_OPTIONS.map(opt => {
-                const active = columns === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    onClick={() => setColumns(opt.value)}
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium leading-none transition-colors sm:px-3 sm:text-xs ${
-                      active ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <LayoutGrid className="h-3 w-3 opacity-70" />
-                    {opt.value}
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              type="button"
-              onClick={() => setRangeEditorOpen(true)}
-              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border/60 bg-muted/40 px-2 py-1.5 text-[11px] font-medium leading-none hover:bg-muted/60 transition-colors"
-              aria-label="Chỉnh dãy số"
-            >
-              <LayoutGrid className="h-3 w-3 opacity-70" />
-              {rangeMin}–{rangeMax}
-            </button>
-          </div>
           <div className="grid grid-cols-2 gap-2.5">
             <div className="min-w-0 space-y-1">
               <span className="block pl-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
@@ -476,33 +440,6 @@ export default function MonthlyOrder() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setPreset("month")}
-              className="rounded-full border border-border bg-background px-3 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
-            >
-              Tháng này
-            </button>
-            <button
-              type="button"
-              onClick={() => setPreset("30d")}
-              className="rounded-full border border-border bg-background px-3 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
-            >
-              30 ngày qua
-            </button>
-            <button
-              type="button"
-              onClick={() => setPreset("next30")}
-              className="rounded-full border border-border bg-background px-3 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
-            >
-              30 ngày tới
-            </button>
-            <span className="ml-auto text-[10px] tabular-nums text-muted-foreground/70">
-              {dayCount} ngày · {stats.daysWithItems} có số
-            </span>
-          </div>
-
           {hasInvalidRange && (
             <p className="text-[11px] text-destructive">Ngày không hợp lệ — kiểm tra định dạng YYYY-MM-DD</p>
           )}
@@ -510,6 +447,43 @@ export default function MonthlyOrder() {
             <p className="text-[11px] text-amber-600">Khoảng tối đa 60 ngày — đã tự cắt cho dễ xem.</p>
           )}
         </div>
+      </div>
+
+      {/* Table controls: column and range customizers */}
+      <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 bg-background border-b border-border/50">
+        <div
+          className="inline-flex shrink-0 rounded-full border border-border/60 bg-muted/40 p-0.5"
+          role="tablist"
+          aria-label="Số cột"
+        >
+          {COL_OPTIONS.map(opt => {
+            const active = columns === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setColumns(opt.value)}
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium leading-none transition-colors sm:px-3 sm:text-xs ${
+                  active ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <LayoutGrid className="h-3 w-3 opacity-70" />
+                {opt.value}
+              </button>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          onClick={() => setRangeEditorOpen(true)}
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border/60 bg-muted/40 px-2 py-1.5 text-[11px] font-medium leading-none hover:bg-muted/60 transition-colors"
+          aria-label="Chỉnh dãy số"
+        >
+          <LayoutGrid className="h-3 w-3 opacity-70" />
+          {rangeMin}–{rangeMax}
+        </button>
       </div>
 
       {/* Viewport-fit grid — 2-col is week-paged vertical */}

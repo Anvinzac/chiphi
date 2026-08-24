@@ -9,6 +9,7 @@ import { mockMonthlyOrderByDate } from "@/lib/mockMonthlyOrderGrid";
 import type { MonthlyOrderLine } from "@/lib/mockMonthlyOrderGrid";
 import { googleSumExpr } from "@/lib/googleSumExpr";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -98,6 +99,12 @@ export default function MonthlyOrder() {
   const [editingValue, setEditingValue] = useState("");
   const [anchor, setAnchor] = useState<AnchorInfo>(null);
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number; arrow: "top" | "left" | "right"; arrowOffset: number } | null>(null);
+  // Range picker state: store {min, max} per date
+  const [ranges, setRanges] = useState<Map<string, { min: number; max: number }>>(new Map());
+  // Track which date's range is being edited in the range picker
+  const [rangeEditDate, setRangeEditDate] = useState<string | null>(null);
+  const [rangeMin, setRangeMin] = useState("");
+  const [rangeMax, setRangeMax] = useState("");
 
   const itemsByDate = useMemo(() => {
     const m = new Map(baseItems);
@@ -184,7 +191,69 @@ export default function MonthlyOrder() {
     setEditingValue("");
     setAnchor(null);
     setPopoverPos(null);
+    setRangeEditDate(null);
+    setRangeMin("");
+    setRangeMax("");
   };
+
+  const closeRangeEdit = () => {
+    setRangeEditDate(null);
+    setRangeMin("");
+    setRangeMax("");
+  };
+
+  const openRangeEdit = (dateStr: string) => {
+    const existing = ranges.get(dateStr);
+    setRangeEditDate(dateStr);
+    setRangeMin(existing ? String(existing.min) : "");
+    setRangeMax(existing ? String(existing.max) : "");
+  };
+
+  const saveRange = () => {
+    if (!rangeEditDate) return;
+    const min = parseInt(rangeMin) || 0;
+    const max = parseInt(rangeMax) || 0;
+    if (min <= 0 || max <= 0 || min >= max) {
+      toast.error("Dãy số không hợp lệ");
+      return;
+    }
+    setRanges(prev => {
+      const m = new Map(prev);
+      m.set(rangeEditDate, { min, max });
+      return m;
+    });
+    closeRangeEdit();
+  };
+
+  const deleteRange = () => {
+    if (!rangeEditDate) return;
+    setRanges(prev => {
+      const m = new Map(prev);
+      m.delete(rangeEditDate);
+      return m;
+    });
+    closeRangeEdit();
+  };
+
+  // Select a value from the range and hide the range display
+  const selectRangeValue = (value: number) => {
+    if (!editingDate) return;
+    setEditingValue(String(value));
+    // Don't close the numpad - just hide the range and let user continue with custom input
+  };
+
+  // Get range values for the current editing date
+  const currentRange = useMemo(() => {
+    if (!editingDate) return null;
+    const r = ranges.get(editingDate);
+    if (!r) return null;
+    // Generate array of numbers from min to max
+    const values: number[] = [];
+    for (let i = r.min; i <= r.max; i++) {
+      values.push(i);
+    }
+    return values;
+  }, [editingDate, ranges]);
 
   // Compute popover position: top row -> below, lower rows -> sideways
   useEffect(() => {
@@ -525,15 +594,42 @@ export default function MonthlyOrder() {
               <span className="text-xs font-semibold tabular-nums">
                 {editingDate ? format(parseISO(editingDate), "EEEE, d 'th' M") : ""}
               </span>
-              <button
-                type="button"
-                onClick={closeNumpad}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-                aria-label="Đóng"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => openRangeEdit(editingDate!)}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                  aria-label="Chỉnh dãy số"
+                  title="Chỉnh dãy số"
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={closeNumpad}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                  aria-label="Đóng"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
+
+            {/* Range values display - shown above numpad when range exists for this date */}
+            {currentRange && currentRange.length > 0 && (
+              <div className="mx-3 mb-2 flex gap-1 overflow-x-auto pb-1">
+                {currentRange.map(val => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => selectRangeValue(val)}
+                    className="shrink-0 rounded-lg border border-border/60 bg-card px-2 py-1 text-sm font-medium tabular-nums shadow-sm hover:bg-muted active:scale-95"
+                  >
+                    {val}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div className="mx-3 flex h-10 items-center justify-center rounded-xl border bg-muted/30 px-3 text-xl font-bold tabular-nums">
               {editingValue !== "" ? editingValue : <span className="text-muted-foreground/40 text-sm">— trống —</span>}
@@ -605,6 +701,60 @@ export default function MonthlyOrder() {
           </div>
         </>
       )}
+
+      {/* Range edit dialog */}
+      <Dialog open={rangeEditDate !== null} onOpenChange={closeRangeEdit}>
+        <DialogContent className="max-w-[90vw] rounded-xl sm:max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="font-display">Chỉnh dãy số</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Đặt dãy số sẽ hiển thị phía trên bàn phím để chọn nhanh.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-medium mb-1">Từ</label>
+                <Input
+                  type="number"
+                  value={rangeMin}
+                  onChange={e => setRangeMin(e.target.value)}
+                  placeholder="VD: 16"
+                  className="h-9 text-sm"
+                  inputMode="numeric"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1">Đến</label>
+                <Input
+                  type="number"
+                  value={rangeMax}
+                  onChange={e => setRangeMax(e.target.value)}
+                  placeholder="VD: 22"
+                  className="h-9 text-sm"
+                  inputMode="numeric"
+                />
+              </div>
+            </div>
+            <p className="text-[10px] text-muted-foreground/60">
+              Sau khi lưu, các số trong dãy sẽ xuất hiện phía trên bàn phím khi chỉnh ngày này.
+            </p>
+          </div>
+          <div className="mt-4 flex gap-2">
+            {ranges.get(rangeEditDate!) && (
+              <Button variant="destructive" size="sm" onClick={deleteRange} className="flex-1">
+                Xóa dãy
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={closeRangeEdit} className="flex-1">
+              Hủy
+            </Button>
+            <Button size="sm" onClick={saveRange} className="flex-1">
+              Lưu dãy
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={totalOpen} onOpenChange={setTotalOpen}>
         <DialogContent className="max-w-[92vw] rounded-xl sm:max-w-sm">

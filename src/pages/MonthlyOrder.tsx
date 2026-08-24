@@ -196,14 +196,6 @@ export default function MonthlyOrder() {
     setHasStartedTyping(false);
   };
 
-  // Select a value from the range and hide the range display
-  const selectRangeValue = (value: number) => {
-    if (!editingDate) return;
-    setEditingValue(String(value));
-    setHasStartedTyping(true);
-    // Don't close the numpad - just hide the range and let user continue with custom input
-  };
-
   // Get range values from global range settings
   const currentRange = useMemo(() => {
     const min = parseInt(rangeMin) || 0;
@@ -567,27 +559,31 @@ export default function MonthlyOrder() {
               </button>
             </div>
 
-            {/* Range values display - shown covering the main field, hidden when typing starts */}
-            {currentRange && currentRange.length > 0 && !hasStartedTyping && (
-              <div
-                className="mx-3 mb-2 grid grid-flow-row grid-cols-[repeat(auto-fill,minmax(40px,1fr))] gap-1 pb-1 transition-all duration-200 ease-out"
-                onScroll={e => e.stopPropagation()}
-              >
-                {currentRange.map(val => (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => selectRangeValue(val)}
-                    className="rounded-lg border border-border/60 bg-card px-2 py-1 text-sm font-medium tabular-nums shadow-sm hover:bg-muted active:scale-95"
-                  >
-                    {val}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <div className="mx-3 flex h-10 items-center justify-center rounded-xl border bg-muted/30 px-3 text-xl font-bold tabular-nums transition-all duration-200 ease-out">
-              {editingValue !== "" ? editingValue : <span className="text-muted-foreground/40 text-sm">— trống —</span>}
+            {/* Main value field - shows either range quick-pick buttons or typed value */}
+            <div className="mx-3 flex h-10 items-center justify-center rounded-xl border bg-muted/30 px-1 py-1 text-xl font-bold tabular-nums transition-all duration-200 ease-out overflow-hidden">
+              {currentRange && currentRange.length > 0 && !hasStartedTyping ? (
+                // Show range quick-pick buttons in place of the value field
+                <div className="grid grid-flow-col auto-cols-[minmax(40px,1fr)] gap-1 w-full h-full" onScroll={e => e.stopPropagation()}>
+                  {currentRange.map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => {
+                        setEditingValue(String(val));
+                        handleSave();
+                        closeNumpad();
+                      }}
+                      className="rounded-lg border border-border/60 bg-card px-2 py-1 text-sm font-medium tabular-nums shadow-sm hover:bg-muted active:scale-95"
+                    >
+                      {val}
+                    </button>
+                  ))}
+                </div>
+              ) : editingValue !== "" ? (
+                editingValue
+              ) : (
+                <span className="text-muted-foreground/40 text-sm">— trống —</span>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-1.5 p-3 pb-2">

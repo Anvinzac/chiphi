@@ -573,7 +573,10 @@ export default function MonthlyOrder() {
 
             {/* Range values display - shown above numpad when range exists for this date */}
             {currentRange && currentRange.length > 0 && (
-              <div className="mx-3 mb-2 flex gap-1 overflow-x-auto pb-1">
+              <div
+                className="mx-3 mb-2 flex gap-1 overflow-x-auto pb-1"
+                onScroll={e => e.stopPropagation()}
+              >
                 {currentRange.map(val => (
                   <button
                     key={val}

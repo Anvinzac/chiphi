@@ -104,6 +104,8 @@ export default function MonthlyOrder() {
   const [rangeMax, setRangeMax] = useState("24");
   // State for range editor dialog
   const [rangeEditorOpen, setRangeEditorOpen] = useState(false);
+  // Track if user has started typing (to hide range pills)
+  const [hasStartedTyping, setHasStartedTyping] = useState(false);
 
   const itemsByDate = useMemo(() => {
     const m = new Map(baseItems);
@@ -183,6 +185,7 @@ export default function MonthlyOrder() {
     setEditingDate(info.dateStr);
     setEditingValue(current);
     setAnchor({ rect: info.rect, row: info.row, col: info.col, columns: info.columns });
+    setHasStartedTyping(current !== "");
   };
 
   const closeNumpad = () => {
@@ -190,12 +193,14 @@ export default function MonthlyOrder() {
     setEditingValue("");
     setAnchor(null);
     setPopoverPos(null);
+    setHasStartedTyping(false);
   };
 
   // Select a value from the range and hide the range display
   const selectRangeValue = (value: number) => {
     if (!editingDate) return;
     setEditingValue(String(value));
+    setHasStartedTyping(true);
     // Don't close the numpad - just hide the range and let user continue with custom input
   };
 
@@ -270,12 +275,27 @@ export default function MonthlyOrder() {
     setEditingValue(prev => {
       if (prev.length >= 4) return prev;
       if (prev === "0") return d;
-      return prev + d;
+      const next = prev + d;
+      if (prev === "" && !hasStartedTyping) {
+        setHasStartedTyping(true);
+      }
+      return next;
     });
   };
 
-  const handleBackspace = () => setEditingValue(prev => prev.slice(0, -1));
-  const handleClear = () => setEditingValue("");
+  const handleBackspace = () => {
+    setEditingValue(prev => {
+      const next = prev.slice(0, -1);
+      if (next === "") {
+        setHasStartedTyping(false);
+      }
+      return next;
+    });
+  };
+  const handleClear = () => {
+    setEditingValue("");
+    setHasStartedTyping(false);
+  };
   const handleSave = () => {
     if (!editingDate) return;
     const v = editingValue.trim();
@@ -571,10 +591,10 @@ export default function MonthlyOrder() {
               </button>
             </div>
 
-            {/* Range values display - shown above numpad when range exists for this date */}
-            {currentRange && currentRange.length > 0 && (
+            {/* Range values display - shown covering the main field, hidden when typing starts */}
+            {currentRange && currentRange.length > 0 && !hasStartedTyping && (
               <div
-                className="mx-3 mb-2 flex gap-1 overflow-x-auto pb-1"
+                className="mx-3 mb-2 grid grid-flow-row grid-cols-[repeat(auto-fill,minmax(40px,1fr))] gap-1 pb-1 transition-all duration-200 ease-out"
                 onScroll={e => e.stopPropagation()}
               >
                 {currentRange.map(val => (
@@ -582,7 +602,7 @@ export default function MonthlyOrder() {
                     key={val}
                     type="button"
                     onClick={() => selectRangeValue(val)}
-                    className="shrink-0 rounded-lg border border-border/60 bg-card px-2 py-1 text-sm font-medium tabular-nums shadow-sm hover:bg-muted active:scale-95"
+                    className="rounded-lg border border-border/60 bg-card px-2 py-1 text-sm font-medium tabular-nums shadow-sm hover:bg-muted active:scale-95"
                   >
                     {val}
                   </button>
@@ -590,7 +610,7 @@ export default function MonthlyOrder() {
               </div>
             )}
 
-            <div className="mx-3 flex h-10 items-center justify-center rounded-xl border bg-muted/30 px-3 text-xl font-bold tabular-nums">
+            <div className="mx-3 flex h-10 items-center justify-center rounded-xl border bg-muted/30 px-3 text-xl font-bold tabular-nums transition-all duration-200 ease-out">
               {editingValue !== "" ? editingValue : <span className="text-muted-foreground/40 text-sm">— trống —</span>}
             </div>
 

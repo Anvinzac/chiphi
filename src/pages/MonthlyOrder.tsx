@@ -1,15 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, CalendarDays, Check, Copy, Delete, LayoutGrid, Search, X } from "lucide-react";
+import { ArrowLeft, CalendarDays, Check, Copy, Delete, GripHorizontal, Hash, LayoutGrid, Search, X } from "lucide-react";
 import { addDays, format, isValid, parseISO } from "date-fns";
 import { toast } from "sonner";
 import MonthlyOrderGrid, { type MonthlyOrderCol } from "@/components/orders/MonthlyOrderGrid";
 import MonthlyOrderTwoColPager from "@/components/orders/MonthlyOrderTwoColPager";
+import MonthBoundCalendar from "@/components/daily/MonthBoundCalendar";
+import MoneyLabel from "@/components/daily/MoneyLabel";
 import { mockMonthlyOrderByDate } from "@/lib/mockMonthlyOrderGrid";
 import type { MonthlyOrderLine } from "@/lib/mockMonthlyOrderGrid";
 import { googleSumExpr } from "@/lib/googleSumExpr";
+import { vndFromThousands } from "@/lib/vndThousands";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -42,11 +47,18 @@ const COL_OPTIONS: { value: MonthlyOrderCol; label: string }[] = [
   { value: 2, label: "2 cột" },
   { value: 3, label: "3 cột" },
   { value: 4, label: "4 cột" },
+  { value: 7, label: "7 cột" },
 ];
 
 const POPOVER_W = 280;
-const POPOVER_H = 310;
+const POPOVER_H = 340;
 const GAP = 10;
+const RANGE_KEY_CLASS =
+  "rounded-xl border border-[#b8cddc] bg-[#dce8f0] py-2 text-base font-semibold tabular-nums text-[#3a4f58] shadow-sm active:scale-95";
+const PAD_KEY_CLASS =
+  "keypad-key rounded-xl border border-border/60 bg-card py-2 text-base font-medium shadow-sm active:scale-95";
+const PAD_MUTED_CLASS =
+  "keypad-key rounded-xl border border-border/60 bg-muted/40 py-2 text-xs font-medium text-muted-foreground active:scale-95";
 
 type AnchorInfo = {
   rect: DOMRect;
@@ -75,9 +87,8 @@ export default function MonthlyOrder() {
   const [endInput, setEndInput] = useState(() => toInputValue(defaultEnd));
   const [columns, setColumns] = useState<MonthlyOrderCol>(4);
   const [totalOpen, setTotalOpen] = useState(false);
-
-  const startRef = useRef<HTMLInputElement>(null);
-  const endRef = useRef<HTMLInputElement>(null);
+  const [boundOpen, setBoundOpen] = useState<"start" | "end" | null>(null);
+  const [calMonth, setCalMonth] = useState(() => defaultStart);
 
   const parsed = useMemo(() => {
     const s = parseInputValue(startInput);
@@ -104,8 +115,12 @@ export default function MonthlyOrder() {
   const [rangeMax, setRangeMax] = useState("24");
   // State for range editor dialog
   const [rangeEditorOpen, setRangeEditorOpen] = useState(false);
-  // Track if user has started typing (to hide range pills)
-  const [hasStartedTyping, setHasStartedTyping] = useState(false);
+  const [rangeEnabled, setRangeEnabled] = useState(true);
+  const [useRangeKeys, setUseRangeKeys] = useState(true);
+  const typingRef = useRef(false);
+  const pickTimerRef = useRef<number | null>(null);
+  const [pickedRange, setPickedRange] = useState<number | null>(null);
+  const [unitPriceDraft, setUnitPriceDraft] = useState("");
 
   const itemsByDate = useMemo(() => {
     const m = new Map(baseItems);
@@ -138,6 +153,8 @@ export default function MonthlyOrder() {
     return { daysWithItems, totalLines, totalSum, dayTotals };
   }, [itemsByDate]);
   const googleExpr = googleSumExpr(stats.dayTotals);
+  const unitPriceVnd = vndFromThousands(unitPriceDraft);
+  const moneyTotal = unitPriceVnd > 0 ? stats.totalSum * unitPriceVnd : 0;
 
   const copyMonthTotal = async () => {
     try {
@@ -180,20 +197,31 @@ export default function MonthlyOrder() {
   };
 
   const handleDayClick = (info: { dateStr: string; rect: DOMRect; row: number; col: number; columns: number }) => {
+    if (pickTimerRef.current != null) {
+      window.clearTimeout(pickTimerRef.current);
+      pickTimerRef.current = null;
+    }
+    setPickedRange(null);
     const lines = itemsByDate.get(info.dateStr) ?? [];
     const current = lines.length > 0 ? lines[0].num : "";
     setEditingDate(info.dateStr);
     setEditingValue(current);
     setAnchor({ rect: info.rect, row: info.row, col: info.col, columns: info.columns });
-    setHasStartedTyping(current !== "");
+    typingRef.current = false;
+    setUseRangeKeys(rangeEnabled);
   };
 
   const closeNumpad = () => {
+    if (pickTimerRef.current != null) {
+      window.clearTimeout(pickTimerRef.current);
+      pickTimerRef.current = null;
+    }
+    setPickedRange(null);
     setEditingDate(null);
     setEditingValue("");
     setAnchor(null);
     setPopoverPos(null);
-    setHasStartedTyping(false);
+    typingRef.current = false;
   };
 
   // Get range values from global range settings
@@ -208,6 +236,10 @@ export default function MonthlyOrder() {
     }
     return values;
   }, [rangeMin, rangeMax]);
+  const rangeValues = currentRange ?? [];
+  const showRangeKeys = useRangeKeys && rangeValues.length > 0;
+  const rangeAt = (i: number) => (showRangeKeys ? rangeValues[i] : undefined);
+  const extraRange = showRangeKeys ? rangeValues.slice(15) : [];
 
   // Compute popover position: top row -> below, lower rows -> sideways
   useEffect(() => {
@@ -264,33 +296,31 @@ export default function MonthlyOrder() {
   }, [editingDate, anchor]);
 
   const handleDigit = (d: string) => {
+    const replace = !typingRef.current;
+    typingRef.current = true;
     setEditingValue(prev => {
+      if (replace) return d;
       if (prev.length >= 4) return prev;
       if (prev === "0") return d;
-      const next = prev + d;
-      if (prev === "" && !hasStartedTyping) {
-        setHasStartedTyping(true);
-      }
-      return next;
+      return prev + d;
     });
   };
 
   const handleBackspace = () => {
     setEditingValue(prev => {
       const next = prev.slice(0, -1);
-      if (next === "") {
-        setHasStartedTyping(false);
-      }
+      if (next === "") typingRef.current = false;
       return next;
     });
   };
   const handleClear = () => {
     setEditingValue("");
-    setHasStartedTyping(false);
+    typingRef.current = false;
   };
   const handleSave = (value?: string) => {
     if (!editingDate) return;
-    const v = value ?? editingValue.trim();
+    const raw = typeof value === "string" ? value : editingValue;
+    const v = raw.trim();
     const next: MonthlyOrderLine[] = v === "" ? [] : [{ num: v.replace(/^0+(?=\d)/, "") || "0" }];
     setOverrides(prev => {
       const m = new Map(prev);
@@ -298,6 +328,16 @@ export default function MonthlyOrder() {
       return m;
     });
     closeNumpad();
+  };
+  const pickRange = (n: number) => {
+    if (!editingDate) return;
+    if (pickTimerRef.current != null) window.clearTimeout(pickTimerRef.current);
+    setEditingValue(String(n));
+    setPickedRange(n);
+    pickTimerRef.current = window.setTimeout(() => {
+      pickTimerRef.current = null;
+      handleSave(String(n));
+    }, 520);
   };
   const handleDelete = () => {
     if (!editingDate) return;
@@ -316,11 +356,16 @@ export default function MonthlyOrder() {
       if (e.key === "Enter") handleSave();
       if (e.key === "Backspace") {
         e.preventDefault();
-        handleBackspace();
+        if (!showRangeKeys) handleBackspace();
       }
       if (/^[0-9]$/.test(e.key)) {
         e.preventDefault();
-        handleDigit(e.key);
+        if (showRangeKeys && e.key !== "0") {
+          const rv = rangeValues[Number(e.key) - 1];
+          if (rv != null) pickRange(rv);
+          return;
+        }
+        if (!showRangeKeys) handleDigit(e.key);
       }
     };
     document.addEventListener("keydown", onKey);
@@ -330,24 +375,20 @@ export default function MonthlyOrder() {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [editingDate, editingValue]);
+  }, [editingDate, editingValue, showRangeKeys, rangeValues]);
 
   const hasInvalidRange = !parsed;
 
-  const openPicker = (ref: React.RefObject<HTMLInputElement>) => {
-    const el = ref.current;
-    if (!el) return;
-    const anyEl = el as unknown as { showPicker?: () => void };
-    if (typeof anyEl.showPicker === "function") {
-      try {
-        anyEl.showPicker();
-        return;
-      } catch {
-        /* fallback */
-      }
-    }
-    el.click();
-    el.focus();
+  const openBound = (which: "start" | "end") => {
+    setCalMonth(which === "start" ? rangeStart : rangeEnd);
+    setBoundOpen(which);
+  };
+
+  const pickBound = (which: "start" | "end", day: Date) => {
+    const value = toInputValue(day);
+    if (which === "start") setStartInput(value);
+    else setEndInput(value);
+    setBoundOpen(null);
   };
 
   return (
@@ -382,53 +423,73 @@ export default function MonthlyOrder() {
               <span className="block pl-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                 Từ ngày
               </span>
-              <button
-                type="button"
-                onClick={() => openPicker(startRef)}
-                className="flex h-9 w-full min-w-0 items-center justify-between gap-1.5 rounded-xl border border-border bg-background px-3 py-2 text-left shadow-sm transition-colors hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-                aria-label="Chọn ngày bắt đầu"
+              <Popover
+                open={boundOpen === "start"}
+                onOpenChange={open => (open ? openBound("start") : setBoundOpen(null))}
               >
-                <span className="min-w-0 truncate text-sm font-semibold tabular-nums">
-                  {hasInvalidRange ? "—" : shortVi(rangeStart)}
-                </span>
-                <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              </button>
-              <input
-                ref={startRef}
-                type="date"
-                value={startInput}
-                onChange={e => setStartInput(e.target.value)}
-                max={endInput || undefined}
-                className="sr-only"
-                tabIndex={-1}
-                aria-hidden
-              />
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex h-9 w-full min-w-0 items-center justify-between gap-1.5 rounded-xl border border-border bg-background px-3 py-2 text-left shadow-sm transition-colors hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                    aria-label="Chọn ngày bắt đầu"
+                  >
+                    <span className="min-w-0 truncate text-sm font-semibold tabular-nums">
+                      {hasInvalidRange ? "—" : shortVi(rangeStart)}
+                    </span>
+                    <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  sideOffset={8}
+                  className="w-auto rounded-2xl border-border/60 bg-popover p-0 shadow-warm-lg"
+                >
+                  <MonthBoundCalendar
+                    month={calMonth}
+                    onMonthChange={setCalMonth}
+                    selected={rangeStart}
+                    rangeStart={rangeStart}
+                    rangeEnd={rangeEnd}
+                    onSelect={day => pickBound("start", day)}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="min-w-0 space-y-1">
               <span className="block pl-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                 Đến ngày
               </span>
-              <button
-                type="button"
-                onClick={() => openPicker(endRef)}
-                className="flex h-9 w-full min-w-0 items-center justify-between gap-1.5 rounded-xl border border-border bg-background px-3 py-2 text-left shadow-sm transition-colors hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-                aria-label="Chọn ngày kết thúc"
+              <Popover
+                open={boundOpen === "end"}
+                onOpenChange={open => (open ? openBound("end") : setBoundOpen(null))}
               >
-                <span className="min-w-0 truncate text-sm font-semibold tabular-nums">
-                  {hasInvalidRange ? "—" : shortVi(rangeEnd)}
-                </span>
-                <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              </button>
-              <input
-                ref={endRef}
-                type="date"
-                value={endInput}
-                onChange={e => setEndInput(e.target.value)}
-                min={startInput || undefined}
-                className="sr-only"
-                tabIndex={-1}
-                aria-hidden
-              />
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex h-9 w-full min-w-0 items-center justify-between gap-1.5 rounded-xl border border-border bg-background px-3 py-2 text-left shadow-sm transition-colors hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                    aria-label="Chọn ngày kết thúc"
+                  >
+                    <span className="min-w-0 truncate text-sm font-semibold tabular-nums">
+                      {hasInvalidRange ? "—" : shortVi(rangeEnd)}
+                    </span>
+                    <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="end"
+                  sideOffset={8}
+                  className="w-auto rounded-2xl border-border/60 bg-popover p-0 shadow-warm-lg"
+                >
+                  <MonthBoundCalendar
+                    month={calMonth}
+                    onMonthChange={setCalMonth}
+                    selected={rangeEnd}
+                    rangeStart={rangeStart}
+                    rangeEnd={rangeEnd}
+                    onSelect={day => pickBound("end", day)}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 
@@ -470,7 +531,12 @@ export default function MonthlyOrder() {
         <button
           type="button"
           onClick={() => setRangeEditorOpen(true)}
-          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border/60 bg-muted/40 px-2 py-1.5 text-[11px] font-medium leading-none hover:bg-muted/60 transition-colors"
+          aria-pressed={rangeEnabled}
+          className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1.5 text-[11px] font-medium leading-none transition-colors ${
+            rangeEnabled
+              ? "border-[#b8cddc] bg-[#dce8f0] text-[#3a4f58] shadow-sm"
+              : "border-border/60 bg-muted/40 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+          }`}
           aria-label="Chỉnh dãy số"
         >
           <LayoutGrid className="h-3 w-3 opacity-70" />
@@ -502,23 +568,54 @@ export default function MonthlyOrder() {
             onSelectDay={handleDayClick}
           />
         )}
-        {/* Bottom total bar — with tappable total */}
-        <div className="relative flex shrink-0 items-center border-t border-border bg-card px-3 py-2.5 sm:px-4">
+        {/* Bottom total bar — qty × unit price = money */}
+        <div className="flex shrink-0 items-center gap-1 border-t border-border bg-card px-3 py-2 sm:gap-1.5 sm:px-4">
           <span className="shrink-0 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Tổng</span>
           <button
             type="button"
             disabled={hasInvalidRange}
             onClick={() => setTotalOpen(true)}
-            className="total-amount-hit absolute left-1/2 -translate-x-1/2 hover:bg-muted/50 disabled:pointer-events-none"
+            className="total-amount-hit shrink-0 hover:bg-muted/50 disabled:pointer-events-none"
             aria-label="Xem chi tiết tổng"
           >
-            <span className="text-lg font-display font-bold leading-none tabular-nums">
+            <span className="text-base font-display font-bold leading-none tabular-nums sm:text-lg">
               {hasInvalidRange ? "—" : stats.totalSum}
             </span>
           </button>
-          <span className="ml-auto shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
-            {hasInvalidRange ? "" : `${stats.daysWithItems}/${dayCount} ngày`}
+          <span className="shrink-0 text-muted-foreground/45" aria-hidden>
+            ×
           </span>
+          <label className="monthly-unit-price flex h-7 shrink-0 items-center rounded-md border border-border/70 bg-background px-1.5">
+            <input
+              inputMode="decimal"
+              autoComplete="off"
+              value={unitPriceDraft}
+              placeholder="giá"
+              aria-label="Đơn giá (nghìn đồng)"
+              disabled={hasInvalidRange}
+              onChange={e => setUnitPriceDraft(e.target.value.replace(/[^\d.]/g, ""))}
+              className="h-6 w-10 min-w-0 border-0 bg-transparent p-0 text-center text-xs font-semibold tabular-nums text-foreground shadow-none outline-none placeholder:font-medium placeholder:text-muted-foreground/40 focus-visible:ring-0"
+            />
+            {unitPriceDraft ? (
+              <span className="text-[9px] leading-none text-muted-foreground/65">.000</span>
+            ) : null}
+          </label>
+          {unitPriceVnd > 0 && !hasInvalidRange ? (
+            <>
+              <span className="shrink-0 text-muted-foreground/45" aria-hidden>
+                =
+              </span>
+              <MoneyLabel
+                amount={moneyTotal}
+                className="min-w-0 truncate text-base font-display font-bold leading-none sm:text-lg"
+                smallClassName="text-[0.7em]"
+              />
+            </>
+          ) : (
+            <span className="ml-auto shrink-0 text-right text-[10px] tabular-nums text-muted-foreground sm:text-[11px]">
+              {hasInvalidRange ? "" : `${stats.daysWithItems}/${dayCount} ngày`}
+            </span>
+          )}
         </div>
       </div>
 
@@ -559,99 +656,197 @@ export default function MonthlyOrder() {
               </button>
             </div>
 
-            {/* Main value field - shows either range quick-pick buttons or typed value */}
-            <div className="mx-3 h-auto min-h-[40px] rounded-xl border bg-muted/30 px-1 py-1 text-xl font-bold tabular-nums transition-all duration-200 ease-out">
-              {currentRange && currentRange.length > 0 && !hasStartedTyping ? (
-                // Show range quick-pick buttons - wraps to multiple rows, no overflow
-                <div className="grid grid-flow-row grid-cols-[repeat(auto-fill,minmax(40px,1fr))] gap-1 w-full" onScroll={e => e.stopPropagation()}>
-                  {currentRange.map(val => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={e => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        handleSave(String(val));
-                      }}
-                      className="h-8 rounded-lg border border-border/60 bg-card px-2 py-1 text-sm font-medium tabular-nums shadow-sm hover:bg-muted active:scale-95"
-                    >
-                      {val}
-                    </button>
-                  ))}
-                </div>
-              ) : editingValue !== "" ? (
-                <div className="flex h-10 items-center justify-center">
-                  {editingValue}
-                </div>
+            <div className={`relative mx-3 flex h-12 items-center justify-center overflow-hidden rounded-xl border bg-muted/30 px-3 pr-11 text-xl font-bold tabular-nums${pickedRange != null ? " pad-value-preview" : ""}`}>
+              {editingValue !== "" ? (
+                editingValue
               ) : (
-                <div className="flex h-10 items-center justify-center">
-                  <span className="text-muted-foreground/40 text-sm">— trống —</span>
-                </div>
+                <span className="text-sm font-medium text-muted-foreground/40">— trống —</span>
+              )}
+              {rangeValues.length > 0 ? (
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={useRangeKeys}
+                  className="pad-mode-flip"
+                  onClick={() => {
+                    setUseRangeKeys(on => {
+                      const next = !on;
+                      if (next) typingRef.current = false;
+                      return next;
+                    });
+                  }}
+                  aria-label={useRangeKeys ? "Dùng dãy số" : "Bàn phím 0–9"}
+                >
+                  <span className="pad-mode-flip__well">
+                    <span className="pad-mode-flip__pebble" />
+                    <span className="pad-mode-flip__mark pad-mode-flip__mark--range">
+                      <GripHorizontal className="h-3.5 w-3.5" strokeWidth={2.2} />
+                    </span>
+                    <span className="pad-mode-flip__mark pad-mode-flip__mark--keys">
+                      <Hash className="h-3.5 w-3.5" strokeWidth={2.2} />
+                    </span>
+                  </span>
+                </button>
+              ) : null}
+            </div>
+
+            {extraRange.length > 0 ? (
+              <div className="grid grid-cols-3 gap-1.5 px-3 pt-3">
+                {extraRange.map(val => (
+                  <button
+                    key={`extra-${val}`}
+                    type="button"
+                    onClick={() => pickRange(val)}
+                    className={`${RANGE_KEY_CLASS}${pickedRange === val ? " pad-range-key--picked" : ""}`}
+                    style={{ minHeight: "2.5rem" }}
+                  >
+                    {val}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="grid grid-cols-3 gap-1.5 p-3 pb-2">
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d, i) => {
+                const rv = rangeAt(i);
+                if (rv != null) {
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => pickRange(rv)}
+                      className={`${RANGE_KEY_CLASS}${pickedRange === rv ? " pad-range-key--picked" : ""}`}
+                      style={{ minHeight: "2.5rem" }}
+                    >
+                      {rv}
+                    </button>
+                  );
+                }
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => handleDigit(d)}
+                    className={PAD_KEY_CLASS}
+                    style={{ minHeight: "2.5rem" }}
+                  >
+                    {d}
+                  </button>
+                );
+              })}
+              {rangeAt(9) != null ? (
+                <button
+                  type="button"
+                  onClick={() => pickRange(rangeAt(9)!)}
+                  className={`${RANGE_KEY_CLASS}${pickedRange === rangeAt(9) ? " pad-range-key--picked" : ""}`}
+                  style={{ minHeight: "2.5rem" }}
+                >
+                  {rangeAt(9)}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className={PAD_MUTED_CLASS}
+                  style={{ minHeight: "2.5rem" }}
+                >
+                  C
+                </button>
+              )}
+              {rangeAt(10) != null ? (
+                <button
+                  type="button"
+                  onClick={() => pickRange(rangeAt(10)!)}
+                  className={`${RANGE_KEY_CLASS}${pickedRange === rangeAt(10) ? " pad-range-key--picked" : ""}`}
+                  style={{ minHeight: "2.5rem" }}
+                >
+                  {rangeAt(10)}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleDigit("0")}
+                  className={PAD_KEY_CLASS}
+                  style={{ minHeight: "2.5rem" }}
+                >
+                  0
+                </button>
+              )}
+              {rangeAt(11) != null ? (
+                <button
+                  type="button"
+                  onClick={() => pickRange(rangeAt(11)!)}
+                  className={`${RANGE_KEY_CLASS}${pickedRange === rangeAt(11) ? " pad-range-key--picked" : ""}`}
+                  style={{ minHeight: "2.5rem" }}
+                >
+                  {rangeAt(11)}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleBackspace}
+                  className={PAD_MUTED_CLASS}
+                  style={{ minHeight: "2.5rem" }}
+                  aria-label="Xóa"
+                >
+                  <Delete className="mx-auto h-4 w-4" />
+                </button>
               )}
             </div>
 
-            <div className="grid grid-cols-3 gap-1.5 p-3 pb-2">
-              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map(d => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => handleDigit(d)}
-                  className="keypad-key rounded-xl border border-border/60 bg-card py-2 text-base font-medium shadow-sm active:scale-95"
-                  style={{ minHeight: "2.5rem" }}
-                >
-                  {d}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={handleClear}
-                className="keypad-key rounded-xl border border-border/60 bg-muted/40 py-2 text-xs font-medium text-muted-foreground"
-                style={{ minHeight: "2.5rem" }}
-              >
-                C
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDigit("0")}
-                className="keypad-key rounded-xl border border-border/60 bg-card py-2 text-base font-medium shadow-sm active:scale-95"
-                style={{ minHeight: "2.5rem" }}
-              >
-                0
-              </button>
-              <button
-                type="button"
-                onClick={handleBackspace}
-                className="keypad-key rounded-xl border border-border/60 bg-muted/40 py-2 text-muted-foreground active:scale-95"
-                style={{ minHeight: "2.5rem" }}
-                aria-label="Xóa"
-              >
-                <Delete className="mx-auto h-4 w-4" />
-              </button>
-            </div>
-
             <div className="grid grid-cols-3 gap-1.5 px-3 pb-3">
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="rounded-xl border border-destructive/30 bg-destructive/5 py-2.5 text-xs font-medium text-destructive hover:bg-destructive/10"
-              >
-                Xóa
-              </button>
-              <button
-                type="button"
-                onClick={closeNumpad}
-                className="rounded-xl border border-border bg-background py-2.5 text-xs font-medium hover:bg-muted"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                className="inline-flex items-center justify-center gap-1 rounded-xl bg-primary py-2.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
-              >
-                <Check className="h-3.5 w-3.5" />
-                Lưu
-              </button>
+              {rangeAt(12) != null ? (
+                <button
+                  type="button"
+                  onClick={() => pickRange(rangeAt(12)!)}
+                  className={`${RANGE_KEY_CLASS}${pickedRange === rangeAt(12) ? " pad-range-key--picked" : ""}`}
+                >
+                  {rangeAt(12)}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  className="rounded-xl border border-destructive/30 bg-destructive/5 py-2.5 text-xs font-medium text-destructive hover:bg-destructive/10"
+                >
+                  Xóa
+                </button>
+              )}
+              {rangeAt(13) != null ? (
+                <button
+                  type="button"
+                  onClick={() => pickRange(rangeAt(13)!)}
+                  className={`${RANGE_KEY_CLASS}${pickedRange === rangeAt(13) ? " pad-range-key--picked" : ""}`}
+                >
+                  {rangeAt(13)}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={closeNumpad}
+                  className="rounded-xl border border-border bg-background py-2.5 text-xs font-medium hover:bg-muted"
+                >
+                  Hủy
+                </button>
+              )}
+              {rangeAt(14) != null ? (
+                <button
+                  type="button"
+                  onClick={() => pickRange(rangeAt(14)!)}
+                  className={`${RANGE_KEY_CLASS}${pickedRange === rangeAt(14) ? " pad-range-key--picked" : ""}`}
+                >
+                  {rangeAt(14)}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleSave()}
+                  className="inline-flex items-center justify-center gap-1 rounded-xl bg-primary py-2.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  Lưu
+                </button>
+              )}
             </div>
           </div>
         </>
@@ -712,6 +907,17 @@ export default function MonthlyOrder() {
             <DialogTitle className="font-display">Dãy số</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <label className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5">
+              <span className="text-sm font-medium">Dãy nhanh</span>
+              <Switch
+                checked={rangeEnabled}
+                onCheckedChange={checked => {
+                  setRangeEnabled(checked);
+                  setUseRangeKeys(checked);
+                }}
+                aria-label="Bật dãy số trên bàn phím"
+              />
+            </label>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs font-medium mb-1">Từ</label>

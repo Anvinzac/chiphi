@@ -1,9 +1,15 @@
 import { useMemo } from "react";
-import { eachDayOfInterval, format, getDay, isSameDay } from "date-fns";
+import { eachDayOfInterval, endOfWeek, format, getDay, isSameDay, startOfWeek } from "date-fns";
 import { vi } from "date-fns/locale";
 import type { MonthlyOrderLine } from "@/lib/mockMonthlyOrderGrid";
 
-export type MonthlyOrderCol = 2 | 3 | 4;
+export type MonthlyOrderCol = 2 | 3 | 4 | 7;
+
+const WEEKDAYS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+
+function cellDensity(columns: MonthlyOrderCol) {
+  return `order-month-cell-${columns}`;
+}
 
 interface MonthlyOrderGridProps {
   rangeStart: Date;
@@ -26,17 +32,27 @@ export default function MonthlyOrderGrid({
   todayStr,
   onSelectDay,
 }: MonthlyOrderGridProps) {
-  const days = useMemo(
-    () => eachDayOfInterval({ start: rangeStart, end: rangeEnd }),
-    [rangeStart, rangeEnd],
-  );
+  const weekAligned = columns === 7;
+  const rangeStartKey = format(rangeStart, "yyyy-MM-dd");
+  const rangeEndKey = format(rangeEnd, "yyyy-MM-dd");
+  const density = cellDensity(columns);
+
+  const days = useMemo(() => {
+    if (weekAligned) {
+      return eachDayOfInterval({
+        start: startOfWeek(rangeStart, { weekStartsOn: 1 }),
+        end: endOfWeek(rangeEnd, { weekStartsOn: 1 }),
+      });
+    }
+    return eachDayOfInterval({ start: rangeStart, end: rangeEnd });
+  }, [rangeStart, rangeEnd, weekAligned]);
 
   const rowCount = Math.max(1, Math.ceil(days.length / columns));
-  const padCount = rowCount * columns - days.length;
+  const padCount = weekAligned ? 0 : rowCount * columns - days.length;
 
-  return (
+  const grid = (
     <div
-      key={`${columns}-${format(rangeStart, "yyyy-MM-dd")}-${format(rangeEnd, "yyyy-MM-dd")}`}
+      key={`${columns}-${rangeStartKey}-${rangeEndKey}`}
       className="order-month-grid"
       style={{
         gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
@@ -46,7 +62,8 @@ export default function MonthlyOrderGrid({
     >
       {days.map((day, idx) => {
         const dateStr = format(day, "yyyy-MM-dd");
-        const lines = itemsByDate.get(dateStr) ?? [];
+        const outOfRange = weekAligned && (dateStr < rangeStartKey || dateStr > rangeEndKey);
+        const lines = outOfRange ? [] : itemsByDate.get(dateStr) ?? [];
         const weekend = getDay(day) === 0 || getDay(day) === 6;
         const isFuture = dateStr > todayStr;
         const isToday = dateStr === todayStr;
@@ -74,30 +91,23 @@ export default function MonthlyOrderGrid({
           </>
         );
 
-        if (isFuture) {
-          return (
-            <div
-              key={dateStr}
-              className={`order-month-cell order-month-cell-future ${weekend ? "order-month-cell-weekend" : ""} ${columns === 2 ? "order-month-cell-2" : columns === 3 ? "order-month-cell-3" : "order-month-cell-4"}`}
-              aria-label={`${format(day, "PPP", { locale: vi })} · chưa tới`}
-            >
-              {inner}
-            </div>
-          );
-        }
+        const className = [
+          "order-month-cell",
+          density,
+          weekend && "order-month-cell-weekend",
+          isToday && !outOfRange && "order-month-cell-today",
+          isFuture && "order-month-cell-future",
+          outOfRange && "order-month-cell-outofrange",
+        ]
+          .filter(Boolean)
+          .join(" ");
 
-        if (!onSelectDay) {
+        if (outOfRange || isFuture || !onSelectDay) {
           return (
             <div
               key={dateStr}
-              className={[
-                "order-month-cell",
-                weekend && "order-month-cell-weekend",
-                isToday && "order-month-cell-today",
-                columns === 2 ? "order-month-cell-2" : columns === 3 ? "order-month-cell-3" : "order-month-cell-4",
-              ]
-                .filter(Boolean)
-                .join(" ")}
+              className={className}
+              aria-label={`${format(day, "PPP", { locale: vi })}${outOfRange ? " · ngoài khoảng" : isFuture ? " · chưa tới" : ""}`}
             >
               {inner}
             </div>
@@ -113,26 +123,30 @@ export default function MonthlyOrderGrid({
               onSelectDay({ dateStr, rect, row, col, columns });
             }}
             aria-label={`${format(day, "PPP", { locale: vi })} · ${hasLines ? lines.map(lineLabel).join(", ") : "không có món"}`}
-            className={[
-              "order-month-cell",
-              weekend && "order-month-cell-weekend",
-              isToday && "order-month-cell-today",
-              columns === 2 ? "order-month-cell-2" : columns === 3 ? "order-month-cell-3" : "order-month-cell-4",
-            ]
-              .filter(Boolean)
-              .join(" ")}
+            className={className}
           >
             {inner}
           </button>
         );
       })}
       {Array.from({ length: padCount }, (_, i) => (
-        <div
-          key={`pad-${i}`}
-          className={`order-month-cell order-month-cell-pad ${columns === 2 ? "order-month-cell-2" : columns === 3 ? "order-month-cell-3" : "order-month-cell-4"}`}
-          aria-hidden
-        />
+        <div key={`pad-${i}`} className={`order-month-cell order-month-cell-pad ${density}`} aria-hidden />
       ))}
+    </div>
+  );
+
+  if (!weekAligned) return grid;
+
+  return (
+    <div className="order-month-week-wrap">
+      <div className="order-month-weekdays" aria-hidden>
+        {WEEKDAYS.map((d, i) => (
+          <div key={d} className={`order-month-weekday ${i >= 5 ? "order-month-weekday-weekend" : ""}`}>
+            {d}
+          </div>
+        ))}
+      </div>
+      {grid}
     </div>
   );
 }

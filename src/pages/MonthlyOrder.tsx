@@ -41,8 +41,24 @@ function clampRange(start: Date, end: Date): { start: Date; end: Date } {
   return { start, end };
 }
 
-/** 15 pad keys: 1 extra before + 13 in-range (12 apart) + 1 extra after. */
+/** 5×3 pad: at most 13 in-range (12 apart) so extras can sit around them. */
 const RANGE_GAP = 12;
+const RANGE_PAD_SLOTS = 15;
+
+type RangePadKey = { kind: "extra" | "core"; value: number };
+
+/** Always 15 keys, in-range block centered (balanced extras before/after). */
+function buildRangePadKeys(min: number, max: number): RangePadKey[] {
+  const coreCount = max - min + 1;
+  const extra = Math.max(0, RANGE_PAD_SLOTS - coreCount);
+  const before = Math.floor(extra / 2);
+  const after = extra - before;
+  const keys: RangePadKey[] = [];
+  for (let n = min - before; n < min; n++) keys.push({ kind: "extra", value: n });
+  for (let n = min; n <= max; n++) keys.push({ kind: "core", value: n });
+  for (let n = max + 1; n <= max + after; n++) keys.push({ kind: "extra", value: n });
+  return keys;
+}
 
 function parseQtyBound(raw: string): number | null {
   const n = Number.parseInt(raw, 10);
@@ -111,7 +127,7 @@ function RangeExtraKey({
       style={{ minHeight: "2.5rem" }}
       aria-label={String(value)}
     >
-      <Plus className="h-4 w-4" strokeWidth={2.2} />
+      <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
       <span className="pad-range-ghost__val">{value}</span>
     </button>
   );
@@ -324,13 +340,8 @@ export default function MonthlyOrder() {
   }, [rangeBounds]);
   const rangePadKeys = useMemo(() => {
     if (!rangeBounds) return [];
-    const keys: { kind: "extra" | "core"; value: number }[] = [
-      { kind: "extra", value: rangeBounds.min - 1 },
-    ];
-    for (const value of rangeCore) keys.push({ kind: "core", value });
-    keys.push({ kind: "extra", value: rangeBounds.max + 1 });
-    return keys;
-  }, [rangeBounds, rangeCore]);
+    return buildRangePadKeys(rangeBounds.min, rangeBounds.max);
+  }, [rangeBounds]);
 
   const commitQtyRange = (which: "min" | "max") => {
     const min = parseQtyBound(rangeMin);
@@ -847,17 +858,17 @@ export default function MonthlyOrder() {
 
             {showRangeKeys ? (
               <div className="grid grid-cols-3 gap-1.5 p-3">
-                {rangePadKeys.map(key =>
+                {rangePadKeys.map((key, i) =>
                   key.kind === "extra" ? (
                     <RangeExtraKey
-                      key={`extra-${key.value}`}
+                      key={`pad-${i}-${key.value}`}
                       value={key.value}
                       picked={pickedRange === key.value}
                       onPick={pickRange}
                     />
                   ) : (
                     <button
-                      key={key.value}
+                      key={`pad-${i}-${key.value}`}
                       type="button"
                       onClick={() => pickRange(key.value)}
                       className={`${RANGE_KEY_CLASS}${pickedRange === key.value ? " pad-range-key--picked" : ""}`}
@@ -1033,7 +1044,7 @@ export default function MonthlyOrder() {
                 />
               </div>
             </div>
-            <p className="text-[11px] text-muted-foreground">Cách nhau tối đa 12 — 13 ô trên bàn phím, 1 trước và 1 sau cho số ngoài dãy.</p>
+            <p className="text-[11px] text-muted-foreground">Cách nhau tối đa 12. Luôn 15 ô — số trong dãy nằm giữa, ô ngoài dãy cân hai bên.</p>
           </div>
           <div className="mt-4 flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setRangeEditorOpen(false)} className="flex-1">

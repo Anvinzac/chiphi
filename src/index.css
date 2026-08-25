@@ -639,9 +639,9 @@
   }
 
   .pad-range-ghost {
-    border: 1.5px dashed #b8cddc;
+    border: 1px dashed hsl(var(--border));
     background: transparent;
-    color: #7a929c;
+    color: hsl(var(--muted-foreground) / 0.34);
     -webkit-tap-highlight-color: transparent;
     transition: transform 0.28s cubic-bezier(0.22, 1.35, 0.32, 1), color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
   }
@@ -651,18 +651,18 @@
     right: 0.3rem;
     bottom: 0.18rem;
     font-size: 0.62rem;
-    font-weight: 700;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
     line-height: 1;
-    color: #3a4f58;
-    opacity: 0.28;
+    color: hsl(var(--muted-foreground));
+    opacity: 0.32;
   }
 
   .pad-range-ghost:hover,
   .pad-range-ghost:focus-visible {
-    color: #3a4f58;
-    border-color: #9bb3c4;
-    background: rgba(220, 232, 240, 0.45);
+    color: hsl(var(--muted-foreground) / 0.62);
+    border-color: hsl(var(--border));
+    background: hsl(var(--muted) / 0.4);
     outline: none;
   }
 

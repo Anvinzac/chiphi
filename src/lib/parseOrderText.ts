@@ -1,11 +1,16 @@
 import { foldCategoryName } from "./categoryVisuals";
 
+export type ParsedOrderMode = "measure" | "money";
+
 export interface ParsedOrderLine {
   raw: string;
   quantity: string;
   unit: string;
   name: string;
   normalizedName: string;
+  mode: ParsedOrderMode;
+  /** Thousands of ₫ when mode is money (e.g. "10" from "10k"). */
+  moneyThousands: string;
   matched?: {
     id: string;
     name: string;
@@ -18,6 +23,7 @@ const KNOWN_UNITS = [
   "kg",
   "g",
   "lạng",
+  "lang",
   "gam",
   "tấn",
   "yến",
@@ -44,6 +50,16 @@ const KNOWN_UNITS = [
   "hũ",
 ];
 
+/** Longest first so "gói" wins over "g", "bịch" over shorter stems. */
+const UNITS_BY_LENGTH = [...KNOWN_UNITS].sort((a, b) => b.length - a.length);
+
+/** `k` is last so it never steals `kg`. */
+const MONEY_SUFFIXES = ["nghìn", "nghin", "ngàn", "ngan", "k"];
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function normalizeUnit(unit: string): string {
   const folded = foldCategoryName(unit);
   for (const u of KNOWN_UNITS) {
@@ -52,85 +68,109 @@ function normalizeUnit(unit: string): string {
   return unit;
 }
 
-function parseLine(raw: string): { quantity: string; unit: string; name: string } | null {
+/** Strip a leading token when the next char is not a letter (so `k` ≠ `kg`). */
+function stripPrefixToken(rest: string, token: string): string | null {
+  const re = new RegExp(`^${escapeRegex(token)}(?![a-zA-ZÀ-ỹ])`, "i");
+  if (!re.test(rest)) return null;
+  return rest.slice(token.length).trim();
+}
+
+export function parseOrderLine(raw: string): {
+  quantity: string;
+  unit: string;
+  name: string;
+  mode: ParsedOrderMode;
+  moneyThousands: string;
+} | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
-  // Remove leading bullet or dash
   const cleaned = trimmed.replace(/^[-•*]\s*/, "");
-  // Try to match quantity and unit at start
-  // Patterns:
-  // "2kg cà chua" -> qty 2, unit kg, name cà chua
-  // "2 kg cà chua" -> qty 2, unit kg, name cà chua
-  // "1.5kg rau muống" -> qty 1.5, unit kg, name rau muống
-  // "500g hành lá" -> qty 500, unit g, name hành lá
-  // "3 gói đậu hũ" -> qty 3, unit gói, name đậu hũ
-  // "cà chua 2kg" -> qty 2, unit kg, name cà chua (reverse)
-  // For now, handle the common case: qty at start
-  const qtyUnitNameRegex = /^(\d+(?:[.,]\d+)?)\s*([a-zA-ZÀ-ỹ]+)?\s+(.+)$/;
-  const match = cleaned.match(qtyUnitNameRegex);
-  if (match) {
-    const qtyRaw = match[1].replace(",", ".");
-    const unitRaw = match[2] || "";
-    const nameRaw = match[3].trim();
-    // Check if unitRaw is actually part of name (not a known unit)
-    const unitFolded = foldCategoryName(unitRaw);
-    const isKnownUnit = unitRaw && KNOWN_UNITS.some(u => foldCategoryName(u) === unitFolded);
-    if (unitRaw && isKnownUnit) {
-      return {
-        quantity: qtyRaw,
-        unit: normalizeUnit(unitRaw),
-        name: nameRaw,
-      };
+
+  const leading = cleaned.match(/^(\d+(?:[.,]\d+)?)(.*)$/);
+  if (leading) {
+    const qtyRaw = leading[1].replace(",", ".");
+    const rest = leading[2].trim();
+    if (!rest) {
+      return { quantity: qtyRaw, unit: "", name: "", mode: "measure", moneyThousands: "" };
     }
-    // If unitRaw is not a known unit, treat it as part of name, and quantity is qtyRaw, unit is default, name is unitRaw + " " + nameRaw
-    if (unitRaw && !isKnownUnit) {
-      return {
-        quantity: qtyRaw,
-        unit: "",
-        name: `${unitRaw} ${nameRaw}`.trim(),
-      };
+
+    for (const suf of MONEY_SUFFIXES) {
+      const name = stripPrefixToken(rest, suf);
+      if (name != null) {
+        return {
+          quantity: "1",
+          unit: "",
+          name,
+          mode: "money",
+          moneyThousands: qtyRaw,
+        };
+      }
     }
-    // No unit
+
+    for (const unit of UNITS_BY_LENGTH) {
+      const name = stripPrefixToken(rest, unit);
+      if (name != null) {
+        return {
+          quantity: qtyRaw,
+          unit: normalizeUnit(unit),
+          name,
+          mode: "measure",
+          moneyThousands: "",
+        };
+      }
+    }
+
     return {
       quantity: qtyRaw,
       unit: "",
-      name: nameRaw,
+      name: rest,
+      mode: "measure",
+      moneyThousands: "",
     };
   }
-  // No quantity at start, try quantity at end: "cà chua 2kg"
-  const nameQtyUnitRegex = /^(.+?)\s+(\d+(?:[.,]\d+)?)\s*([a-zA-ZÀ-ỹ]+)?\s*$/;
-  const match2 = cleaned.match(nameQtyUnitRegex);
-  if (match2) {
-    const nameRaw = match2[1].trim();
-    const qtyRaw = match2[2].replace(",", ".");
-    const unitRaw = match2[3] || "";
-    const unitFolded = foldCategoryName(unitRaw);
-    const isKnownUnit = unitRaw && KNOWN_UNITS.some(u => foldCategoryName(u) === unitFolded);
-    if (unitRaw && isKnownUnit) {
-      return {
-        quantity: qtyRaw,
-        unit: normalizeUnit(unitRaw),
-        name: nameRaw,
-      };
-    }
-    if (unitRaw && !isKnownUnit) {
-      return {
-        quantity: qtyRaw,
-        unit: "",
-        name: `${nameRaw} ${unitRaw}`.trim(),
-      };
+
+  const trailing = cleaned.match(/^(.+?)\s+(\d+(?:[.,]\d+)?)([a-zA-ZÀ-ỹ]+)?\s*$/);
+  if (trailing) {
+    const nameRaw = trailing[1].trim();
+    const qtyRaw = trailing[2].replace(",", ".");
+    const token = trailing[3] || "";
+    if (token) {
+      const folded = foldCategoryName(token);
+      if (MONEY_SUFFIXES.some(s => foldCategoryName(s) === folded)) {
+        return {
+          quantity: "1",
+          unit: "",
+          name: nameRaw,
+          mode: "money",
+          moneyThousands: qtyRaw,
+        };
+      }
+      const known = KNOWN_UNITS.find(u => foldCategoryName(u) === folded);
+      if (known) {
+        return {
+          quantity: qtyRaw,
+          unit: normalizeUnit(known),
+          name: nameRaw,
+          mode: "measure",
+          moneyThousands: "",
+        };
+      }
     }
     return {
       quantity: qtyRaw,
       unit: "",
-      name: nameRaw,
+      name: token ? `${nameRaw} ${token}`.trim() : nameRaw,
+      mode: "measure",
+      moneyThousands: "",
     };
   }
-  // No quantity found, treat whole line as name with quantity 1
+
   return {
     quantity: "1",
     unit: "",
     name: cleaned,
+    mode: "measure",
+    moneyThousands: "",
   };
 }
 
@@ -151,35 +191,35 @@ export function parseOrderText(
 
   const result: ParsedOrderLine[] = [];
   for (const raw of lines) {
-    const parsed = parseLine(raw);
-    if (!parsed) continue;
+    const parsed = parseOrderLine(raw);
+    if (!parsed || !parsed.name) continue;
     const normalized = foldCategoryName(parsed.name);
     const matched = catalogMap.get(normalized) || null;
-    // Also try to find partial match: if catalog name is substring of parsed name or vice versa
-    let finalMatched = matched;
-    if (!finalMatched) {
-      for (const [key, ing] of catalogMap) {
-        if (normalized.includes(key) || key.includes(normalized)) {
-          finalMatched = ing;
-          break;
-        }
-      }
-    }
     result.push({
       raw,
       quantity: parsed.quantity,
-      unit: parsed.unit || finalMatched?.unit || "kg",
+      unit: parsed.unit || matched?.unit || "kg",
       name: parsed.name,
       normalizedName: normalized,
-      matched: finalMatched
+      mode: parsed.mode,
+      moneyThousands: parsed.moneyThousands,
+      matched: matched
         ? {
-            id: finalMatched.id,
-            name: finalMatched.name,
-            unit: finalMatched.unit,
-            reference_price: finalMatched.reference_price,
+            id: matched.id,
+            name: matched.name,
+            unit: matched.unit,
+            reference_price: matched.reference_price,
           }
         : null,
     });
   }
   return result;
+}
+
+/** `10k` for money lines; `3 bịch` for measure. */
+export function formatParsedAmount(
+  line: Pick<ParsedOrderLine, "mode" | "quantity" | "unit" | "moneyThousands">,
+): string {
+  if (line.mode === "money") return `${line.moneyThousands}k`;
+  return [line.quantity, line.unit].filter(Boolean).join(" ");
 }

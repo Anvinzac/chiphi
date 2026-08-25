@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Check, Copy, QrCode, Store } from "lucide-react";
+import { ArrowLeft, Check, ClipboardList, Copy, QrCode, Store } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +19,7 @@ import {
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import MoneyLabel from "@/components/daily/MoneyLabel";
 import { useHoldToConfirm } from "@/hooks/useHoldToConfirm";
 import {
@@ -35,6 +36,8 @@ import {
 } from "@/lib/formatOrderQty";
 import { customerNameFromUser, formatOrderDay, orderIdentityLine } from "@/lib/orderIdentity";
 import BulkIngredientPager from "@/components/orders/BulkIngredientPager";
+import { foldCategoryName } from "@/lib/categoryVisuals";
+import { formatParsedAmount, parseOrderText } from "@/lib/parseOrderText";
 
 type OrderItemDraft = {
   id?: string;
@@ -261,6 +264,9 @@ export default function OrderDetail() {
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
   const [bulkAmounts, setBulkAmounts] = useState<Map<string, string>>(new Map());
   const [bulkStep, setBulkStep] = useState<"choose" | "amounts">("choose");
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+  const [pasteApplying, setPasteApplying] = useState(false);
   /** Real DB id once the first ingredient was saved; null while UI-only draft. */
   const [orderId, setOrderId] = useState<string | null>(isNewSession ? null : routeId || null);
   const orderIdRef = useRef<string | null>(orderId);
@@ -427,6 +433,12 @@ export default function OrderDetail() {
     items.forEach((row, i) => map.set(row.name.trim().toLowerCase(), i));
     return map;
   }, [items]);
+
+  const parsedPaste = useMemo(
+    () => parseOrderText(pasteText, catalog),
+    [pasteText, catalog],
+  );
+  const pasteNewCount = parsedPaste.filter(l => !l.matched).length;
 
   const activeIngredients = useMemo(() => {
     if (!lockedCatId) return [];
@@ -702,6 +714,117 @@ export default function OrderDetail() {
     },
     [ensurePersisted, abandonEmptyOrder, loadCatalog],
   );
+
+  const applyPastedLines = async () => {
+    if (!user || parsedPaste.length === 0) return;
+    if (!lockedCatId) {
+      toast.error("Chưa có danh mục để thêm nguyên liệu mới");
+      return;
+    }
+    setPasteApplying(true);
+    try {
+      type PasteIng = {
+        id: string;
+        name: string;
+        unit: string;
+        reference_price: number | null;
+      };
+      const byFold = new Map<string, PasteIng>();
+      for (const ing of catalog) {
+        const key = foldCategoryName(ing.name);
+        if (!byFold.has(key)) {
+          byFold.set(key, {
+            id: ing.id,
+            name: ing.name,
+            unit: ing.unit,
+            reference_price: ing.reference_price,
+          });
+        }
+      }
+
+      let createdCount = 0;
+      const pending: { fold: string; name: string; unit: string }[] = [];
+      const seenNew = new Set<string>();
+      for (const line of parsedPaste) {
+        if (line.matched) {
+          byFold.set(foldCategoryName(line.name), line.matched);
+          continue;
+        }
+        const fold = foldCategoryName(line.name);
+        if (byFold.has(fold) || seenNew.has(fold)) continue;
+        seenNew.add(fold);
+        pending.push({
+          fold,
+          name: line.name,
+          unit: line.mode === "measure" && line.unit ? line.unit : "kg",
+        });
+      }
+      if (pending.length) {
+        const { data, error } = await supabase
+          .from("order_ingredients")
+          .insert(
+            pending.map(p => ({
+              user_id: user.id,
+              category_id: lockedCatId,
+              name: p.name,
+              unit: p.unit,
+            })),
+          )
+          .select("id, name, unit, reference_price");
+        if (error) throw error;
+        createdCount = data?.length ?? 0;
+        for (const row of data || []) {
+          byFold.set(foldCategoryName(row.name), row as PasteIng);
+        }
+      }
+
+      const next = [...items];
+      const indexByFold = new Map<string, number>();
+      next.forEach((row, i) => {
+        const key = foldCategoryName(row.name);
+        if (key && !indexByFold.has(key)) indexByFold.set(key, i);
+      });
+
+      for (const line of parsedPaste) {
+        const fold = foldCategoryName(line.name);
+        const ing = byFold.get(fold);
+        const existingIdx = indexByFold.get(fold);
+        const draft: OrderItemDraft = {
+          name: ing?.name ?? line.name,
+          quantity: line.mode === "measure" ? line.quantity : "",
+          unit: line.mode === "measure" ? (line.unit || ing?.unit || "kg") : (ing?.unit || "kg"),
+          sort_order: existingIdx != null ? next[existingIdx].sort_order : next.length,
+          catalog_id: ing?.id,
+          reference_price: ing?.reference_price ?? null,
+          order_mode: line.mode,
+          money_amount: line.mode === "money" ? line.moneyThousands : "",
+        };
+        if (existingIdx != null) {
+          next[existingIdx] = { ...next[existingIdx], ...draft };
+        } else {
+          indexByFold.set(fold, next.length);
+          next.push(draft);
+        }
+      }
+
+      setItems(next);
+      syncItemsSideEffects(next);
+      if (createdCount) await loadCatalog();
+      setPasteText("");
+      setPasteOpen(false);
+      toast.success(`Đã thêm ${parsedPaste.length} dòng`, {
+        description: createdCount
+          ? `${createdCount} nguyên liệu mới vào danh mục`
+          : undefined,
+      });
+    } catch (e) {
+      toast.error("Không dán được đơn", {
+        description: e instanceof Error ? e.message : "Thử lại sau.",
+      });
+    } finally {
+      setPasteApplying(false);
+    }
+  };
 
   const pickIngredientForExpanded = (ing: CatalogIngredient) => {
     const key = ing.name.trim().toLowerCase();
@@ -1120,7 +1243,15 @@ export default function OrderDetail() {
           </div>
         ) : (
           <>
-            <div className="mb-2 flex justify-end">
+            <div className="mb-2 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPasteOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/15"
+              >
+                <ClipboardList className="h-3.5 w-3.5" />
+                Dán tin
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -1400,6 +1531,86 @@ export default function OrderDetail() {
               </Button>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={pasteOpen}
+        onOpenChange={open => {
+          setPasteOpen(open);
+          if (!open) setPasteApplying(false);
+        }}
+      >
+        <DialogContent className="flex max-h-[90vh] max-w-[92vw] flex-col overflow-hidden rounded-xl sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-display">Dán tin nhắn</DialogTitle>
+          </DialogHeader>
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+            <p className="shrink-0 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">10k</span> là 10.000₫.
+              {" "}
+              <span className="font-medium text-foreground">10kg</span> vẫn là khối lượng. Tên mới sẽ được thêm vào danh mục.
+            </p>
+            <Textarea
+              value={pasteText}
+              onChange={e => setPasteText(e.target.value)}
+              placeholder={"10kg cà rốt\n10k lá quế\n3 bịch bào ngư xám"}
+              className="h-28 shrink-0 resize-y rounded-xl text-sm"
+              autoFocus
+            />
+            {parsedPaste.length > 0 && (
+              <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-border/60">
+                <div className="grid grid-cols-[auto_1fr_auto] gap-px bg-border/60">
+                  <div className="bg-muted/40 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    SL
+                  </div>
+                  <div className="bg-muted/40 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Tên
+                  </div>
+                  <div className="bg-muted/40 px-2 py-1 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Khớp
+                  </div>
+                  {parsedPaste.map((line, idx) => (
+                    <div key={`${line.normalizedName}-${idx}`} className="contents">
+                      <div
+                        className={`bg-card px-2 py-1.5 text-center text-xs tabular-nums ${
+                          line.matched ? "" : "bg-amber-50 text-amber-800"
+                        }`}
+                      >
+                        {formatParsedAmount(line)}
+                      </div>
+                      <div
+                        className={`bg-card px-2 py-1.5 text-xs ${
+                          line.matched ? "text-foreground" : "bg-amber-50 font-medium text-amber-800"
+                        }`}
+                      >
+                        {line.matched?.name ?? line.name}
+                      </div>
+                      <div
+                        className={`bg-card px-2 py-1.5 text-right text-[10px] ${
+                          line.matched ? "text-muted-foreground" : "bg-amber-50 text-amber-700"
+                        }`}
+                      >
+                        {line.matched ? "có sẵn" : "mới"}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <Button
+              type="button"
+              className="w-full shrink-0"
+              disabled={parsedPaste.length === 0 || pasteApplying}
+              onClick={() => void applyPastedLines()}
+            >
+              {pasteApplying
+                ? "Đang thêm…"
+                : pasteNewCount
+                  ? `Thêm ${parsedPaste.length} dòng · ${pasteNewCount} mới`
+                  : `Thêm ${parsedPaste.length} dòng`}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -35,6 +35,7 @@ import {
   VENDOR_PRICE_STEP,
   effectiveVendorUnitPrice,
 } from "@/lib/mockVendorUnitPrice";
+import { formatParsedAmount, parseOrderText } from "@/lib/parseOrderText";
 
 const VENDOR_ORDER_SHOP = "Quán Chay Lá";
 
@@ -1081,8 +1082,23 @@ export default function SupplierOrder() {
   const [expSinglePrice, setExpSinglePrice] = useState("");
   const [expBulkSelected, setExpBulkSelected] = useState<Set<string>>(new Set());
   const [expPasteText, setExpPasteText] = useState("");
-  const [expParsed, setExpParsed] = useState<import("@/lib/parseOrderText").ParsedOrderLine[]>([]);
   const [expCatalog, setExpCatalog] = useState<CatalogIngredient[]>([]);
+  const expParsed = useMemo(
+    () => parseOrderText(expPasteText, expCatalog),
+    [expPasteText, expCatalog],
+  );
+
+  const loadExpCatalog = async () => {
+    try {
+      const { data } = await supabase
+        .from("order_ingredients")
+        .select("id, name, unit, reference_price")
+        .limit(500);
+      if (data) setExpCatalog(data as CatalogIngredient[]);
+    } catch {
+      /* vendor anon often cannot read catalog */
+    }
+  };
   const itemsRef = useRef<SharedItem[]>([]);
   const saveTimersRef = useRef(new Map<string, number>());
   const extrasTimerRef = useRef<number | null>(null);
@@ -1743,15 +1759,7 @@ export default function SupplierOrder() {
               onClick={() => {
                 setExpMode("bulk");
                 setExpOpen(true);
-                // Load catalog for bulk
-                void (async () => {
-                  try {
-                    const { data } = await supabase.from("order_ingredients").select("id, name, unit, reference_price").limit(100);
-                    if (data) setExpCatalog(data as any);
-                  } catch {
-                    /* ignore */
-                  }
-                })();
+                void loadExpCatalog();
               }}
               className="rounded-lg border border-border/60 bg-card px-2 py-2 text-center text-xs hover:border-primary/30"
             >
@@ -1763,7 +1771,7 @@ export default function SupplierOrder() {
                 setExpMode("paste");
                 setExpOpen(true);
                 setExpPasteText("");
-                setExpParsed([]);
+                void loadExpCatalog();
               }}
               className="rounded-lg border border-border/60 bg-card px-2 py-2 text-center text-xs hover:border-primary/30"
             >
@@ -1897,7 +1905,10 @@ export default function SupplierOrder() {
               <button
                 key={m}
                 type="button"
-                onClick={() => setExpMode(m)}
+                onClick={() => {
+                  setExpMode(m);
+                  if (m === "bulk" || m === "paste") void loadExpCatalog();
+                }}
                 className={`flex-1 rounded-full px-2 py-1.5 text-xs font-medium ${expMode === m ? "bg-card shadow text-foreground" : "text-muted-foreground"}`}
               >
                 {m === "single" ? "Từng món" : m === "bulk" ? "Chọn sỉ" : "Dán tin"}
@@ -2003,54 +2014,49 @@ export default function SupplierOrder() {
               <textarea
                 value={expPasteText}
                 onChange={e => setExpPasteText(e.target.value)}
-                placeholder={"2kg cà chua\n1.5kg rau muống\n3 gói đậu hũ"}
+                placeholder={"10kg cà rốt\n10k lá quế\n3 bịch bào ngư xám"}
                 className="min-h-[100px] w-full rounded-xl border border-border bg-background p-3 text-sm outline-none focus:border-primary/40"
               />
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => {
-                    import("@/lib/parseOrderText").then(({ parseOrderText }) => {
-                      const parsed = parseOrderText(expPasteText, expCatalog as any);
-                      setExpParsed(parsed);
-                    });
-                  }}
-                >
-                  Phân tích
-                </Button>
-                <Button
-                  type="button"
-                  className="flex-1"
-                  disabled={expParsed.length === 0}
-                  onClick={async () => {
-                    for (const line of expParsed) {
-                      try {
-                        await supabase.rpc("add_shared_order_alternate", {
-                          p_token: token,
-                          p_name: line.name,
-                          p_quantity: Number(line.quantity) || 1,
-                          p_unit: line.unit || "kg",
-                        });
-                      } catch {
-                        /* ignore */
-                      }
+              <Button
+                type="button"
+                className="w-full"
+                disabled={expParsed.length === 0}
+                onClick={async () => {
+                  const measure = expParsed.filter(line => line.mode === "measure");
+                  const moneyCount = expParsed.length - measure.length;
+                  for (const line of measure) {
+                    try {
+                      await supabase.rpc("add_shared_order_alternate", {
+                        p_token: token,
+                        p_name: line.name,
+                        p_quantity: Number(line.quantity) || 1,
+                        p_unit: line.unit || "kg",
+                      });
+                    } catch {
+                      /* ignore */
                     }
-                    toast.success(`Đã thêm ${expParsed.length} dòng`);
-                    const { data: rows } = await supabase.rpc("get_shared_order_items", { p_token: token });
-                    if (rows) {
-                      const next = rows as SharedItem[];
-                      itemsRef.current = next;
-                      setItems(next);
-                    }
-                    setExpParsed([]);
-                    setExpPasteText("");
-                  }}
-                >
-                  Thêm tất cả
-                </Button>
-              </div>
+                  }
+                  toast.success(
+                    measure.length
+                      ? `Đã thêm ${measure.length} dòng`
+                      : "Không có dòng khối lượng",
+                    {
+                      description: moneyCount
+                        ? `${moneyCount} dòng tiền (10k) — dán từ đơn hàng để lưu số tiền`
+                        : undefined,
+                    },
+                  );
+                  const { data: rows } = await supabase.rpc("get_shared_order_items", { p_token: token });
+                  if (rows) {
+                    const next = rows as SharedItem[];
+                    itemsRef.current = next;
+                    setItems(next);
+                  }
+                  setExpPasteText("");
+                }}
+              >
+                Thêm tất cả
+              </Button>
               {expParsed.length > 0 && (
                 <div className="max-h-[35vh] overflow-auto rounded-xl border border-border/60">
                   <div className="grid grid-cols-[auto_1fr_auto] gap-px bg-border/60">
@@ -2060,7 +2066,7 @@ export default function SupplierOrder() {
                     {expParsed.map((line, idx) => (
                       <div key={idx} className={`contents ${!line.matched ? "bg-amber-50" : ""}`}>
                         <div className={`bg-card px-2 py-1.5 text-center text-xs tabular-nums ${!line.matched ? "bg-amber-50 text-amber-700" : ""}`}>
-                          {line.quantity} {line.unit}
+                          {formatParsedAmount(line)}
                         </div>
                         <div className={`bg-card px-2 py-1.5 text-xs ${!line.matched ? "bg-amber-50 text-amber-700 font-medium" : "text-foreground"}`}>
                           {line.name}
@@ -2078,7 +2084,10 @@ export default function SupplierOrder() {
                   </div>
                 </div>
               )}
-              <p className="text-[11px] text-muted-foreground">Chưa khớp sẽ tô vàng — bấm “Thêm tất cả” sẽ tạo món và lưu tên vào DB để lần sau nhớ giá.</p>
+              <p className="text-[11px] text-muted-foreground">
+                <span className="font-medium text-foreground">10k</span> là 10.000₫, không phải đơn vị.
+                {" "}Chưa khớp tô vàng. Dòng tiền cần dán từ đơn hàng mới lưu được số tiền.
+              </p>
             </div>
           )}
         </DialogContent>

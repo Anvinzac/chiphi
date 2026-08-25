@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, CalendarDays, Check, Copy, Delete, GripHorizontal, Hash, LayoutGrid, Search, X } from "lucide-react";
+import { ArrowLeft, CalendarDays, Check, Copy, Delete, GripHorizontal, Hash, LayoutGrid, Plus, Search, X } from "lucide-react";
 import { addDays, format, isValid, parseISO } from "date-fns";
 import { toast } from "sonner";
 import MonthlyOrderGrid, { type MonthlyOrderCol } from "@/components/orders/MonthlyOrderGrid";
 import MonthlyOrderTwoColPager from "@/components/orders/MonthlyOrderTwoColPager";
 import MonthBoundCalendar from "@/components/daily/MonthBoundCalendar";
 import MoneyLabel from "@/components/daily/MoneyLabel";
+import ClearFieldButton from "@/components/daily/ClearFieldButton";
+import ThousandsMark from "@/components/daily/ThousandsMark";
 import { mockMonthlyOrderByDate } from "@/lib/mockMonthlyOrderGrid";
 import type { MonthlyOrderLine } from "@/lib/mockMonthlyOrderGrid";
 import { googleSumExpr } from "@/lib/googleSumExpr";
@@ -39,9 +41,36 @@ function clampRange(start: Date, end: Date): { start: Date; end: Date } {
   return { start, end };
 }
 
+/** 15 pad keys: 1 extra before + 13 in-range (12 apart) + 1 extra after. */
+const RANGE_GAP = 12;
+
+function parseQtyBound(raw: string): number | null {
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 1 ? n : null;
+}
+
+function clampQtyRange(min: number, max: number, prefer: "min" | "max"): { min: number; max: number } {
+  let a = Math.max(1, Math.floor(min));
+  let b = Math.max(1, Math.floor(max));
+  if (prefer === "min") {
+    if (b <= a) b = a + 1;
+    if (b - a > RANGE_GAP) b = a + RANGE_GAP;
+  } else {
+    if (a >= b) a = Math.max(1, b - 1);
+    if (b - a > RANGE_GAP) a = Math.max(1, b - RANGE_GAP);
+    if (b - a > RANGE_GAP) b = a + RANGE_GAP;
+  }
+  return { min: a, max: b };
+}
+
 function shortVi(d: Date): string {
   return format(d, "d 'th' M");
 }
+
+const DEFAULT_TITLE = "Đơn tháng";
+const TITLE_STORAGE_KEY = "chiphi:monthly-order-title";
+const UNIT_PRICE_NUM_CLASS =
+  "font-display text-base font-bold leading-none tabular-nums sm:text-lg";
 
 const COL_OPTIONS: { value: MonthlyOrderCol; label: string }[] = [
   { value: 2, label: "2 cột" },
@@ -55,10 +84,38 @@ const POPOVER_H = 340;
 const GAP = 10;
 const RANGE_KEY_CLASS =
   "rounded-xl border border-[#b8cddc] bg-[#dce8f0] py-2 text-base font-semibold tabular-nums text-[#3a4f58] shadow-sm active:scale-95";
+const RANGE_GHOST_CLASS =
+  "pad-range-ghost relative inline-flex items-center justify-center rounded-xl";
 const PAD_KEY_CLASS =
   "keypad-key rounded-xl border border-border/60 bg-card py-2 text-base font-medium shadow-sm active:scale-95";
 const PAD_MUTED_CLASS =
   "keypad-key rounded-xl border border-border/60 bg-muted/40 py-2 text-xs font-medium text-muted-foreground active:scale-95";
+
+function RangeExtraKey({
+  value,
+  picked,
+  onPick,
+}: {
+  value: number;
+  picked: boolean;
+  onPick: (n: number) => void;
+}) {
+  if (value < 1) {
+    return <span className={RANGE_GHOST_CLASS} style={{ minHeight: "2.5rem", opacity: 0.28 }} />;
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => onPick(value)}
+      className={`${RANGE_GHOST_CLASS}${picked ? " pad-range-key--picked" : ""}`}
+      style={{ minHeight: "2.5rem" }}
+      aria-label={String(value)}
+    >
+      <Plus className="h-4 w-4" strokeWidth={2.2} />
+      <span className="pad-range-ghost__val">{value}</span>
+    </button>
+  );
+}
 
 type AnchorInfo = {
   rect: DOMRect;
@@ -110,9 +167,9 @@ export default function MonthlyOrder() {
   const [editingValue, setEditingValue] = useState("");
   const [anchor, setAnchor] = useState<AnchorInfo>(null);
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number; arrow: "top" | "left" | "right"; arrowOffset: number } | null>(null);
-  // Range picker state: single global range with default values 16-24
+  // Range picker: 13 in-range values (12 apart) so 1 extra before/after fit on 15 keys
   const [rangeMin, setRangeMin] = useState("16");
-  const [rangeMax, setRangeMax] = useState("24");
+  const [rangeMax, setRangeMax] = useState("28");
   // State for range editor dialog
   const [rangeEditorOpen, setRangeEditorOpen] = useState(false);
   const [rangeEnabled, setRangeEnabled] = useState(true);
@@ -121,6 +178,34 @@ export default function MonthlyOrder() {
   const pickTimerRef = useRef<number | null>(null);
   const [pickedRange, setPickedRange] = useState<number | null>(null);
   const [unitPriceDraft, setUnitPriceDraft] = useState("");
+  const [title, setTitle] = useState(() => {
+    try {
+      return localStorage.getItem(TITLE_STORAGE_KEY) || DEFAULT_TITLE;
+    } catch {
+      return DEFAULT_TITLE;
+    }
+  });
+  const [editingTitle, setEditingTitle] = useState(false);
+  const titleRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!editingTitle) return;
+    const el = titleRef.current;
+    if (!el) return;
+    el.focus();
+    el.select();
+  }, [editingTitle]);
+
+  const commitTitle = () => {
+    const next = title.trim() || DEFAULT_TITLE;
+    setTitle(next);
+    setEditingTitle(false);
+    try {
+      localStorage.setItem(TITLE_STORAGE_KEY, next);
+    } catch {
+      /* private mode */
+    }
+  };
 
   const itemsByDate = useMemo(() => {
     const m = new Map(baseItems);
@@ -224,22 +309,37 @@ export default function MonthlyOrder() {
     typingRef.current = false;
   };
 
-  // Get range values from global range settings
-  const currentRange = useMemo(() => {
-    const min = parseInt(rangeMin) || 0;
-    const max = parseInt(rangeMax) || 0;
-    if (min <= 0 || max <= 0 || min >= max) return null;
-    // Generate array of numbers from min to max
-    const values: number[] = [];
-    for (let i = min; i <= max; i++) {
-      values.push(i);
-    }
-    return values;
+  const rangeBounds = useMemo(() => {
+    const min = parseQtyBound(rangeMin);
+    const max = parseQtyBound(rangeMax);
+    if (min == null || max == null) return null;
+    return clampQtyRange(min, max, "min");
   }, [rangeMin, rangeMax]);
-  const rangeValues = currentRange ?? [];
-  const showRangeKeys = useRangeKeys && rangeValues.length > 0;
-  const rangeAt = (i: number) => (showRangeKeys ? rangeValues[i] : undefined);
-  const extraRange = showRangeKeys ? rangeValues.slice(15) : [];
+  const showRangeKeys = useRangeKeys && rangeBounds != null;
+  const rangeCore = useMemo(() => {
+    if (!rangeBounds) return [];
+    const values: number[] = [];
+    for (let n = rangeBounds.min; n <= rangeBounds.max; n++) values.push(n);
+    return values;
+  }, [rangeBounds]);
+  const rangePadKeys = useMemo(() => {
+    if (!rangeBounds) return [];
+    const keys: { kind: "extra" | "core"; value: number }[] = [
+      { kind: "extra", value: rangeBounds.min - 1 },
+    ];
+    for (const value of rangeCore) keys.push({ kind: "core", value });
+    keys.push({ kind: "extra", value: rangeBounds.max + 1 });
+    return keys;
+  }, [rangeBounds, rangeCore]);
+
+  const commitQtyRange = (which: "min" | "max") => {
+    const min = parseQtyBound(rangeMin);
+    const max = parseQtyBound(rangeMax);
+    if (min == null || max == null) return;
+    const next = clampQtyRange(min, max, which);
+    setRangeMin(String(next.min));
+    setRangeMax(String(next.max));
+  };
 
   // Compute popover position: top row -> below, lower rows -> sideways
   useEffect(() => {
@@ -361,7 +461,7 @@ export default function MonthlyOrder() {
       if (/^[0-9]$/.test(e.key)) {
         e.preventDefault();
         if (showRangeKeys && e.key !== "0") {
-          const rv = rangeValues[Number(e.key) - 1];
+          const rv = rangeCore[Number(e.key) - 1];
           if (rv != null) pickRange(rv);
           return;
         }
@@ -375,7 +475,7 @@ export default function MonthlyOrder() {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [editingDate, editingValue, showRangeKeys, rangeValues]);
+  }, [editingDate, editingValue, showRangeKeys, rangeCore]);
 
   const hasInvalidRange = !parsed;
 
@@ -404,10 +504,53 @@ export default function MonthlyOrder() {
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div className="min-w-0 flex-1">
-            <h1 className="flex items-center gap-2 font-display text-[17px] leading-tight text-foreground sm:text-xl">
-              <CalendarDays className="h-4 w-4 shrink-0 text-primary" />
-              Đơn tháng
-            </h1>
+            {editingTitle ? (
+              <div className="flex items-center gap-1.5">
+                <CalendarDays className="h-4 w-4 shrink-0 text-primary" />
+                <input
+                  ref={titleRef}
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  onBlur={commitTitle}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitTitle();
+                    }
+                    if (e.key === "Escape") {
+                      try {
+                        setTitle(localStorage.getItem(TITLE_STORAGE_KEY) || DEFAULT_TITLE);
+                      } catch {
+                        setTitle(DEFAULT_TITLE);
+                      }
+                      setEditingTitle(false);
+                    }
+                  }}
+                  className="min-w-0 flex-1 bg-transparent font-display text-[17px] leading-tight text-foreground outline-none caret-primary sm:text-xl"
+                  aria-label="Tên đơn"
+                  autoComplete="off"
+                  enterKeyHint="done"
+                />
+                <ClearFieldButton
+                  visible={title.length > 0}
+                  size="sm"
+                  label="Xóa tên"
+                  onClear={() => setTitle("")}
+                />
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditingTitle(true)}
+                className="flex min-w-0 max-w-full items-center gap-2 rounded-md text-left hover:bg-muted/40"
+                aria-label="Đổi tên đơn"
+              >
+                <CalendarDays className="h-4 w-4 shrink-0 text-primary" />
+                <h1 className="min-w-0 truncate font-display text-[17px] leading-tight text-foreground sm:text-xl">
+                  {title}
+                </h1>
+              </button>
+            )}
             <p className="truncate text-[11px] leading-tight text-muted-foreground">
               {hasInvalidRange ? "Chọn ngày bắt đầu và kết thúc" : `${shortVi(rangeStart)} – ${shortVi(rangeEnd)} · ${dayCount} ngày`}
             </p>
@@ -540,7 +683,7 @@ export default function MonthlyOrder() {
           aria-label="Chỉnh dãy số"
         >
           <LayoutGrid className="h-3 w-3 opacity-70" />
-          {rangeMin}–{rangeMax}
+          {rangeBounds ? `${rangeBounds.min}–${rangeBounds.max}` : `${rangeMin}–${rangeMax}`}
         </button>
       </div>
 
@@ -568,50 +711,62 @@ export default function MonthlyOrder() {
             onSelectDay={handleDayClick}
           />
         )}
-        {/* Bottom total bar — qty × unit price = money */}
-        <div className="flex shrink-0 items-center gap-1 border-t border-border bg-card px-3 py-2 sm:gap-1.5 sm:px-4">
+        {/* Bottom total bar — result cluster centered */}
+        <div className="relative flex min-h-12 shrink-0 items-center border-t border-border bg-card px-3 py-2 sm:px-4">
           <span className="shrink-0 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Tổng</span>
-          <button
-            type="button"
-            disabled={hasInvalidRange}
-            onClick={() => setTotalOpen(true)}
-            className="total-amount-hit shrink-0 hover:bg-muted/50 disabled:pointer-events-none"
-            aria-label="Xem chi tiết tổng"
-          >
-            <span className="text-base font-display font-bold leading-none tabular-nums sm:text-lg">
-              {hasInvalidRange ? "—" : stats.totalSum}
-            </span>
-          </button>
-          <span className="shrink-0 text-muted-foreground/45" aria-hidden>
-            ×
-          </span>
-          <label className="monthly-unit-price flex h-7 shrink-0 items-center rounded-md border border-border/70 bg-background px-1.5">
-            <input
-              inputMode="decimal"
-              autoComplete="off"
-              value={unitPriceDraft}
-              placeholder="giá"
-              aria-label="Đơn giá (nghìn đồng)"
+          <div className="pointer-events-none absolute inset-y-0 left-1/2 flex -translate-x-1/2 items-center gap-1 sm:gap-1.5">
+            <button
+              type="button"
               disabled={hasInvalidRange}
-              onChange={e => setUnitPriceDraft(e.target.value.replace(/[^\d.]/g, ""))}
-              className="h-6 w-10 min-w-0 border-0 bg-transparent p-0 text-center text-xs font-semibold tabular-nums text-foreground shadow-none outline-none placeholder:font-medium placeholder:text-muted-foreground/40 focus-visible:ring-0"
-            />
-            {unitPriceDraft ? (
-              <span className="text-[9px] leading-none text-muted-foreground/65">.000</span>
-            ) : null}
-          </label>
-          {unitPriceVnd > 0 && !hasInvalidRange ? (
-            <>
-              <span className="shrink-0 text-muted-foreground/45" aria-hidden>
-                =
+              onClick={() => setTotalOpen(true)}
+              className="total-amount-hit pointer-events-auto shrink-0 hover:bg-muted/50 disabled:pointer-events-none"
+              aria-label="Xem chi tiết tổng"
+            >
+              <span className={`leading-none ${UNIT_PRICE_NUM_CLASS}`}>
+                {hasInvalidRange ? "—" : stats.totalSum}
               </span>
-              <MoneyLabel
-                amount={moneyTotal}
-                className="min-w-0 truncate text-base font-display font-bold leading-none sm:text-lg"
-                smallClassName="text-[0.7em]"
-              />
-            </>
-          ) : (
+            </button>
+            <span className="shrink-0 text-muted-foreground/45" aria-hidden>
+              ×
+            </span>
+            <label className="monthly-unit-price pointer-events-auto inline-flex shrink-0 items-baseline rounded-md border border-border/70 bg-background px-1.5 py-0.5">
+              <span className="relative inline-grid min-w-[1ch]">
+                <span
+                  className={`invisible col-start-1 row-start-1 whitespace-pre ${UNIT_PRICE_NUM_CLASS}`}
+                  aria-hidden
+                >
+                  {unitPriceDraft || "giá"}
+                </span>
+                <input
+                  inputMode="decimal"
+                  autoComplete="off"
+                  size={1}
+                  value={unitPriceDraft}
+                  placeholder="giá"
+                  aria-label="Đơn giá (nghìn đồng)"
+                  disabled={hasInvalidRange}
+                  onChange={e => setUnitPriceDraft(e.target.value.replace(/[^\d.]/g, ""))}
+                  className={`col-start-1 row-start-1 w-full min-w-0 border-0 bg-transparent p-0 text-center shadow-none outline-none placeholder:font-medium placeholder:text-muted-foreground/40 focus-visible:ring-0 ${UNIT_PRICE_NUM_CLASS}`}
+                />
+              </span>
+              {unitPriceDraft ? (
+                <ThousandsMark className="text-[0.7em] font-display font-bold leading-none text-muted-foreground/70" />
+              ) : null}
+            </label>
+            {unitPriceVnd > 0 && !hasInvalidRange ? (
+              <>
+                <span className="shrink-0 text-muted-foreground/45" aria-hidden>
+                  =
+                </span>
+                <MoneyLabel
+                  amount={moneyTotal}
+                  className="min-w-0 truncate text-base font-display font-bold leading-none sm:text-lg"
+                  smallClassName="text-[0.7em]"
+                />
+              </>
+            ) : null}
+          </div>
+          {unitPriceVnd > 0 && !hasInvalidRange ? null : (
             <span className="ml-auto shrink-0 text-right text-[10px] tabular-nums text-muted-foreground sm:text-[11px]">
               {hasInvalidRange ? "" : `${stats.daysWithItems}/${dayCount} ngày`}
             </span>
@@ -662,7 +817,7 @@ export default function MonthlyOrder() {
               ) : (
                 <span className="text-sm font-medium text-muted-foreground/40">— trống —</span>
               )}
-              {rangeValues.length > 0 ? (
+              {rangeBounds != null ? (
                 <button
                   type="button"
                   role="switch"
@@ -690,60 +845,43 @@ export default function MonthlyOrder() {
               ) : null}
             </div>
 
-            {extraRange.length > 0 ? (
-              <div className="grid grid-cols-3 gap-1.5 px-3 pt-3">
-                {extraRange.map(val => (
-                  <button
-                    key={`extra-${val}`}
-                    type="button"
-                    onClick={() => pickRange(val)}
-                    className={`${RANGE_KEY_CLASS}${pickedRange === val ? " pad-range-key--picked" : ""}`}
-                    style={{ minHeight: "2.5rem" }}
-                  >
-                    {val}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-
-            <div className="grid grid-cols-3 gap-1.5 p-3 pb-2">
-              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d, i) => {
-                const rv = rangeAt(i);
-                if (rv != null) {
-                  return (
+            {showRangeKeys ? (
+              <div className="grid grid-cols-3 gap-1.5 p-3">
+                {rangePadKeys.map(key =>
+                  key.kind === "extra" ? (
+                    <RangeExtraKey
+                      key={`extra-${key.value}`}
+                      value={key.value}
+                      picked={pickedRange === key.value}
+                      onPick={pickRange}
+                    />
+                  ) : (
                     <button
-                      key={d}
+                      key={key.value}
                       type="button"
-                      onClick={() => pickRange(rv)}
-                      className={`${RANGE_KEY_CLASS}${pickedRange === rv ? " pad-range-key--picked" : ""}`}
+                      onClick={() => pickRange(key.value)}
+                      className={`${RANGE_KEY_CLASS}${pickedRange === key.value ? " pad-range-key--picked" : ""}`}
                       style={{ minHeight: "2.5rem" }}
                     >
-                      {rv}
+                      {key.value}
                     </button>
-                  );
-                }
-                return (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => handleDigit(d)}
-                    className={PAD_KEY_CLASS}
-                    style={{ minHeight: "2.5rem" }}
-                  >
-                    {d}
-                  </button>
-                );
-              })}
-              {rangeAt(9) != null ? (
+                  ),
+                )}
+              </div>
+            ) : (
+              <>
+            <div className="grid grid-cols-3 gap-1.5 p-3 pb-2">
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map(d => (
                 <button
+                  key={d}
                   type="button"
-                  onClick={() => pickRange(rangeAt(9)!)}
-                  className={`${RANGE_KEY_CLASS}${pickedRange === rangeAt(9) ? " pad-range-key--picked" : ""}`}
+                  onClick={() => handleDigit(d)}
+                  className={PAD_KEY_CLASS}
                   style={{ minHeight: "2.5rem" }}
                 >
-                  {rangeAt(9)}
+                  {d}
                 </button>
-              ) : (
+              ))}
                 <button
                   type="button"
                   onClick={handleClear}
@@ -752,17 +890,6 @@ export default function MonthlyOrder() {
                 >
                   C
                 </button>
-              )}
-              {rangeAt(10) != null ? (
-                <button
-                  type="button"
-                  onClick={() => pickRange(rangeAt(10)!)}
-                  className={`${RANGE_KEY_CLASS}${pickedRange === rangeAt(10) ? " pad-range-key--picked" : ""}`}
-                  style={{ minHeight: "2.5rem" }}
-                >
-                  {rangeAt(10)}
-                </button>
-              ) : (
                 <button
                   type="button"
                   onClick={() => handleDigit("0")}
@@ -771,17 +898,6 @@ export default function MonthlyOrder() {
                 >
                   0
                 </button>
-              )}
-              {rangeAt(11) != null ? (
-                <button
-                  type="button"
-                  onClick={() => pickRange(rangeAt(11)!)}
-                  className={`${RANGE_KEY_CLASS}${pickedRange === rangeAt(11) ? " pad-range-key--picked" : ""}`}
-                  style={{ minHeight: "2.5rem" }}
-                >
-                  {rangeAt(11)}
-                </button>
-              ) : (
                 <button
                   type="button"
                   onClick={handleBackspace}
@@ -791,19 +907,9 @@ export default function MonthlyOrder() {
                 >
                   <Delete className="mx-auto h-4 w-4" />
                 </button>
-              )}
             </div>
 
             <div className="grid grid-cols-3 gap-1.5 px-3 pb-3">
-              {rangeAt(12) != null ? (
-                <button
-                  type="button"
-                  onClick={() => pickRange(rangeAt(12)!)}
-                  className={`${RANGE_KEY_CLASS}${pickedRange === rangeAt(12) ? " pad-range-key--picked" : ""}`}
-                >
-                  {rangeAt(12)}
-                </button>
-              ) : (
                 <button
                   type="button"
                   onClick={handleDelete}
@@ -811,16 +917,6 @@ export default function MonthlyOrder() {
                 >
                   Xóa
                 </button>
-              )}
-              {rangeAt(13) != null ? (
-                <button
-                  type="button"
-                  onClick={() => pickRange(rangeAt(13)!)}
-                  className={`${RANGE_KEY_CLASS}${pickedRange === rangeAt(13) ? " pad-range-key--picked" : ""}`}
-                >
-                  {rangeAt(13)}
-                </button>
-              ) : (
                 <button
                   type="button"
                   onClick={closeNumpad}
@@ -828,16 +924,6 @@ export default function MonthlyOrder() {
                 >
                   Hủy
                 </button>
-              )}
-              {rangeAt(14) != null ? (
-                <button
-                  type="button"
-                  onClick={() => pickRange(rangeAt(14)!)}
-                  className={`${RANGE_KEY_CLASS}${pickedRange === rangeAt(14) ? " pad-range-key--picked" : ""}`}
-                >
-                  {rangeAt(14)}
-                </button>
-              ) : (
                 <button
                   type="button"
                   onClick={() => handleSave()}
@@ -846,8 +932,9 @@ export default function MonthlyOrder() {
                   <Check className="h-3.5 w-3.5" />
                   Lưu
                 </button>
-              )}
             </div>
+              </>
+            )}
           </div>
         </>
       )}
@@ -925,9 +1012,11 @@ export default function MonthlyOrder() {
                   type="number"
                   value={rangeMin}
                   onChange={e => setRangeMin(e.target.value)}
+                  onBlur={() => commitQtyRange("min")}
                   placeholder="16"
                   className="h-9 text-sm"
                   inputMode="numeric"
+                  min={1}
                 />
               </div>
               <div>
@@ -936,18 +1025,21 @@ export default function MonthlyOrder() {
                   type="number"
                   value={rangeMax}
                   onChange={e => setRangeMax(e.target.value)}
-                  placeholder="24"
+                  onBlur={() => commitQtyRange("max")}
+                  placeholder="28"
                   className="h-9 text-sm"
                   inputMode="numeric"
+                  min={2}
                 />
               </div>
             </div>
+            <p className="text-[11px] text-muted-foreground">Cách nhau tối đa 12 — 13 ô trên bàn phím, 1 trước và 1 sau cho số ngoài dãy.</p>
           </div>
           <div className="mt-4 flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setRangeEditorOpen(false)} className="flex-1">
               Hủy
             </Button>
-            <Button size="sm" onClick={() => setRangeEditorOpen(false)} className="flex-1">
+            <Button size="sm" onClick={() => { commitQtyRange("min"); setRangeEditorOpen(false); }} className="flex-1">
               Lưu
             </Button>
           </div>

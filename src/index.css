@@ -638,6 +638,38 @@
     transform: scale(0.96);
   }
 
+  .pad-range-ghost {
+    border: 1.5px dashed #b8cddc;
+    background: transparent;
+    color: #7a929c;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.28s cubic-bezier(0.22, 1.35, 0.32, 1), color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+  }
+
+  .pad-range-ghost__val {
+    position: absolute;
+    right: 0.3rem;
+    bottom: 0.18rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    color: #3a4f58;
+    opacity: 0.28;
+  }
+
+  .pad-range-ghost:hover,
+  .pad-range-ghost:focus-visible {
+    color: #3a4f58;
+    border-color: #9bb3c4;
+    background: rgba(220, 232, 240, 0.45);
+    outline: none;
+  }
+
+  .pad-range-ghost:active {
+    transform: scale(0.94);
+  }
+
   .pad-value-preview {
     animation: padValuePreview 0.38s cubic-bezier(0.22, 1.12, 0.32, 1);
   }
@@ -1212,6 +1244,10 @@
     }
 
     .pad-mode-flip__pebble {
+      transition: none;
+    }
+
+    .pad-range-ghost {
       transition: none;
     }
 

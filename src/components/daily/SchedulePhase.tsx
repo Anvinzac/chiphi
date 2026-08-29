@@ -371,7 +371,7 @@ export default function SchedulePhase({
           </button>
 
           {advancedOpen && (
-            <div className="mt-2 space-y-4 rounded-xl border border-border/50 bg-card/80 px-2.5 py-2.5">
+            <div className="mt-2 space-y-4">
               <div className="space-y-2">
                 <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
                   Biên lai

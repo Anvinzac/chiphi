@@ -17,7 +17,9 @@ interface VendorPhaseProps {
   onSelect: (vendor: { id: string | null; name: string }) => void;
   onCreate: (name: string) => Promise<VendorOption | null>;
   onDone: () => void;
-  onBack: () => void;
+  onBack?: () => void;
+  /** Search + list only — sits in the amount-page keypad slot. */
+  embedded?: boolean;
 }
 
 export default function VendorPhase({
@@ -30,6 +32,7 @@ export default function VendorPhase({
   onCreate,
   onDone,
   onBack,
+  embedded = false,
 }: VendorPhaseProps) {
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
@@ -81,31 +84,9 @@ export default function VendorPhase({
         : "border-border/60 bg-muted/70 text-foreground hover:border-primary/30"
     }`;
 
-  return (
-    <div className="flex h-full min-h-0 flex-1 flex-col px-5 pt-2 pb-3">
-      <div className="flex shrink-0 items-center justify-between mb-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex min-h-11 items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-          aria-label="Quay lại số tiền"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Số tiền
-        </button>
-        <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-          Nhà cung cấp
-        </span>
-        <button
-          type="button"
-          onClick={onDone}
-          className="flex min-h-11 items-center gap-1 text-xs font-medium text-primary"
-        >
-          Xong <Check className="h-3.5 w-3.5" />
-        </button>
-      </div>
-
-      <div className="shrink-0 mb-3">
+  const body = (
+    <>
+      <div className="shrink-0 mb-2">
         <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-muted/40 px-3 py-2">
           <Store className="h-4 w-4 shrink-0 text-muted-foreground" />
           <input
@@ -128,7 +109,7 @@ export default function VendorPhase({
             onClear={() => setQuery("")}
           />
         </div>
-        {(selectedVendorName || selectedVendorId) && (
+        {!embedded && (selectedVendorName || selectedVendorId) && (
           <p className="mt-2 text-[11px] text-muted-foreground">
             Đang chọn:{" "}
             <span className="font-medium text-foreground">
@@ -241,6 +222,41 @@ export default function VendorPhase({
           )}
         </section>
       </div>
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full min-h-0 flex-1 flex-col px-5 pt-2 pb-3">
+      <div className="flex shrink-0 items-center justify-between mb-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex min-h-11 items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+          aria-label="Quay lại số tiền"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Số tiền
+        </button>
+        <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          Nhà cung cấp
+        </span>
+        <button
+          type="button"
+          onClick={onDone}
+          className="flex min-h-11 items-center gap-1 text-xs font-medium text-primary"
+        >
+          Xong <Check className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      {body}
     </div>
   );
 }

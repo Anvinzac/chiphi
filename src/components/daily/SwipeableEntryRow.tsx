@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Table2 } from "lucide-react";
 import MoneyLabel from "./MoneyLabel";
 import CategoryGlyph from "./CategoryGlyph";
 import SalaryRoster from "./SalaryRoster";
 import { useHoldToConfirm } from "@/hooks/useHoldToConfirm";
 import { isSalaryExpense } from "@/lib/salaryRoster";
-import { useSalaryEmployees } from "@/hooks/useSalaryEmployees";
-import { employeesToExpenseLines, type ExpenseLine } from "@/lib/salaryEmployees";
+import type { ExpenseLine } from "@/lib/salaryEmployees";
 import {
   amountHighlightLabelClass,
   amountHighlightTitle,
@@ -49,13 +48,9 @@ export default function SwipeableEntryRow({
     enabled: !isPending,
   });
   const salary = !isPending && isSalaryExpense(item_name, categoryName);
-  const isContainer = !isPending;
   const [rosterOpen, setRosterOpen] = useState(false);
-  const { employees, meta } = useSalaryEmployees();
-  const ownLines = nestedLines ?? [];
-  const displayLines =
-    ownLines.length > 0 ? ownLines : salary ? employeesToExpenseLines(employees) : [];
-  const periodLabel = ownLines.length > 0 ? null : meta?.period?.label;
+  const displayLines = nestedLines ?? [];
+  const hasDetails = !isPending && displayLines.length > 0;
 
   const handleRowClick = () => {
     if (consumeClick()) return;
@@ -83,11 +78,17 @@ export default function SwipeableEntryRow({
       cancelConfirm();
       return;
     }
-    if (isContainer) {
-      setRosterOpen(open => !open);
+    onAmountClick?.();
+  };
+
+  const handleDetailToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (consumeClick()) return;
+    if (confirming) {
+      cancelConfirm();
       return;
     }
-    onAmountClick?.();
+    setRosterOpen(open => !open);
   };
 
   const titleClass = "text-sm font-medium truncate text-foreground/90 text-left min-w-0";
@@ -107,7 +108,20 @@ export default function SwipeableEntryRow({
         <CategoryGlyph categoryName={categoryName || (salary ? item_name : undefined)} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 min-w-0">
-            {onNameClick ? (
+            {hasDetails ? (
+              <button
+                type="button"
+                className="expense-detail-hit"
+                title={rosterOpen ? "Đóng chi tiết" : "Xem chi tiết"}
+                aria-expanded={rosterOpen}
+                aria-label={`${rosterOpen ? "Đóng" : "Xem"} chi tiết ${item_name}`}
+                onClick={handleDetailToggle}
+              >
+                <Table2 className="expense-detail-hit__icon" strokeWidth={2.2} />
+                <span className="expense-detail-hit__name">{item_name}</span>
+                <ChevronDown className="expense-detail-hit__chevron" strokeWidth={2.4} />
+              </button>
+            ) : onNameClick ? (
               <button type="button" className={`${titleClass} hover:text-primary transition-colors`} onClick={handleNameClick}>
                 {item_name}
               </button>
@@ -182,18 +196,11 @@ export default function SwipeableEntryRow({
             >
               Xóa
             </button>
-          ) : onAmountClick || isContainer ? (
+          ) : onAmountClick ? (
             <button
               type="button"
-              className="tabular-nums salary-amount-hit"
-              title={
-                rosterOpen
-                  ? "Đóng chi tiết"
-                  : salary
-                    ? "Xem chi tiết lương"
-                    : "Xem chi tiết khoản chi"
-              }
-              aria-expanded={rosterOpen}
+              className="tabular-nums"
+              title={amountHighlightTitle(highlight) ?? "Sửa số tiền"}
               onClick={handleAmountClick}
             >
               <MoneyLabel
@@ -201,7 +208,6 @@ export default function SwipeableEntryRow({
                 className={`text-sm font-display text-foreground/85 ${amountHighlightLabelClass(highlight)}`}
                 smallClassName="text-[0.7em]"
               />
-              <ChevronDown className="salary-amount-chevron" strokeWidth={2.4} />
             </button>
           ) : (
             <MoneyLabel
@@ -212,15 +218,11 @@ export default function SwipeableEntryRow({
           )}
         </span>
       </div>
-      {isContainer ? (
+      {hasDetails ? (
         <div className={`day-section-fold ${rosterOpen ? "day-section-fold--open" : ""}`}>
           <div className="day-section-fold__clip">
             <div className="day-section-fold__body">
-              <SalaryRoster
-                lines={displayLines}
-                periodLabel={periodLabel}
-                salary={salary}
-              />
+              <SalaryRoster lines={displayLines} />
             </div>
           </div>
         </div>

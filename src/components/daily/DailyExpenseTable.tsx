@@ -9,7 +9,6 @@ import PaymentGroup, { type PaymentGroupData, type PaymentEntry } from "./Paymen
 import SwipeableEntryRow from "./SwipeableEntryRow";
 import ClearFieldButton from "./ClearFieldButton";
 import AmountPhase from "./AmountPhase";
-import VendorPhase from "./VendorPhase";
 import SchedulePhase from "./SchedulePhase";
 import PurchaseDetailDialog from "./PurchaseDetailDialog";
 import RangeDayPicker from "./RangeDayPicker";
@@ -51,7 +50,6 @@ import {
   type ExpenseLine,
 } from "@/lib/salaryEmployees";
 import { extractReceiptJsonFromImage } from "@/lib/receiptVision";
-import { useSalaryEmployees } from "@/hooks/useSalaryEmployees";
 import { useLaggedSnapshot } from "@/hooks/useLaggedSnapshot";
 import { useHighValueThresholds } from "@/hooks/useHighValueThresholds";
 import { amountHighlight } from "@/lib/highValueThresholds";
@@ -177,7 +175,6 @@ export default function DailyExpenseTable({
 }: DailyExpenseTableProps = {}) {
   const { user } = useAuth();
   const throwaway = isThrowawayAccount(user?.email);
-  const { replaceAll: replaceSalaryRoster } = useSalaryEmployees();
   const { snapshot, scheduleRefresh } = useLaggedSnapshot();
   const [{ high: highValue, veryHigh: veryHighValue }] = useHighValueThresholds();
   const [viewMode, setViewMode] = useState<ViewMode>("range");
@@ -1028,7 +1025,7 @@ export default function DailyExpenseTable({
   handleNameConfirmRef.current = handleNameConfirm;
 
   const applyExpenseJson = useCallback(
-    async (raw: string, opts?: { updateRoster?: boolean; source?: "json" | "receipt" }) => {
+    async (raw: string, opts?: { source?: "json" | "receipt" }) => {
       const result = parseSalaryJson(raw);
       if (!result.ok) {
         toast.error(result.error);
@@ -1062,14 +1059,6 @@ export default function DailyExpenseTable({
             ? `Đã điền tổng từ JSON · ${n} NV · ${label}`
             : `Đã điền tổng từ JSON · ${n} NV`,
       );
-      if (opts?.updateRoster !== false) {
-        try {
-          await replaceSalaryRoster(result.employees, result.meta);
-        } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : "Không lưu được danh sách NV";
-          toast.error(message);
-        }
-      }
       toast.success(
         fromReceipt
           ? `Đã lấy tổng từ ảnh · ${n} dòng`
@@ -1079,19 +1068,22 @@ export default function DailyExpenseTable({
       );
       return true;
     },
-    [replaceSalaryRoster],
+    [],
   );
 
-  const analyzeReceiptPhoto = useCallback(async () => {
-    if (!receiptFile) {
+  const analyzeReceiptPhoto = useCallback(async (file?: File | null) => {
+    const photo = file ?? receiptFile;
+    if (!photo) {
       toast.error("Chưa có ảnh biên lai");
       return;
     }
     if (receiptAnalyzing) return;
+    if (file) setReceiptFile(file);
     setReceiptAnalyzing(true);
     try {
-      const json = await extractReceiptJsonFromImage(receiptFile);
-      await applyExpenseJson(json, { updateRoster: false, source: "receipt" });
+      const json = await extractReceiptJsonFromImage(photo);
+      const ok = await applyExpenseJson(json, { source: "receipt" });
+      if (ok) goToAmountPhaseRef.current?.();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Không đọc được biên lai";
       toast.error(message);
@@ -1541,12 +1533,6 @@ export default function DailyExpenseTable({
     if (active instanceof HTMLElement) active.blur();
   }, []);
   goToAmountPhaseRef.current = goToAmountPhase;
-
-  const goToVendorPhase = useCallback(() => {
-    setPhase("vendor");
-    const active = document.activeElement;
-    if (active instanceof HTMLElement) active.blur();
-  }, []);
 
   const goToMorePhase = useCallback(() => {
     setPhase("more");
@@ -2595,12 +2581,24 @@ export default function DailyExpenseTable({
                     setMatch={setMatch}
                     setVerifyData={setVerifyData}
                     onBack={goToNamePhase}
-                    onOpenVendor={goToVendorPhase}
                     onOpenMore={goToMorePhase}
                     onKeyDown={handleAmountKeyDown}
                     onSave={handleSave}
                     saving={saving}
                     noteSuggestions={noteSuggestions}
+                    nestedLines={pendingNestedLines}
+                    onClearNested={() => setPendingNestedLines([])}
+                    onPickReceiptPhoto={file => void analyzeReceiptPhoto(file)}
+                    receiptAnalyzing={receiptAnalyzing}
+                    vendors={suppliers}
+                    frequentVendorIds={frequentVendorIds}
+                    defaultVendorId={
+                      match?.itemId
+                        ? items.find(i => i.id === match.itemId)?.default_supplier_id ?? null
+                        : defaultVendorId
+                    }
+                    onSelectVendor={applyVendorSelection}
+                    onCreateVendor={createVendor}
                   />
                 </div>
 
@@ -2631,7 +2629,8 @@ export default function DailyExpenseTable({
                     canSave={
                       !saving &&
                       !receiptAnalyzing &&
-                      ([...amountLines, { amount: amountValue }].some(l => Number(l.amount) > 0))
+                      (pendingNestedLines.length > 0 ||
+                        [...amountLines, { amount: amountValue }].some(l => Number(l.amount) > 0))
                     }
                     onApplyJson={applyExpenseJson}
                     jsonHint={jsonHint}
@@ -2640,25 +2639,6 @@ export default function DailyExpenseTable({
                   />
                 </div>
               </div>
-              {phase === "vendor" && (
-                <div className="absolute inset-0 z-10 flex flex-col bg-card">
-                  <VendorPhase
-                    vendors={suppliers}
-                    frequentVendorIds={frequentVendorIds}
-                    defaultVendorId={
-                      match?.itemId
-                        ? items.find(i => i.id === match.itemId)?.default_supplier_id ?? null
-                        : defaultVendorId
-                    }
-                    selectedVendorId={match?.supplierId ?? verifyData?.supplierId ?? null}
-                    selectedVendorName={match?.supplierName || verifyData?.supplierName || ""}
-                    onSelect={applyVendorSelection}
-                    onCreate={createVendor}
-                    onDone={goToAmountPhase}
-                    onBack={goToAmountPhase}
-                  />
-                </div>
-              )}
               </div>
             )}
           </div>

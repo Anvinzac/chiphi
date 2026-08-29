@@ -1,4 +1,5 @@
 import { foldCategoryName } from "./categoryVisuals";
+import { repairCopiedJson } from "./repairCopiedJson";
 
 export type SalaryEmployee = {
   id: string;
@@ -192,8 +193,12 @@ function readSummary(value: unknown): SalarySummary | undefined {
 function employeesFromPayload(data: unknown): unknown[] | null {
   if (Array.isArray(data)) return data;
   if (!data || typeof data !== "object") return null;
-  const list = (data as Record<string, unknown>).employees;
-  return Array.isArray(list) ? list : null;
+  const rec = data as Record<string, unknown>;
+  for (const key of ["employees", "lines", "items"] as const) {
+    const list = rec[key];
+    if (Array.isArray(list)) return list;
+  }
+  return null;
 }
 
 export type ParseSalaryJsonResult =
@@ -205,18 +210,18 @@ export function parseSalaryJson(raw: string): ParseSalaryJsonResult {
   if (!trimmed) return { ok: false, error: "Chưa có JSON để dán" };
   let data: unknown;
   try {
-    data = JSON.parse(trimmed);
+    data = JSON.parse(repairCopiedJson(trimmed));
   } catch {
     return { ok: false, error: "JSON không hợp lệ" };
   }
   const list = employeesFromPayload(data);
   if (!list) {
-    return { ok: false, error: "Không thấy employees[] — dán file xuất lương (schema v1)" };
+    return { ok: false, error: "Không thấy employees[] / lines[] — dán schema v1 hoặc JSON dòng chi" };
   }
 
   const employees = list.map(mapSalaryEmployee).filter((row): row is Omit<SalaryEmployee, "id"> => row != null);
   if (employees.length === 0) {
-    return { ok: false, error: "Không map được nhân viên — cần name hoặc account, và amount" };
+    return { ok: false, error: "Không map được dòng — cần name hoặc account, và amount" };
   }
 
   let meta: SalaryImportMeta | undefined;

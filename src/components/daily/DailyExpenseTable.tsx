@@ -50,6 +50,7 @@ import {
   salaryJsonTotalVnd,
   type ExpenseLine,
 } from "@/lib/salaryEmployees";
+import { extractReceiptJsonFromImage } from "@/lib/receiptVision";
 import { useSalaryEmployees } from "@/hooks/useSalaryEmployees";
 import { useLaggedSnapshot } from "@/hooks/useLaggedSnapshot";
 import { useHighValueThresholds } from "@/hooks/useHighValueThresholds";
@@ -264,6 +265,7 @@ export default function DailyExpenseTable({
   const [completingRepeat, setCompletingRepeat] = useState<Exclude<ScheduleRepeat, "none"> | null>(null);
   const [pendingNestedLines, setPendingNestedLines] = useState<ExpenseLine[]>([]);
   const [jsonHint, setJsonHint] = useState<string | null>(null);
+  const [receiptAnalyzing, setReceiptAnalyzing] = useState(false);
 
   const nameRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
@@ -1026,7 +1028,7 @@ export default function DailyExpenseTable({
   handleNameConfirmRef.current = handleNameConfirm;
 
   const applyExpenseJson = useCallback(
-    async (raw: string) => {
+    async (raw: string, opts?: { updateRoster?: boolean; source?: "json" | "receipt" }) => {
       const result = parseSalaryJson(raw);
       if (!result.ok) {
         toast.error(result.error);
@@ -1051,23 +1053,52 @@ export default function DailyExpenseTable({
         ),
       );
       const n = result.employees.length;
+      const fromReceipt = opts?.source === "receipt";
       const label = result.meta?.period?.label;
       setJsonHint(
-        label
-          ? `Đã điền tổng từ JSON · ${n} NV · ${label}`
-          : `Đã điền tổng từ JSON · ${n} NV`,
+        fromReceipt
+          ? `Đã điền tổng từ ảnh · ${n} dòng`
+          : label
+            ? `Đã điền tổng từ JSON · ${n} NV · ${label}`
+            : `Đã điền tổng từ JSON · ${n} NV`,
       );
-      try {
-        await replaceSalaryRoster(result.employees, result.meta);
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : "Không lưu được danh sách NV";
-        toast.error(message);
+      if (opts?.updateRoster !== false) {
+        try {
+          await replaceSalaryRoster(result.employees, result.meta);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : "Không lưu được danh sách NV";
+          toast.error(message);
+        }
       }
-      toast.success(label ? `Đã lấy tổng · ${n} NV · ${label}` : `Đã lấy tổng · ${n} NV`);
+      toast.success(
+        fromReceipt
+          ? `Đã lấy tổng từ ảnh · ${n} dòng`
+          : label
+            ? `Đã lấy tổng · ${n} NV · ${label}`
+            : `Đã lấy tổng · ${n} NV`,
+      );
       return true;
     },
     [replaceSalaryRoster],
   );
+
+  const analyzeReceiptPhoto = useCallback(async () => {
+    if (!receiptFile) {
+      toast.error("Chưa có ảnh biên lai");
+      return;
+    }
+    if (receiptAnalyzing) return;
+    setReceiptAnalyzing(true);
+    try {
+      const json = await extractReceiptJsonFromImage(receiptFile);
+      await applyExpenseJson(json, { updateRoster: false, source: "receipt" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Không đọc được biên lai";
+      toast.error(message);
+    } finally {
+      setReceiptAnalyzing(false);
+    }
+  }, [applyExpenseJson, receiptAnalyzing, receiptFile]);
 
   const handleSave = useCallback(async () => {
     if (!user || savingRef.current) return;
@@ -2599,10 +2630,13 @@ export default function DailyExpenseTable({
                     saving={saving}
                     canSave={
                       !saving &&
+                      !receiptAnalyzing &&
                       ([...amountLines, { amount: amountValue }].some(l => Number(l.amount) > 0))
                     }
                     onApplyJson={applyExpenseJson}
                     jsonHint={jsonHint}
+                    receiptAnalyzing={receiptAnalyzing}
+                    onAnalyzeReceipt={analyzeReceiptPhoto}
                   />
                 </div>
               </div>

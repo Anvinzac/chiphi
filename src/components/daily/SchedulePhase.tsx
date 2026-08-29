@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Camera, Check, ChevronDown, ClipboardList, ImageIcon, Trash2 } from "lucide-react";
+import { ArrowLeft, Camera, Check, ChevronDown, ClipboardList, ImageIcon, ScanText, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
 import {
   PAYMENT_METHODS,
   SCHEDULE_OPTIONS,
@@ -8,6 +9,7 @@ import {
 } from "@/lib/expenseSchedule";
 import { SPAN_PRESETS, splitAmountAcrossPeriods, type SpanPresetKey } from "@/lib/expenseSpan";
 import { focusWithoutScroll } from "@/lib/focusWithoutScroll";
+import { repairCopiedJson } from "@/lib/repairCopiedJson";
 import MoneyLabel from "./MoneyLabel";
 
 interface SchedulePhaseProps {
@@ -35,6 +37,8 @@ interface SchedulePhaseProps {
   canSave: boolean;
   onApplyJson?: (raw: string) => Promise<boolean>;
   jsonHint?: string | null;
+  receiptAnalyzing?: boolean;
+  onAnalyzeReceipt?: () => Promise<void> | void;
 }
 
 export default function SchedulePhase({
@@ -62,19 +66,26 @@ export default function SchedulePhase({
   canSave,
   onApplyJson,
   jsonHint,
+  receiptAnalyzing = false,
+  onAnalyzeReceipt,
 }: SchedulePhaseProps) {
   const showNote = paymentMethod === "bank" || paymentMethod === "other" || paymentMethod === "borrow";
-  const [receiptOpen, setReceiptOpen] = useState(() => !!receiptPreview);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [jsonPaste, setJsonPaste] = useState("");
   const [jsonBusy, setJsonBusy] = useState(false);
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const jsonFileRef = useRef<HTMLInputElement>(null);
   const customSpanRef = useRef<HTMLInputElement>(null);
+  const advancedSectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (receiptPreview) setReceiptOpen(true);
-  }, [receiptPreview]);
+    if (!advancedOpen) return;
+    const id = window.setTimeout(() => {
+      advancedSectionRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }, 40);
+    return () => window.clearTimeout(id);
+  }, [advancedOpen]);
 
   useEffect(() => {
     if (!spanEnabled || spanPreset !== "custom") return;
@@ -109,12 +120,30 @@ export default function SchedulePhase({
 
   const applyJson = async (raw: string) => {
     if (!onApplyJson || jsonBusy) return;
+    const repaired = repairCopiedJson(raw);
+    if (repaired !== raw) setJsonPaste(repaired);
+    if (!repaired.trim()) return;
     setJsonBusy(true);
     try {
-      const ok = await onApplyJson(raw);
+      const ok = await onApplyJson(repaired);
       if (ok) setJsonPaste("");
     } finally {
       setJsonBusy(false);
+    }
+  };
+
+  const pasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text.trim()) {
+        toast.error("Clipboard trống");
+        return;
+      }
+      setJsonPaste(repairCopiedJson(text));
+      await applyJson(text);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Không đọc được clipboard";
+      toast.error(message);
     }
   };
 
@@ -140,124 +169,75 @@ export default function SchedulePhase({
         <span className="w-16" />
       </div>
 
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain no-scrollbar pb-2">
-        {onApplyJson ? (
-          <section className="space-y-2">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-              Dán JSON
-            </p>
-            <textarea
-              value={jsonPaste}
-              onChange={e => setJsonPaste(e.target.value)}
-              onPaste={e => {
-                const text = e.clipboardData.getData("text");
-                if (!text.trim()) return;
-                window.setTimeout(() => applyJson(text), 0);
-              }}
-              placeholder='{"employees":[{"account":"tphi","name":"T. Phi","amount":5000000}],"summary":{"total_amount":5000000}}'
-              className="min-h-[96px] w-full rounded-xl border border-border bg-background p-3 font-mono text-[11px] outline-none focus:border-primary/40"
-              spellCheck={false}
-            />
-            <input
-              ref={jsonFileRef}
-              type="file"
-              accept="application/json,.json,text/plain"
-              className="sr-only"
-              onChange={async e => {
-                const file = e.target.files?.[0];
-                e.currentTarget.value = "";
-                if (!file) return;
-                try {
-                  const text = await file.text();
-                  setJsonPaste(text);
-                  await applyJson(text);
-                } catch {
-                  /* ignore */
-                }
-              }}
-            />
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => jsonFileRef.current?.click()}
-                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-[11px] font-medium text-foreground"
-              >
-                <ClipboardList className="h-3.5 w-3.5" />
-                Chọn file
-              </button>
-              <button
-                type="button"
-                disabled={!jsonPaste.trim() || jsonBusy}
-                onClick={() => applyJson(jsonPaste)}
-                className="inline-flex flex-1 items-center justify-center rounded-xl border border-primary/35 bg-primary/10 px-3 py-2 text-[11px] font-medium text-primary disabled:opacity-40"
-              >
-                {jsonBusy ? "Đang map…" : "Lấy tổng"}
-              </button>
-            </div>
-            {jsonHint ? (
-              <p className="text-[11px] leading-relaxed text-foreground">
-                {jsonHint}
-                {filledVnd > 0 ? (
-                  <>
-                    {" · "}
-                    <MoneyLabel
-                      amount={filledVnd}
-                      className="inline font-display text-foreground"
-                      smallClassName="text-[0.7em]"
-                    />
-                  </>
-                ) : null}
-              </p>
-            ) : (
-              <p className="text-[11px] leading-relaxed text-muted-foreground">
-                Dán hoặc chọn file. Tổng lấy từ{" "}
-                <span className="font-medium text-foreground">summary.total_amount</span>
-                {", "}hoặc cộng <span className="font-medium text-foreground">employees[].amount</span>.
-              </p>
-            )}
-          </section>
-        ) : null}
-
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain no-scrollbar pb-2">
         <section>
-          <button
-            type="button"
-            onClick={() => setRememberAmount(!rememberAmount)}
-            className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition-colors ${
-              rememberAmount
-                ? "border-primary/40 bg-primary/10"
-                : "border-border/60 bg-muted/40 hover:bg-muted"
-            }`}
-            aria-pressed={rememberAmount}
-          >
-            <span className="min-w-0">
-              <span className="block text-[11px] font-medium text-foreground">Nhớ số tiền</span>
-              <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                {rememberAmount
-                  ? "Lần sau nhập tên này sẽ điền sẵn"
-                  : "Lưu làm số tiền mặc định lần sau"}
-              </span>
-            </span>
-          </button>
+          <p className="mb-1.5 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+            Cách thanh toán
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {PAYMENT_METHODS.map(m => {
+              const active = paymentMethod === m.id;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setPaymentMethod(m.id)}
+                  className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                    active
+                      ? "border-primary/50 bg-primary/15 font-medium text-primary"
+                      : "border-border/60 bg-muted/70 text-foreground hover:border-primary/30"
+                  }`}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+          {showNote && (
+            <input
+              type="text"
+              value={paymentMethodNote}
+              onChange={e => setPaymentMethodNote(e.target.value)}
+              placeholder={
+                paymentMethod === "bank"
+                  ? "Tên ngân hàng / STK…"
+                  : paymentMethod === "borrow"
+                    ? "Vay của ai…"
+                    : "Ghi chú…"
+              }
+              className="mt-2 w-full border-b border-border/50 bg-transparent py-2 text-sm outline-none caret-primary placeholder:text-muted-foreground/40 focus:border-primary/50"
+              autoComplete="off"
+            />
+          )}
         </section>
 
         <section className="space-y-1.5">
-          <button
-            type="button"
-            onClick={() => setSpanEnabled(!spanEnabled)}
-            className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition-colors ${
-              spanEnabled
-                ? "border-primary/40 bg-primary/10"
-                : "border-border/60 bg-muted/40 hover:bg-muted"
-            }`}
-            aria-pressed={spanEnabled}
-          >
-            <span className="min-w-0">
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              onClick={() => setRememberAmount(!rememberAmount)}
+              className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                rememberAmount
+                  ? "border-primary/40 bg-primary/10"
+                  : "border-border/60 bg-muted/40 hover:bg-muted"
+              }`}
+              aria-pressed={rememberAmount}
+            >
+              <span className="block text-[11px] font-medium text-foreground">Nhớ số tiền</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSpanEnabled(!spanEnabled)}
+              className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                spanEnabled
+                  ? "border-primary/40 bg-primary/10"
+                  : "border-border/60 bg-muted/40 hover:bg-muted"
+              }`}
+              aria-pressed={spanEnabled}
+            >
               <span className="block text-[11px] font-medium text-foreground">Chia nhiều kỳ</span>
-              <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                {spanEnabled ? "Bật" : "Sửa lớn / đặt hàng số lượng lớn"}
-              </span>
-            </span>
-          </button>
+            </button>
+          </div>
 
           {spanEnabled && (
             <div className="space-y-1.5 rounded-xl border border-border/50 bg-card/80 px-2.5 py-2">
@@ -362,135 +342,238 @@ export default function SchedulePhase({
           </div>
         </section>
 
-        <section>
-          <p className="mb-1.5 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-            Cách thanh toán
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {PAYMENT_METHODS.map(m => {
-              const active = paymentMethod === m.id;
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => setPaymentMethod(m.id)}
-                  className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                    active
-                      ? "border-primary/50 bg-primary/15 font-medium text-primary"
-                      : "border-border/60 bg-muted/70 text-foreground hover:border-primary/30"
-                  }`}
-                >
-                  {m.label}
-                </button>
-              );
-            })}
-          </div>
-          {showNote && (
-            <input
-              type="text"
-              value={paymentMethodNote}
-              onChange={e => setPaymentMethodNote(e.target.value)}
-              placeholder={
-                paymentMethod === "bank"
-                  ? "Tên ngân hàng / STK…"
-                  : paymentMethod === "borrow"
-                    ? "Vay của ai…"
-                    : "Ghi chú…"
-              }
-              className="mt-2 w-full border-b border-border/50 bg-transparent py-2 text-sm outline-none caret-primary placeholder:text-muted-foreground/40 focus:border-primary/50"
-              autoComplete="off"
-            />
-          )}
-        </section>
-
-        <section>
+        <section ref={advancedSectionRef}>
           <button
             type="button"
-            onClick={() => setReceiptOpen(open => !open)}
+            onClick={() => setAdvancedOpen(open => !open)}
             className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition-colors ${
-              receiptOpen || receiptPreview
+              advancedOpen || jsonHint || receiptPreview
                 ? "border-primary/40 bg-primary/10"
                 : "border-border/60 bg-muted/40 hover:bg-muted"
             }`}
-            aria-expanded={receiptOpen}
+            aria-expanded={advancedOpen}
           >
             <span className="min-w-0">
-              <span className="block text-[11px] font-medium text-foreground">Biên lai</span>
+              <span className="block text-[11px] font-medium text-foreground">Nâng cao</span>
               <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                {receiptPreview ? "Đã gắn ảnh giao dịch" : "Chụp hoặc tải ảnh (tuỳ chọn)"}
+                {jsonHint
+                  ? jsonHint
+                  : receiptPreview
+                    ? "Đã gắn ảnh biên lai"
+                    : "JSON và biên lai viết tay"}
               </span>
             </span>
             <ChevronDown
-              className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
-                receiptOpen ? "rotate-180" : ""
+              className={`schedule-fold-chevron h-4 w-4 shrink-0 text-muted-foreground ${
+                advancedOpen ? "rotate-180" : ""
               }`}
             />
           </button>
 
-          {receiptOpen && (
-            <div className="mt-2 space-y-2 rounded-xl border border-border/50 bg-card/80 px-2.5 py-2.5">
-              {receiptPreview ? (
-                <div className="relative overflow-hidden rounded-xl border border-border/60 bg-muted/30">
-                  <img
-                    src={receiptPreview}
-                    alt="Biên lai"
-                    className="max-h-36 w-full bg-black/5 object-contain"
-                  />
+          {advancedOpen && (
+            <div className="mt-2 space-y-4 rounded-xl border border-border/50 bg-card/80 px-2.5 py-2.5">
+              <div className="space-y-2">
+                <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                  Biên lai
+                </p>
+                {receiptPreview ? (
+                  <div className="relative overflow-hidden rounded-xl border border-border/60 bg-muted/30">
+                    <img
+                      src={receiptPreview}
+                      alt="Biên lai"
+                      className="max-h-36 w-full bg-black/5 object-contain"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onPickReceipt(null)}
+                      className="absolute top-2 right-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-background/90 text-destructive shadow-sm"
+                      aria-label="Xóa ảnh"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-[11px] leading-relaxed text-muted-foreground">
+                    Ảnh viết tay được đọc thành JSON{" "}
+                    <span className="font-medium text-foreground">employees[]</span>
+                    {" + "}
+                    <span className="font-medium text-foreground">summary.total_amount</span>
+                    , cùng format dán tay.
+                  </p>
+                )}
+
+                <input
+                  ref={cameraRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="sr-only"
+                  onChange={e => {
+                    onPickReceipt(e.target.files?.[0] ?? null);
+                    e.currentTarget.value = "";
+                  }}
+                />
+                <input
+                  ref={galleryRef}
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={e => {
+                    onPickReceipt(e.target.files?.[0] ?? null);
+                    e.currentTarget.value = "";
+                  }}
+                />
+
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => onPickReceipt(null)}
-                    className="absolute top-2 right-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-background/90 text-destructive shadow-sm"
-                    aria-label="Xóa ảnh"
+                    onClick={() => cameraRef.current?.click()}
+                    className="flex items-center justify-center gap-2 rounded-xl border border-primary/35 bg-primary/10 px-3 py-2.5 text-xs font-medium text-primary"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Camera className="h-4 w-4" />
+                    Chụp ảnh
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => galleryRef.current?.click()}
+                    className="flex items-center justify-center gap-2 rounded-xl border border-border/60 bg-muted/60 px-3 py-2.5 text-xs font-medium text-foreground"
+                  >
+                    <ImageIcon className="h-4 w-4" />
+                    Thư viện
                   </button>
                 </div>
-              ) : (
-                <p className="px-1 py-2 text-center text-[11px] text-muted-foreground">
-                  Ảnh xác nhận giao dịch. Cho phép camera hoặc chọn từ thư viện.
-                </p>
-              )}
 
-              <input
-                ref={cameraRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="sr-only"
-                onChange={e => {
-                  onPickReceipt(e.target.files?.[0] ?? null);
-                  e.currentTarget.value = "";
-                }}
-              />
-              <input
-                ref={galleryRef}
-                type="file"
-                accept="image/*"
-                className="sr-only"
-                onChange={e => {
-                  onPickReceipt(e.target.files?.[0] ?? null);
-                  e.currentTarget.value = "";
-                }}
-              />
-
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => cameraRef.current?.click()}
-                  className="flex items-center justify-center gap-2 rounded-xl border border-primary/35 bg-primary/10 px-3 py-2.5 text-xs font-medium text-primary"
-                >
-                  <Camera className="h-4 w-4" />
-                  Chụp ảnh
-                </button>
-                <button
-                  type="button"
-                  onClick={() => galleryRef.current?.click()}
-                  className="flex items-center justify-center gap-2 rounded-xl border border-border/60 bg-muted/60 px-3 py-2.5 text-xs font-medium text-foreground"
-                >
-                  <ImageIcon className="h-4 w-4" />
-                  Thư viện
-                </button>
+                {onAnalyzeReceipt ? (
+                  <button
+                    type="button"
+                    onClick={() => void onAnalyzeReceipt()}
+                    disabled={!receiptPreview || receiptAnalyzing}
+                    className={`flex w-full items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/15 px-3 py-2.5 text-xs font-medium text-primary disabled:opacity-40 ${
+                      receiptAnalyzing ? "receipt-analyze-busy" : ""
+                    }`}
+                  >
+                    <ScanText className="h-4 w-4" />
+                    {receiptAnalyzing ? "Đang đọc chữ viết tay…" : "Đọc chữ viết tay"}
+                  </button>
+                ) : null}
+                {jsonHint && jsonHint.includes("ảnh") ? (
+                  <p className="text-[11px] leading-relaxed text-foreground">
+                    {jsonHint}
+                    {filledVnd > 0 ? (
+                      <>
+                        {" · "}
+                        <MoneyLabel
+                          amount={filledVnd}
+                          className="inline font-display text-foreground"
+                          smallClassName="text-[0.7em]"
+                        />
+                      </>
+                    ) : null}
+                  </p>
+                ) : null}
               </div>
+
+              {onApplyJson ? (
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                    Dán JSON
+                  </p>
+                  <div className="relative">
+                    <textarea
+                      value={jsonPaste}
+                      onChange={e => setJsonPaste(e.target.value)}
+                      onPaste={e => {
+                        const text = e.clipboardData.getData("text");
+                        if (!text.trim()) return;
+                        e.preventDefault();
+                        const repaired = repairCopiedJson(text);
+                        setJsonPaste(repaired);
+                        window.setTimeout(() => applyJson(repaired), 0);
+                      }}
+                      placeholder='{"employees":[{"name":"Rau","amount":25000}],"summary":{"total_amount":25000}}'
+                      className="min-h-[96px] w-full rounded-xl border border-border bg-background p-3 pr-14 font-mono text-[11px] outline-none focus:border-primary/40"
+                      spellCheck={false}
+                    />
+                    {jsonPaste.trim() ? (
+                      <button
+                        type="button"
+                        onClick={() => setJsonPaste("")}
+                        className="absolute top-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-border/70 bg-background/90 text-foreground shadow-sm"
+                        aria-label="Xóa JSON"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void pasteFromClipboard()}
+                        disabled={jsonBusy}
+                        className="absolute top-2 right-2 inline-flex h-7 items-center justify-center rounded-lg border border-primary/35 bg-primary/15 px-2 text-[11px] font-medium text-foreground disabled:opacity-40"
+                      >
+                        Dán
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    ref={jsonFileRef}
+                    type="file"
+                    accept="application/json,.json,text/plain"
+                    className="sr-only"
+                    onChange={async e => {
+                      const file = e.target.files?.[0];
+                      e.currentTarget.value = "";
+                      if (!file) return;
+                      try {
+                        const text = await file.text();
+                        setJsonPaste(text);
+                        await applyJson(text);
+                      } catch {
+                        /* ignore */
+                      }
+                    }}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => jsonFileRef.current?.click()}
+                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-[11px] font-medium text-foreground"
+                    >
+                      <ClipboardList className="h-3.5 w-3.5" />
+                      Chọn file
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!jsonPaste.trim() || jsonBusy}
+                      onClick={() => applyJson(jsonPaste)}
+                      className="inline-flex flex-1 items-center justify-center rounded-xl border border-primary/35 bg-primary/10 px-3 py-2 text-[11px] font-medium text-primary disabled:opacity-40"
+                    >
+                      {jsonBusy ? "Đang map…" : "Lấy tổng"}
+                    </button>
+                  </div>
+                  {jsonHint && !jsonHint.includes("ảnh") ? (
+                    <p className="text-[11px] leading-relaxed text-foreground">
+                      {jsonHint}
+                      {filledVnd > 0 ? (
+                        <>
+                          {" · "}
+                          <MoneyLabel
+                            amount={filledVnd}
+                            className="inline font-display text-foreground"
+                            smallClassName="text-[0.7em]"
+                          />
+                        </>
+                      ) : null}
+                    </p>
+                  ) : (
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                      Dán hoặc chọn file. Tổng lấy từ{" "}
+                      <span className="font-medium text-foreground">summary.total_amount</span>
+                      {", "}hoặc cộng{" "}
+                      <span className="font-medium text-foreground">employees[].amount</span>.
+                    </p>
+                  )}
+                </div>
+              ) : null}
             </div>
           )}
         </section>

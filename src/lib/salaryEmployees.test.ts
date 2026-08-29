@@ -61,10 +61,38 @@ describe("parseSalaryJson schema v1", () => {
     expect(result.meta).toBeUndefined();
   });
 
+  it("repairs messy copied JSON before mapping employees", () => {
+    const messy = `{employees:[{name:“Rau”,amount:25000,},],summary:{total_amount:25000,},}`;
+    const result = parseSalaryJson(messy);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.employees).toEqual([{ name: "Rau", amount: 25_000 }]);
+    expect(result.meta?.summary?.total_amount).toBe(25_000);
+  });
+
   it("rejects empty or invalid JSON", () => {
     expect(parseSalaryJson("").ok).toBe(false);
     expect(parseSalaryJson("{").ok).toBe(false);
     expect(parseSalaryJson('{"foo":1}').ok).toBe(false);
+  });
+
+  it("accepts receipt lines[] with the same name/amount fields", () => {
+    const result = parseSalaryJson(
+      JSON.stringify({
+        lines: [
+          { name: "Rau cải", amount: 25_000 },
+          { name: "Cà chua", amount: 12_000 },
+        ],
+        summary: { total_amount: 40_000, employee_count: 2 },
+      }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.employees).toEqual([
+      { name: "Rau cải", amount: 25_000 },
+      { name: "Cà chua", amount: 12_000 },
+    ]);
+    expect(salaryJsonTotalVnd(result.employees, result.meta)).toBe(40_000);
   });
 
   it("prefers summary.total_amount, else sums employees", () => {

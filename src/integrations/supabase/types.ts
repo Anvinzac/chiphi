@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -625,69 +625,6 @@ export type Database = {
           },
         ]
       }
-      salary_employees: {
-        Row: {
-          account: string | null
-          amount: number
-          created_at: string
-          deposit: number | null
-          id: string
-          name: string
-          sort_index: number
-          transfer_amount: number | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          account?: string | null
-          amount?: number
-          created_at?: string
-          deposit?: number | null
-          id?: string
-          name: string
-          sort_index?: number
-          transfer_amount?: number | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          account?: string | null
-          amount?: number
-          created_at?: string
-          deposit?: number | null
-          id?: string
-          name?: string
-          sort_index?: number
-          transfer_amount?: number | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      salary_roster_meta: {
-        Row: {
-          exported_at: string | null
-          period: Json | null
-          summary: Json | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          exported_at?: string | null
-          period?: Json | null
-          summary?: Json | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          exported_at?: string | null
-          period?: Json | null
-          summary?: Json | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       sub_categories: {
         Row: {
           category_id: string
@@ -726,47 +663,6 @@ export type Database = {
             columns: ["parent_sub_category_id"]
             isOneToOne: false
             referencedRelation: "sub_categories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      sub_payment_lines: {
-        Row: {
-          amount: number
-          attrs: Json
-          created_at: string
-          id: string
-          name: string
-          sort_index: number
-          sub_payment_id: string
-          user_id: string
-        }
-        Insert: {
-          amount?: number
-          attrs?: Json
-          created_at?: string
-          id?: string
-          name: string
-          sort_index?: number
-          sub_payment_id: string
-          user_id: string
-        }
-        Update: {
-          amount?: number
-          attrs?: Json
-          created_at?: string
-          id?: string
-          name?: string
-          sort_index?: number
-          sub_payment_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "sub_payment_lines_sub_payment_id_fkey"
-            columns: ["sub_payment_id"]
-            isOneToOne: false
-            referencedRelation: "sub_payments"
             referencedColumns: ["id"]
           },
         ]
@@ -868,13 +764,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "suppliers"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sub_payment_lines_sub_payment_id_fkey"
-            columns: ["id"]
-            isOneToOne: false
-            referencedRelation: "sub_payment_lines"
-            referencedColumns: ["sub_payment_id"]
           },
         ]
       }

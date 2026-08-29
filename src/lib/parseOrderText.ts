@@ -208,7 +208,7 @@ export function parseOrderText(
             id: matched.id,
             name: matched.name,
             unit: matched.unit,
-            reference_price: matched.reference_price,
+            reference_price: matched.reference_price ?? null,
           }
         : null,
     });

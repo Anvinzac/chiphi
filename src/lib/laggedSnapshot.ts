@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { isMissingRelation } from "@/lib/supabaseMissing";
 
 type PaymentsRow = Database["public"]["Tables"]["payments"]["Row"];
 type SubPaymentsRow = Database["public"]["Tables"]["sub_payments"]["Row"];
@@ -22,6 +23,9 @@ type OrderCategoriesRow = Pick<
   Database["public"]["Tables"]["order_categories"]["Row"],
   "id" | "name" | "source_key" | "sort_order" | "user_id"
 >;
+type SubPaymentLinesRow = Database["public"]["Tables"]["sub_payment_lines"]["Row"];
+type SalaryEmployeesRow = Database["public"]["Tables"]["salary_employees"]["Row"];
+type SalaryRosterMetaRow = Database["public"]["Tables"]["salary_roster_meta"]["Row"];
 
 export const SNAPSHOT_VERSION = 1;
 
@@ -38,6 +42,9 @@ export type SnapshotPayload = {
   orders: OrdersRow[];
   order_items: OrderItemsRow[];
   order_categories: OrderCategoriesRow[];
+  sub_payment_lines?: SubPaymentLinesRow[];
+  salary_employees?: SalaryEmployeesRow[];
+  salary_roster_meta?: SalaryRosterMetaRow[];
 };
 
 export type SnapshotSlot = "today" | "yesterday";
@@ -68,18 +75,6 @@ export function localDateKey(d = new Date()) {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
-}
-
-function isMissingRelation(error: { message?: string; code?: string } | null) {
-  const msg = String(error?.message || "").toLowerCase();
-  const code = String(error?.code || "");
-  return (
-    code === "42P01" ||
-    code === "PGRST205" ||
-    msg.includes("does not exist") ||
-    msg.includes("could not find the table") ||
-    msg.includes("schema cache")
-  );
 }
 
 function payloadWeight(data: SnapshotPayload) {
@@ -261,6 +256,9 @@ export async function fetchLiveSnapshot(
       orders,
       order_items,
       order_categories,
+      sub_payment_lines,
+      salary_employees,
+      salary_roster_meta,
     ] = await Promise.all([
       optionalTable(supabase.from("expense_schedules").select("*").eq("user_id", userId)),
       optionalTable(supabase.from("expense_spans").select("*").eq("user_id", userId)),
@@ -281,6 +279,9 @@ export async function fetchLiveSnapshot(
           .select("id, name, source_key, sort_order, user_id")
           .eq("user_id", userId),
       ),
+      optionalTable(supabase.from("sub_payment_lines").select("*").eq("user_id", userId)),
+      optionalTable(supabase.from("salary_employees").select("*").eq("user_id", userId)),
+      optionalTable(supabase.from("salary_roster_meta").select("*").eq("user_id", userId)),
     ]);
 
     const orderIds = new Set((orders as OrdersRow[]).map(o => o.id));
@@ -300,6 +301,9 @@ export async function fetchLiveSnapshot(
         orders: orders as OrdersRow[],
         order_items: (order_items as OrderItemsRow[]).filter(i => orderIds.has(i.order_id)),
         order_categories: order_categories as OrderCategoriesRow[],
+        sub_payment_lines: sub_payment_lines as SubPaymentLinesRow[],
+        salary_employees: salary_employees as SalaryEmployeesRow[],
+        salary_roster_meta: salary_roster_meta as SalaryRosterMetaRow[],
       },
     };
   } catch (err: unknown) {
@@ -315,6 +319,12 @@ export function paymentsWithSubsInRange(data: SnapshotPayload, start: string, en
     if (list) list.push(row);
     else byPayment.set(row.payment_id, [row]);
   }
+  const linesBySub = new Map<string, SubPaymentLinesRow[]>();
+  for (const line of data.sub_payment_lines ?? []) {
+    const list = linesBySub.get(line.sub_payment_id);
+    if (list) list.push(line);
+    else linesBySub.set(line.sub_payment_id, [line]);
+  }
   return data.payments
     .filter(p => p.date >= start && p.date <= end)
     .sort((a, b) => a.created_at.localeCompare(b.created_at))
@@ -323,7 +333,10 @@ export function paymentsWithSubsInRange(data: SnapshotPayload, start: string, en
       date: p.date,
       total_amount: p.total_amount,
       supplier_id: p.supplier_id,
-      sub_payments: byPayment.get(p.id) ?? [],
+      sub_payments: (byPayment.get(p.id) ?? []).map(s => ({
+        ...s,
+        sub_payment_lines: linesBySub.get(s.id) ?? [],
+      })),
     }));
 }
 

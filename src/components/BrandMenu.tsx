@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ChevronDown, LogOut, Settings, Store, Bell } from "lucide-react";
+import { ChevronDown, LogOut, Settings, Store, Bell, Users } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +39,12 @@ export default function BrandMenu({ isDemo, onSignOut }: BrandMenuProps) {
           <Link to="/reminders" className="flex cursor-pointer items-center gap-2">
             <Bell className="h-4 w-4" />
             Lịch nhắc
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/salary" className="flex cursor-pointer items-center gap-2">
+            <Users className="h-4 w-4" />
+            Nhân viên
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>

@@ -41,6 +41,8 @@ import { EXTRA_WEEKLY_CATEGORIES, foldCategoryName, getCategoryVisual, type Cate
 import { getAmountDefault, setAmountDefault } from "@/lib/expenseAmountDefaults";
 import { thousandsFromVnd } from "@/lib/vndThousands";
 import { paymentsWithSubsInRange, readLaggedSnapshot, type SnapshotPayload } from "@/lib/laggedSnapshot";
+import { isMissingRelation } from "@/lib/supabaseMissing";
+import { normalizeSubPaymentLines } from "@/lib/salaryEmployees";
 import { useLaggedSnapshot } from "@/hooks/useLaggedSnapshot";
 import { useHighValueThresholds } from "@/hooks/useHighValueThresholds";
 import { amountHighlight } from "@/lib/highValueThresholds";
@@ -544,19 +546,31 @@ export default function DailyExpenseTable({
       const rangeStart = viewMode === "daily" ? selectedDate : periodStartStr;
       const rangeEnd = viewMode === "daily" ? selectedDate : periodEndStr;
 
-      let query = supabase
-        .from("payments")
-        .select("id, date, total_amount, supplier_id, created_at, sub_payments(id, item_name, amount, category_id, supplier_id, notes)")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: true });
+      const PAYMENTS_SELECT_WITH_LINES =
+        "id, date, total_amount, supplier_id, created_at, sub_payments(id, item_name, amount, category_id, supplier_id, notes, sub_payment_lines(id, name, amount, attrs, sort_index))";
+      const PAYMENTS_SELECT_FLAT =
+        "id, date, total_amount, supplier_id, created_at, sub_payments(id, item_name, amount, category_id, supplier_id, notes)";
 
-      if (viewMode === "daily") {
-        query = query.eq("date", selectedDate);
-      } else {
-        query = query.gte("date", periodStartStr).lte("date", periodEndStr);
+      const buildPaymentsQuery = (select: string) => {
+        let query = supabase
+          .from("payments")
+          .select(select as "*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: true });
+        if (viewMode === "daily") {
+          query = query.eq("date", selectedDate);
+        } else {
+          query = query.gte("date", periodStartStr).lte("date", periodEndStr);
+        }
+        return query;
+      };
+
+      let { data: livePayments, error: paymentsError } = await buildPaymentsQuery(PAYMENTS_SELECT_WITH_LINES);
+      if (paymentsError && isMissingRelation(paymentsError)) {
+        const retry = await buildPaymentsQuery(PAYMENTS_SELECT_FLAT);
+        livePayments = retry.data;
+        paymentsError = retry.error;
       }
-
-      const { data: livePayments, error: paymentsError } = await query;
       if (loadId !== paymentsLoadIdRef.current) return;
 
       let payments: {
@@ -570,8 +584,9 @@ export default function DailyExpenseTable({
           category_id: string | null;
           supplier_id: string | null;
           notes: string | null;
+          sub_payment_lines?: unknown;
         }[] | null;
-      }[] | null = livePayments;
+      }[] | null = livePayments as any;
 
       if (paymentsError || payments == null) {
         const lagged = snapshot ?? (await readLaggedSnapshot(user.id))?.data ?? null;
@@ -633,6 +648,7 @@ export default function DailyExpenseTable({
               supplier_id: s.supplier_id,
               sub_payment_id: s.id,
               notes: s.notes ?? null,
+              nestedLines: normalizeSubPaymentLines(s.sub_payment_lines),
             })),
           };
         });
@@ -2066,6 +2082,7 @@ export default function DailyExpenseTable({
                             : amountHighlight(item.entry.amount, highValue, veryHighValue)
                         }
                         isPending={item.entry.isPending}
+                        nestedLines={item.entry.nestedLines}
                         onNameClick={() => {
                           if (item.entry.isPending) openReminder(item.entry);
                           else filterAlikePurchases(item.entry.item_name);

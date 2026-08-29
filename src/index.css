@@ -449,6 +449,97 @@
     transform: rotate(-90deg);
   }
 
+  .salary-roster {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem;
+    padding: 0.15rem 0.75rem 0.85rem 3.35rem;
+  }
+
+  .salary-roster__cell {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.35rem;
+    padding: 0.48rem 0.55rem;
+    border-radius: 0.7rem;
+    background: linear-gradient(160deg, #ece6f0 0%, #d8cfe0 100%);
+    color: #3a4f58;
+    box-shadow: inset 0 0 0 1px rgba(40, 28, 20, 0.05);
+  }
+
+  .salary-roster__name {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.72rem;
+    font-weight: 550;
+    line-height: 1.2;
+  }
+
+  .salary-roster__pay {
+    flex-shrink: 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+    color: #3a4f58;
+  }
+
+  .salary-amount-hit {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+  }
+
+  .salary-amount-hit .salary-amount-chevron {
+    width: 0.7rem;
+    height: 0.7rem;
+    color: #7a6d82;
+    transition: transform 0.38s cubic-bezier(0.22, 1.12, 0.32, 1);
+  }
+
+  .salary-amount-hit[aria-expanded="true"] .salary-amount-chevron {
+    transform: rotate(180deg);
+  }
+
+  .salary-roster-empty {
+    padding: 0.35rem 0.75rem 0.9rem 3.35rem;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .salary-roster-empty__link {
+    display: inline-block;
+    margin-top: 0.2rem;
+    font-weight: 600;
+    color: #3a4f58;
+    text-decoration: underline;
+    text-underline-offset: 0.12em;
+  }
+
+  .salary-roster-foot {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.15rem 0.75rem 0.75rem 3.35rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #6a5d70;
+  }
+
+  .salary-roster-foot__edit {
+    margin-left: 0.45rem;
+    font-weight: 550;
+    color: hsl(var(--muted-foreground));
+    text-decoration: underline;
+    text-underline-offset: 0.12em;
+  }
+
   .total-amount-hit {
     display: inline-flex;
     width: max-content;
@@ -508,6 +599,7 @@
     .day-section-fold,
     .day-section-fold__body,
     .day-section-chevron,
+    .salary-amount-hit .salary-amount-chevron,
     .vendor-done-pill {
       transition: none;
     }

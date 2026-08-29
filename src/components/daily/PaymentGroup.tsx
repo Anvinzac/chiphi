@@ -6,6 +6,7 @@ import MoneyLabel from "./MoneyLabel";
 import { formatDayMonth } from "@/lib/formatDateVi";
 import type { ScheduleRepeat } from "@/lib/expenseSchedule";
 import { amountHighlight } from "@/lib/highValueThresholds";
+import type { ExpenseLine } from "@/lib/salaryEmployees";
 
 export interface PaymentEntry {
   item_name: string;
@@ -18,6 +19,7 @@ export interface PaymentEntry {
   scheduleId?: string;
   pendingRepeat?: Exclude<ScheduleRepeat, "none">;
   paymentMethod?: string | null;
+  nestedLines?: ExpenseLine[];
 }
 
 export interface PaymentGroupData {
@@ -68,6 +70,7 @@ export default function PaymentGroup({
         entry.isPending ? "none" : amountHighlight(entry.amount, high, veryHigh)
       }
       isPending={entry.isPending}
+      nestedLines={entry.nestedLines}
       onClick={() => onEntryClick(entry)}
       onNameClick={onEntryNameClick ? () => onEntryNameClick(entry) : undefined}
       onAmountClick={onEntryAmountClick ? () => onEntryAmountClick(entry) : undefined}

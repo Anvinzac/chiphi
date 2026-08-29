@@ -1,6 +1,12 @@
+import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import MoneyLabel from "./MoneyLabel";
 import CategoryGlyph from "./CategoryGlyph";
+import SalaryRoster from "./SalaryRoster";
 import { useHoldToConfirm } from "@/hooks/useHoldToConfirm";
+import { isSalaryExpense } from "@/lib/salaryRoster";
+import { useSalaryEmployees } from "@/hooks/useSalaryEmployees";
+import { employeesToExpenseLines, type ExpenseLine } from "@/lib/salaryEmployees";
 import {
   amountHighlightLabelClass,
   amountHighlightTitle,
@@ -16,6 +22,7 @@ interface SwipeableEntryRowProps {
   supplierName?: string;
   highlight?: AmountHighlight;
   isPending?: boolean;
+  nestedLines?: ExpenseLine[];
   onDelete: () => void;
   onClick: () => void;
   onNameClick?: () => void;
@@ -31,6 +38,7 @@ export default function SwipeableEntryRow({
   supplierName,
   highlight = "none",
   isPending = false,
+  nestedLines,
   onDelete,
   onClick,
   onNameClick,
@@ -40,6 +48,14 @@ export default function SwipeableEntryRow({
   const { confirming, cancelConfirm, consumeClick, rootRef, holdProps } = useHoldToConfirm({
     enabled: !isPending,
   });
+  const salary = !isPending && isSalaryExpense(item_name, categoryName);
+  const isContainer = !isPending;
+  const [rosterOpen, setRosterOpen] = useState(false);
+  const { employees, meta } = useSalaryEmployees();
+  const ownLines = nestedLines ?? [];
+  const displayLines =
+    ownLines.length > 0 ? ownLines : salary ? employeesToExpenseLines(employees) : [];
+  const periodLabel = ownLines.length > 0 ? null : meta?.period?.label;
 
   const handleRowClick = () => {
     if (consumeClick()) return;
@@ -67,6 +83,10 @@ export default function SwipeableEntryRow({
       cancelConfirm();
       return;
     }
+    if (isContainer) {
+      setRosterOpen(open => !open);
+      return;
+    }
     onAmountClick?.();
   };
 
@@ -84,7 +104,7 @@ export default function SwipeableEntryRow({
         } ${confirming ? "bg-destructive/5" : ""}`}
         onClick={handleRowClick}
       >
-        <CategoryGlyph categoryName={categoryName} />
+        <CategoryGlyph categoryName={categoryName || (salary ? item_name : undefined)} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 min-w-0">
             {onNameClick ? (
@@ -162,11 +182,18 @@ export default function SwipeableEntryRow({
             >
               Xóa
             </button>
-          ) : onAmountClick ? (
+          ) : onAmountClick || isContainer ? (
             <button
               type="button"
-              className="tabular-nums"
-              title={amountHighlightTitle(highlight) ?? "Sửa số tiền"}
+              className="tabular-nums salary-amount-hit"
+              title={
+                rosterOpen
+                  ? "Đóng chi tiết"
+                  : salary
+                    ? "Xem chi tiết lương"
+                    : "Xem chi tiết khoản chi"
+              }
+              aria-expanded={rosterOpen}
               onClick={handleAmountClick}
             >
               <MoneyLabel
@@ -174,6 +201,7 @@ export default function SwipeableEntryRow({
                 className={`text-sm font-display text-foreground/85 ${amountHighlightLabelClass(highlight)}`}
                 smallClassName="text-[0.7em]"
               />
+              <ChevronDown className="salary-amount-chevron" strokeWidth={2.4} />
             </button>
           ) : (
             <MoneyLabel
@@ -184,6 +212,19 @@ export default function SwipeableEntryRow({
           )}
         </span>
       </div>
+      {isContainer ? (
+        <div className={`day-section-fold ${rosterOpen ? "day-section-fold--open" : ""}`}>
+          <div className="day-section-fold__clip">
+            <div className="day-section-fold__body">
+              <SalaryRoster
+                lines={displayLines}
+                periodLabel={periodLabel}
+                salary={salary}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

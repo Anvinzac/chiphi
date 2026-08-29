@@ -176,7 +176,7 @@ export function parseOrderLine(raw: string): {
 
 export function parseOrderText(
   text: string,
-  catalog: { id: string; name: string; unit: string; reference_price: number | null }[],
+  catalog: { id: string; name: string; unit: string; reference_price?: number | null }[],
 ): ParsedOrderLine[] {
   const catalogMap = new Map<string, (typeof catalog)[number]>();
   for (const ing of catalog) {
@@ -208,7 +208,7 @@ export function parseOrderText(
             id: matched.id,
             name: matched.name,
             unit: matched.unit,
-            reference_price: matched.reference_price,
+            reference_price: matched.reference_price ?? null,
           }
         : null,
     });

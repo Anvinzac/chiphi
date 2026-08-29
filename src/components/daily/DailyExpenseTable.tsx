@@ -42,7 +42,15 @@ import { getAmountDefault, setAmountDefault } from "@/lib/expenseAmountDefaults"
 import { thousandsFromVnd } from "@/lib/vndThousands";
 import { paymentsWithSubsInRange, readLaggedSnapshot, type SnapshotPayload } from "@/lib/laggedSnapshot";
 import { isMissingRelation } from "@/lib/supabaseMissing";
-import { normalizeSubPaymentLines } from "@/lib/salaryEmployees";
+import {
+  employeesToExpenseLines,
+  newSalaryEmployee,
+  normalizeSubPaymentLines,
+  parseSalaryJson,
+  salaryJsonTotalVnd,
+  type ExpenseLine,
+} from "@/lib/salaryEmployees";
+import { useSalaryEmployees } from "@/hooks/useSalaryEmployees";
 import { useLaggedSnapshot } from "@/hooks/useLaggedSnapshot";
 import { useHighValueThresholds } from "@/hooks/useHighValueThresholds";
 import { amountHighlight } from "@/lib/highValueThresholds";
@@ -168,6 +176,7 @@ export default function DailyExpenseTable({
 }: DailyExpenseTableProps = {}) {
   const { user } = useAuth();
   const throwaway = isThrowawayAccount(user?.email);
+  const { replaceAll: replaceSalaryRoster } = useSalaryEmployees();
   const { snapshot, scheduleRefresh } = useLaggedSnapshot();
   const [{ high: highValue, veryHigh: veryHighValue }] = useHighValueThresholds();
   const [viewMode, setViewMode] = useState<ViewMode>("range");
@@ -253,6 +262,8 @@ export default function DailyExpenseTable({
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
   const [completingScheduleId, setCompletingScheduleId] = useState<string | null>(null);
   const [completingRepeat, setCompletingRepeat] = useState<Exclude<ScheduleRepeat, "none"> | null>(null);
+  const [pendingNestedLines, setPendingNestedLines] = useState<ExpenseLine[]>([]);
+  const [jsonHint, setJsonHint] = useState<string | null>(null);
 
   const nameRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
@@ -840,6 +851,7 @@ export default function DailyExpenseTable({
     amountValue.trim() !== "" ||
     noteValue.trim() !== "" ||
     amountLines.length > 0 ||
+    pendingNestedLines.length > 0 ||
     !!receiptFile ||
     spanEnabled ||
     scheduleRepeat !== "none" ||
@@ -852,6 +864,8 @@ export default function DailyExpenseTable({
     setAmountValue("");
     setNoteValue("");
     setAmountLines([]);
+    setPendingNestedLines([]);
+    setJsonHint(null);
     setSelectedCategoryId(null);
     setMatch(null);
     setVerifyData(null);
@@ -1011,6 +1025,49 @@ export default function DailyExpenseTable({
   }, [nameValue, findItem, categories, subCategories, suppliers, applyKnownAmount]);
   handleNameConfirmRef.current = handleNameConfirm;
 
+  const applyExpenseJson = useCallback(
+    async (raw: string) => {
+      const result = parseSalaryJson(raw);
+      if (!result.ok) {
+        toast.error(result.error);
+        return false;
+      }
+      const total = salaryJsonTotalVnd(result.employees, result.meta);
+      if (!total) {
+        toast.error("JSON không có tổng tiền");
+        return false;
+      }
+      setAmountValue(thousandsFromVnd(total));
+      setAmountLines([]);
+      setPendingNestedLines(
+        employeesToExpenseLines(
+          result.employees.map(row =>
+            newSalaryEmployee(row.name, row.amount, {
+              account: row.account,
+              deposit: row.deposit,
+              transfer_amount: row.transfer_amount,
+            }),
+          ),
+        ),
+      );
+      const n = result.employees.length;
+      const label = result.meta?.period?.label;
+      setJsonHint(
+        label
+          ? `Đã điền tổng từ JSON · ${n} NV · ${label}`
+          : `Đã điền tổng từ JSON · ${n} NV`,
+      );
+      try {
+        await replaceSalaryRoster(result.employees, result.meta);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Không lưu được danh sách NV";
+        toast.error(message);
+      }
+      toast.success(label ? `Đã lấy tổng · ${n} NV · ${label}` : `Đã lấy tổng · ${n} NV`);
+      return true;
+    },
+    [replaceSalaryRoster],
+  );
 
   const handleSave = useCallback(async () => {
     if (!user || savingRef.current) return;
@@ -1040,6 +1097,8 @@ export default function DailyExpenseTable({
           setAmountValue("");
           setNoteValue("");
           setAmountLines([]);
+          setPendingNestedLines([]);
+          setJsonHint(null);
           setSelectedCategoryId(null);
           setMatch(null);
           setVerifyData(null);
@@ -1136,16 +1195,36 @@ export default function DailyExpenseTable({
         payment_method: paymentMethod,
         payment_method_note: paymentMethodNote.trim() || null,
       }));
-      let { error } = await supabase.from("sub_payments").insert(subRows);
+      let { data: inserted, error } = await supabase.from("sub_payments").insert(subRows).select("id");
       if (error && String(error.message).includes("payment_method")) {
         const fallback = subRows.map(({ payment_method: _pm, payment_method_note: _note, ...rest }) => rest);
-        const retry = await supabase.from("sub_payments").insert(fallback);
+        const retry = await supabase.from("sub_payments").insert(fallback).select("id");
         error = retry.error;
+        inserted = retry.data;
       }
 
       if (error) {
         toast.error(error.message || "Lưu thất bại");
         return;
+      }
+
+      const nestedTargetId =
+        pendingNestedLines.length > 0 && inserted?.length
+          ? inserted[inserted.length - 1].id
+          : null;
+      if (nestedTargetId) {
+        const lineRows = pendingNestedLines.map((line, sort_index) => ({
+          user_id: user.id,
+          sub_payment_id: nestedTargetId,
+          sort_index,
+          name: line.name,
+          amount: line.amount,
+          attrs: (line.attrs ?? {}) as Record<string, unknown>,
+        }));
+        const lineRes = await supabase.from("sub_payment_lines").insert(lineRows);
+        if (lineRes.error && !isMissingRelation(lineRes.error)) {
+          toast.error(lineRes.error.message);
+        }
       }
 
       persistRememberedAmount();
@@ -1214,13 +1293,15 @@ export default function DailyExpenseTable({
         }));
       }
 
-      const newEntries: PaymentEntry[] = entries.map(l => ({
+      const newEntries: PaymentEntry[] = entries.map((l, i) => ({
         item_name: nameValue.trim(),
         amount: l.amount,
         category_id: match?.categoryId || null,
         supplier_id: match?.supplierId || null,
-        sub_payment_id: undefined,
+        sub_payment_id: inserted?.[i]?.id,
         notes: l.note,
+        nestedLines:
+          inserted?.[i]?.id && inserted[i].id === nestedTargetId ? pendingNestedLines : undefined,
       }));
 
       // Update or create group
@@ -1264,6 +1345,7 @@ export default function DailyExpenseTable({
     spanEnabled, spanPreset, spanCustomPeriods,
     paymentMethod, paymentMethodNote, receiptFile, scheduleRepeat,
     completingScheduleId, completingRepeat, rememberAmount, defaultsUserId, scheduleRefresh,
+    pendingNestedLines,
   ]);
 
   const handleNameKeyDown = (e: React.KeyboardEvent) => {
@@ -2519,6 +2601,8 @@ export default function DailyExpenseTable({
                       !saving &&
                       ([...amountLines, { amount: amountValue }].some(l => Number(l.amount) > 0))
                     }
+                    onApplyJson={applyExpenseJson}
+                    jsonHint={jsonHint}
                   />
                 </div>
               </div>

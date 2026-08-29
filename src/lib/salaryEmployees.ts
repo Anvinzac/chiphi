@@ -231,6 +231,15 @@ export function parseSalaryJson(raw: string): ParseSalaryJsonResult {
   return { ok: true, employees, meta };
 }
 
+export function salaryJsonTotalVnd(
+  employees: Omit<SalaryEmployee, "id">[],
+  meta?: SalaryImportMeta,
+) {
+  const fromSummary = meta?.summary?.total_amount;
+  if (fromSummary != null && fromSummary > 0) return fromSummary;
+  return employees.reduce((sum, row) => sum + row.amount, 0);
+}
+
 function coerceEmployee(row: unknown): SalaryEmployee | null {
   const mapped = mapSalaryEmployee(row);
   if (!mapped) return null;

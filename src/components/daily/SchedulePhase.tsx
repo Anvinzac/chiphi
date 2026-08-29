@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Camera, Check, ChevronDown, ImageIcon, Trash2 } from "lucide-react";
+import { ArrowLeft, Camera, Check, ChevronDown, ClipboardList, ImageIcon, Trash2 } from "lucide-react";
 import {
   PAYMENT_METHODS,
   SCHEDULE_OPTIONS,
@@ -33,6 +33,8 @@ interface SchedulePhaseProps {
   onSave: () => void;
   saving?: boolean;
   canSave: boolean;
+  onApplyJson?: (raw: string) => Promise<boolean>;
+  jsonHint?: string | null;
 }
 
 export default function SchedulePhase({
@@ -58,11 +60,16 @@ export default function SchedulePhase({
   onSave,
   saving = false,
   canSave,
+  onApplyJson,
+  jsonHint,
 }: SchedulePhaseProps) {
   const showNote = paymentMethod === "bank" || paymentMethod === "other" || paymentMethod === "borrow";
   const [receiptOpen, setReceiptOpen] = useState(() => !!receiptPreview);
+  const [jsonPaste, setJsonPaste] = useState("");
+  const [jsonBusy, setJsonBusy] = useState(false);
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
+  const jsonFileRef = useRef<HTMLInputElement>(null);
   const customSpanRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -100,6 +107,21 @@ export default function SchedulePhase({
 
   const spanBlocksSave = spanEnabled && spanPeriodCount < 2;
 
+  const applyJson = async (raw: string) => {
+    if (!onApplyJson || jsonBusy) return;
+    setJsonBusy(true);
+    try {
+      const ok = await onApplyJson(raw);
+      if (ok) setJsonPaste("");
+    } finally {
+      setJsonBusy(false);
+    }
+  };
+
+  const filledVnd = [...lines, { amount: amountValue }]
+    .map(l => Number(l.amount) || 0)
+    .reduce((s, n) => s + n, 0) * 1000;
+
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col px-5 pt-2 pb-3">
       <div className="mb-3 flex shrink-0 items-center justify-between">
@@ -119,6 +141,83 @@ export default function SchedulePhase({
       </div>
 
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain no-scrollbar pb-2">
+        {onApplyJson ? (
+          <section className="space-y-2">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+              Dán JSON
+            </p>
+            <textarea
+              value={jsonPaste}
+              onChange={e => setJsonPaste(e.target.value)}
+              onPaste={e => {
+                const text = e.clipboardData.getData("text");
+                if (!text.trim()) return;
+                window.setTimeout(() => applyJson(text), 0);
+              }}
+              placeholder='{"employees":[{"account":"tphi","name":"T. Phi","amount":5000000}],"summary":{"total_amount":5000000}}'
+              className="min-h-[96px] w-full rounded-xl border border-border bg-background p-3 font-mono text-[11px] outline-none focus:border-primary/40"
+              spellCheck={false}
+            />
+            <input
+              ref={jsonFileRef}
+              type="file"
+              accept="application/json,.json,text/plain"
+              className="sr-only"
+              onChange={async e => {
+                const file = e.target.files?.[0];
+                e.currentTarget.value = "";
+                if (!file) return;
+                try {
+                  const text = await file.text();
+                  setJsonPaste(text);
+                  await applyJson(text);
+                } catch {
+                  /* ignore */
+                }
+              }}
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => jsonFileRef.current?.click()}
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-[11px] font-medium text-foreground"
+              >
+                <ClipboardList className="h-3.5 w-3.5" />
+                Chọn file
+              </button>
+              <button
+                type="button"
+                disabled={!jsonPaste.trim() || jsonBusy}
+                onClick={() => applyJson(jsonPaste)}
+                className="inline-flex flex-1 items-center justify-center rounded-xl border border-primary/35 bg-primary/10 px-3 py-2 text-[11px] font-medium text-primary disabled:opacity-40"
+              >
+                {jsonBusy ? "Đang map…" : "Lấy tổng"}
+              </button>
+            </div>
+            {jsonHint ? (
+              <p className="text-[11px] leading-relaxed text-foreground">
+                {jsonHint}
+                {filledVnd > 0 ? (
+                  <>
+                    {" · "}
+                    <MoneyLabel
+                      amount={filledVnd}
+                      className="inline font-display text-foreground"
+                      smallClassName="text-[0.7em]"
+                    />
+                  </>
+                ) : null}
+              </p>
+            ) : (
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Dán hoặc chọn file. Tổng lấy từ{" "}
+                <span className="font-medium text-foreground">summary.total_amount</span>
+                {", "}hoặc cộng <span className="font-medium text-foreground">employees[].amount</span>.
+              </p>
+            )}
+          </section>
+        ) : null}
+
         <section>
           <button
             type="button"

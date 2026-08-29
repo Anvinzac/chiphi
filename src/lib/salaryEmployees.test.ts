@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isSalaryExpense } from "./salaryRoster";
-import { mapSalaryEmployee, normalizeSubPaymentLines, parseSalaryJson, salaryEmployeesToLineRows } from "./salaryEmployees";
+import { mapSalaryEmployee, normalizeSubPaymentLines, parseSalaryJson, salaryEmployeesToLineRows, salaryJsonTotalVnd } from "./salaryEmployees";
+import { thousandsFromVnd } from "./vndThousands";
 
 describe("isSalaryExpense", () => {
   it("matches Lương NV on the item or category", () => {
@@ -64,6 +65,20 @@ describe("parseSalaryJson schema v1", () => {
     expect(parseSalaryJson("").ok).toBe(false);
     expect(parseSalaryJson("{").ok).toBe(false);
     expect(parseSalaryJson('{"foo":1}').ok).toBe(false);
+  });
+
+  it("prefers summary.total_amount, else sums employees", () => {
+    const withSummary = parseSalaryJson(JSON.stringify(EXPORT_V1));
+    expect(withSummary.ok).toBe(true);
+    if (withSummary.ok) {
+      expect(salaryJsonTotalVnd(withSummary.employees, withSummary.meta)).toBe(12_000_000);
+      expect(thousandsFromVnd(salaryJsonTotalVnd(withSummary.employees, withSummary.meta))).toBe("12000");
+    }
+    const bare = parseSalaryJson(JSON.stringify(EXPORT_V1.employees));
+    expect(bare.ok).toBe(true);
+    if (bare.ok) {
+      expect(salaryJsonTotalVnd(bare.employees, bare.meta)).toBe(12_000_000);
+    }
   });
 });
 

@@ -50,6 +50,7 @@ import {
   type ExpenseLine,
 } from "@/lib/salaryEmployees";
 import { extractReceiptJsonFromImage } from "@/lib/receiptVision";
+import type { Json } from "@/integrations/supabase/types";
 import { useLaggedSnapshot } from "@/hooks/useLaggedSnapshot";
 import { useHighValueThresholds } from "@/hooks/useHighValueThresholds";
 import { amountHighlight } from "@/lib/highValueThresholds";

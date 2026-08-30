@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { CalendarDays, Copy, HelpCircle, LayoutGrid, Search } from "lucide-react";
 import { format, isValid, parseISO } from "date-fns";
@@ -47,6 +47,9 @@ export default function MonthlyOrderShare() {
   const [vendorNotice, setVendorNotice] = useState("");
   const noticeReadyRef = useRef(false);
   const noticePinRef = useRef(DEFAULT_MONTHLY_PIN);
+  const noticeRef = useRef<HTMLTextAreaElement>(null);
+  const [noticeLines, setNoticeLines] = useState(1);
+  const [noticeAnimOn, setNoticeAnimOn] = useState(false);
 
   const todayStr = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
 
@@ -148,6 +151,20 @@ export default function MonthlyOrderShare() {
     }, 450);
     return () => window.clearTimeout(t);
   }, [vendorNotice, token, order]);
+
+  useLayoutEffect(() => {
+    const el = noticeRef.current;
+    if (!el) return;
+    const line = Number.parseFloat(getComputedStyle(el).lineHeight) || 20;
+    el.style.height = "auto";
+    const next = Math.min(3, Math.max(1, Math.ceil(el.scrollHeight / line - 0.12)));
+    el.style.height = "";
+    setNoticeLines(prev => (prev === next ? prev : next));
+    if (!noticeAnimOn) {
+      const id = requestAnimationFrame(() => setNoticeAnimOn(true));
+      return () => cancelAnimationFrame(id);
+    }
+  }, [vendorNotice, unlocked, noticeAnimOn]);
 
   if (!unlocked || !order) {
     return (
@@ -286,10 +303,10 @@ export default function MonthlyOrderShare() {
               setTotalOpen(true);
             }
           }}
-          className="flex min-h-12 shrink-0 cursor-pointer items-stretch border-t border-border bg-card hover:bg-muted/30"
+          className="flex min-h-12 shrink-0 cursor-pointer items-center border-t border-border bg-card hover:bg-muted/30"
           aria-label="Xem chi tiết tổng"
         >
-          <div className="flex min-w-0 flex-1 items-center gap-1.5 px-3 py-2 sm:px-4">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 self-stretch px-3 py-2 sm:px-4">
             <span className="inline-flex shrink-0 items-center gap-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               Tổng
               <HelpCircle className="h-3.5 w-3.5" strokeWidth={2.1} aria-hidden />
@@ -328,14 +345,21 @@ export default function MonthlyOrderShare() {
             onClick={e => e.stopPropagation()}
             onKeyDown={e => e.stopPropagation()}
           >
-            <input
-              value={vendorNotice}
-              onChange={e => setVendorNotice(e.target.value.slice(0, 200))}
-              onClick={e => e.stopPropagation()}
-              placeholder="Ghi chú…"
-              aria-label="Ghi chú cho đơn tháng"
-              className="h-8 w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/45"
-            />
+            <span
+              className={`monthly-vendor-notice-shell${noticeAnimOn ? " monthly-vendor-notice-shell--live" : ""}`}
+              style={{ ["--notice-lines" as string]: noticeLines }}
+            >
+              <textarea
+                ref={noticeRef}
+                rows={1}
+                value={vendorNotice}
+                onChange={e => setVendorNotice(e.target.value.slice(0, 200))}
+                onClick={e => e.stopPropagation()}
+                placeholder="Ghi chú…"
+                aria-label="Ghi chú cho đơn tháng"
+                className="monthly-vendor-notice bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/45"
+              />
+            </span>
           </label>
         </div>
       </div>

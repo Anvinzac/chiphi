@@ -962,7 +962,7 @@ function MonthlyOrderEditor({ categoryKey }: { categoryKey: string }) {
             ) : null}
           </div>
           {vendorNotice.trim() ? (
-            <p className="ml-auto w-[30%] max-w-[30%] truncate text-right text-[11px] text-muted-foreground" title={vendorNotice}>
+            <p className="monthly-vendor-notice-read ml-auto w-[30%] max-w-[30%] py-0.5 text-right text-[11px] text-muted-foreground" title={vendorNotice}>
               {vendorNotice}
             </p>
           ) : unitPriceVnd > 0 && !hasInvalidRange ? null : (

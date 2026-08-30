@@ -612,6 +612,39 @@
     text-underline-offset: 0.12em;
   }
 
+  .monthly-vendor-notice-shell {
+    display: block;
+    width: 100%;
+    height: calc(1.25em * var(--notice-lines, 1));
+    overflow: hidden;
+  }
+
+  .monthly-vendor-notice-shell--live {
+    transition: height 0.52s cubic-bezier(0.22, 1.28, 0.32, 1);
+  }
+
+  .monthly-vendor-notice {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 1.25em;
+    resize: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+    line-height: 1.25;
+    word-break: break-word;
+  }
+
+  .monthly-vendor-notice-read {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-height: 1.25;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+
   .total-amount-hit {
     display: inline-flex;
     width: max-content;
@@ -1638,7 +1671,8 @@
     }
 
     .order-hub-tile,
-    .order-card-monthly {
+    .order-card-monthly,
+    .monthly-vendor-notice-shell--live {
       transition: none;
     }
 

@@ -898,6 +898,60 @@ export type Database = {
         }
         Relationships: []
       }
+      monthly_orders: {
+        Row: {
+          cells: Json
+          columns: number
+          created_at: string
+          id: string
+          pin_hash: string | null
+          qty_max: number
+          qty_min: number
+          range_enabled: boolean
+          range_end: string
+          range_start: string
+          share_token: string | null
+          title: string
+          unit_price_thousands: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cells?: Json
+          columns?: number
+          created_at?: string
+          id?: string
+          pin_hash?: string | null
+          qty_max?: number
+          qty_min?: number
+          range_enabled?: boolean
+          range_end: string
+          range_start: string
+          share_token?: string | null
+          title?: string
+          unit_price_thousands?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cells?: Json
+          columns?: number
+          created_at?: string
+          id?: string
+          pin_hash?: string | null
+          qty_max?: number
+          qty_min?: number
+          range_enabled?: boolean
+          range_end?: string
+          range_start?: string
+          share_token?: string | null
+          title?: string
+          unit_price_thousands?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1103,6 +1157,16 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      get_shared_monthly_order: {
+        Args: { p_pin: string; p_token: string }
+        Returns: {
+          cells: Json
+          columns: number
+          range_end: string
+          range_start: string
+          title: string
+        }[]
       }
       verify_order_pin: {
         Args: { p_pin: string; p_token: string }

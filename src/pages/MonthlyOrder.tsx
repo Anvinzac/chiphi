@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, CalendarDays, Check, Copy, Delete, GripHorizontal, Hash, LayoutGrid, Plus, Search, X } from "lucide-react";
+import { ArrowLeft, CalendarDays, Check, Copy, Delete, GripHorizontal, Hash, LayoutGrid, Search, Share2, X } from "lucide-react";
 import { addDays, format, isValid, parseISO } from "date-fns";
 import { toast } from "sonner";
 import MonthlyOrderGrid, { type MonthlyOrderCol } from "@/components/orders/MonthlyOrderGrid";
@@ -9,8 +9,20 @@ import MonthBoundCalendar from "@/components/daily/MonthBoundCalendar";
 import MoneyLabel from "@/components/daily/MoneyLabel";
 import ClearFieldButton from "@/components/daily/ClearFieldButton";
 import ThousandsMark from "@/components/daily/ThousandsMark";
-import { mockMonthlyOrderByDate } from "@/lib/mockMonthlyOrderGrid";
+import { emptyMonthlyOrderByDate } from "@/lib/mockMonthlyOrderGrid";
 import type { MonthlyOrderLine } from "@/lib/mockMonthlyOrderGrid";
+import {
+  DEFAULT_MONTHLY_PIN,
+  cellsFromOverrides,
+  monthlyShareUrl,
+  overridesFromCells,
+  readMonthlyOrderLocal,
+  writeMonthlyOrderLocal,
+} from "@/lib/monthlyOrderPersist";
+import { loadMonthlyOrderRemote, saveMonthlyOrderRemote } from "@/lib/monthlyOrderDb";
+import { generateShareToken, hashPin } from "@/lib/orderShare";
+import { useAuth } from "@/hooks/useAuth";
+import { QRCodeSVG } from "qrcode.react";
 import { googleSumExpr } from "@/lib/googleSumExpr";
 import { vndFromThousands } from "@/lib/vndThousands";
 import { Button } from "@/components/ui/button";
@@ -41,24 +53,10 @@ function clampRange(start: Date, end: Date): { start: Date; end: Date } {
   return { start, end };
 }
 
-/** 5×3 pad: at most 13 in-range (12 apart) so extras can sit around them. */
-const RANGE_GAP = 12;
-const RANGE_PAD_SLOTS = 15;
-
-type RangePadKey = { kind: "extra" | "core"; value: number };
-
-/** Always 15 keys, in-range block centered (balanced extras before/after). */
-function buildRangePadKeys(min: number, max: number): RangePadKey[] {
-  const coreCount = max - min + 1;
-  const extra = Math.max(0, RANGE_PAD_SLOTS - coreCount);
-  const before = Math.floor(extra / 2);
-  const after = extra - before;
-  const keys: RangePadKey[] = [];
-  for (let n = min - before; n < min; n++) keys.push({ kind: "extra", value: n });
-  for (let n = min; n <= max; n++) keys.push({ kind: "core", value: n });
-  for (let n = max + 1; n <= max + after; n++) keys.push({ kind: "extra", value: n });
-  return keys;
-}
+/** 4×3 pad: top-left is none, remaining 11 slots are the range. */
+const RANGE_PAD_SLOTS = 12;
+const RANGE_NUMBER_SLOTS = RANGE_PAD_SLOTS - 1;
+const RANGE_GAP = RANGE_NUMBER_SLOTS - 1;
 
 function parseQtyBound(raw: string): number | null {
   const n = Number.parseInt(raw, 10);
@@ -69,10 +67,10 @@ function clampQtyRange(min: number, max: number, prefer: "min" | "max"): { min: 
   let a = Math.max(1, Math.floor(min));
   let b = Math.max(1, Math.floor(max));
   if (prefer === "min") {
-    if (b <= a) b = a + 1;
+    if (b < a) b = a;
     if (b - a > RANGE_GAP) b = a + RANGE_GAP;
   } else {
-    if (a >= b) a = Math.max(1, b - 1);
+    if (a > b) a = b;
     if (b - a > RANGE_GAP) a = Math.max(1, b - RANGE_GAP);
     if (b - a > RANGE_GAP) b = a + RANGE_GAP;
   }
@@ -100,38 +98,14 @@ const POPOVER_H = 340;
 const GAP = 10;
 const RANGE_KEY_CLASS =
   "rounded-xl border border-[#b8cddc] bg-[#dce8f0] py-2 text-base font-semibold tabular-nums text-[#3a4f58] shadow-sm active:scale-95";
+const RANGE_NONE_CLASS =
+  "inline-flex items-center justify-center rounded-xl border border-[#e4b8c0] bg-[#ead6d6] text-[#8a4a55] shadow-sm active:scale-95";
 const RANGE_GHOST_CLASS =
   "pad-range-ghost relative inline-flex items-center justify-center rounded-xl";
 const PAD_KEY_CLASS =
   "keypad-key rounded-xl border border-border/60 bg-card py-2 text-base font-medium shadow-sm active:scale-95";
 const PAD_MUTED_CLASS =
   "keypad-key rounded-xl border border-border/60 bg-muted/40 py-2 text-xs font-medium text-muted-foreground active:scale-95";
-
-function RangeExtraKey({
-  value,
-  picked,
-  onPick,
-}: {
-  value: number;
-  picked: boolean;
-  onPick: (n: number) => void;
-}) {
-  if (value < 1) {
-    return <span className={RANGE_GHOST_CLASS} style={{ minHeight: "2.5rem", opacity: 0.28 }} />;
-  }
-  return (
-    <button
-      type="button"
-      onClick={() => onPick(value)}
-      className={`${RANGE_GHOST_CLASS}${picked ? " pad-range-key--picked" : ""}`}
-      style={{ minHeight: "2.5rem" }}
-      aria-label={String(value)}
-    >
-      <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
-      <span className="pad-range-ghost__val">{value}</span>
-    </button>
-  );
-}
 
 type AnchorInfo = {
   rect: DOMRect;
@@ -141,6 +115,8 @@ type AnchorInfo = {
 } | null;
 
 export default function MonthlyOrder() {
+  const { user } = useAuth();
+  const saved = useMemo(() => readMonthlyOrderLocal(), []);
   const today = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => toInputValue(today), [today]);
 
@@ -156,9 +132,9 @@ export default function MonthlyOrder() {
     return d;
   }, [defaultStart]);
 
-  const [startInput, setStartInput] = useState(() => toInputValue(defaultStart));
-  const [endInput, setEndInput] = useState(() => toInputValue(defaultEnd));
-  const [columns, setColumns] = useState<MonthlyOrderCol>(4);
+  const [startInput, setStartInput] = useState(() => saved?.startInput || toInputValue(defaultStart));
+  const [endInput, setEndInput] = useState(() => saved?.endInput || toInputValue(defaultEnd));
+  const [columns, setColumns] = useState<MonthlyOrderCol>(() => saved?.columns ?? 4);
   const [totalOpen, setTotalOpen] = useState(false);
   const [boundOpen, setBoundOpen] = useState<"start" | "end" | null>(null);
   const [calMonth, setCalMonth] = useState(() => defaultStart);
@@ -177,24 +153,32 @@ export default function MonthlyOrder() {
     [rangeStart, rangeEnd],
   );
 
-  const baseItems = useMemo(() => mockMonthlyOrderByDate(rangeStart, rangeEnd), [rangeStart, rangeEnd]);
-  const [overrides, setOverrides] = useState<Map<string, MonthlyOrderLine[]>>(new Map());
+  const emptyDays = useMemo(() => emptyMonthlyOrderByDate(rangeStart, rangeEnd), [rangeStart, rangeEnd]);
+  const [overrides, setOverrides] = useState<Map<string, MonthlyOrderLine[]>>(
+    () => overridesFromCells(saved?.cells),
+  );
   const [editingDate, setEditingDate] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const [anchor, setAnchor] = useState<AnchorInfo>(null);
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number; arrow: "top" | "left" | "right"; arrowOffset: number } | null>(null);
-  // Range picker: 13 in-range values (12 apart) so 1 extra before/after fit on 15 keys
-  const [rangeMin, setRangeMin] = useState("16");
-  const [rangeMax, setRangeMax] = useState("28");
+  const [rangeMin, setRangeMin] = useState(() => saved?.rangeMin || "16");
+  const [rangeMax, setRangeMax] = useState(() => saved?.rangeMax || "26");
   // State for range editor dialog
   const [rangeEditorOpen, setRangeEditorOpen] = useState(false);
-  const [rangeEnabled, setRangeEnabled] = useState(true);
-  const [useRangeKeys, setUseRangeKeys] = useState(true);
+  const [rangeEnabled, setRangeEnabled] = useState(() => saved?.rangeEnabled ?? true);
+  const [useRangeKeys, setUseRangeKeys] = useState(() => saved?.rangeEnabled ?? true);
   const typingRef = useRef(false);
   const pickTimerRef = useRef<number | null>(null);
   const [pickedRange, setPickedRange] = useState<number | null>(null);
-  const [unitPriceDraft, setUnitPriceDraft] = useState("");
+  const [unitPriceDraft, setUnitPriceDraft] = useState(() => saved?.unitPriceDraft || "");
+  const [shareToken, setShareToken] = useState<string | null>(() => saved?.shareToken ?? null);
+  const [pin, setPin] = useState(DEFAULT_MONTHLY_PIN);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareStep, setShareStep] = useState<"pin" | "qr">("pin");
+  const [sharing, setSharing] = useState(false);
+  const [persistReady, setPersistReady] = useState(false);
   const [title, setTitle] = useState(() => {
+    if (saved?.title) return saved.title;
     try {
       return localStorage.getItem(TITLE_STORAGE_KEY) || DEFAULT_TITLE;
     } catch {
@@ -223,13 +207,76 @@ export default function MonthlyOrder() {
     }
   };
 
+  const snapshot = useMemo(
+    () => ({
+      title,
+      startInput,
+      endInput,
+      columns,
+      rangeMin,
+      rangeMax,
+      rangeEnabled,
+      unitPriceDraft,
+      cells: cellsFromOverrides(overrides),
+      shareToken,
+      updatedAt: new Date().toISOString(),
+    }),
+    [title, startInput, endInput, columns, rangeMin, rangeMax, rangeEnabled, unitPriceDraft, overrides, shareToken],
+  );
+
+  useEffect(() => {
+    if (!user) {
+      setPersistReady(true);
+      return;
+    }
+    let cancelled = false;
+    void loadMonthlyOrderRemote(user.id)
+      .then(remote => {
+        if (cancelled || !remote) return;
+        setTitle(remote.title || DEFAULT_TITLE);
+        setStartInput(remote.startInput);
+        setEndInput(remote.endInput);
+        setColumns(remote.columns);
+        setRangeMin(remote.rangeMin);
+        setRangeMax(remote.rangeMax);
+        setRangeEnabled(remote.rangeEnabled);
+        setUseRangeKeys(remote.rangeEnabled);
+        setUnitPriceDraft(remote.unitPriceDraft);
+        setOverrides(overridesFromCells(remote.cells));
+        setShareToken(remote.shareToken);
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : "Không tải được đơn tháng";
+        toast.error(message);
+      })
+      .finally(() => {
+        if (!cancelled) setPersistReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!persistReady) return;
+    writeMonthlyOrderLocal(snapshot);
+    if (!user) return;
+    const t = window.setTimeout(() => {
+      void saveMonthlyOrderRemote(user.id, snapshot).catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : "Không lưu được đơn tháng";
+        toast.error(message);
+      });
+    }, 450);
+    return () => window.clearTimeout(t);
+  }, [snapshot, user, persistReady]);
+
   const itemsByDate = useMemo(() => {
-    const m = new Map(baseItems);
+    const m = new Map(emptyDays);
     for (const [k, v] of overrides) {
       if (m.has(k)) m.set(k, v);
     }
     return m;
-  }, [baseItems, overrides]);
+  }, [emptyDays, overrides]);
 
   const stats = useMemo(() => {
     let daysWithItems = 0;
@@ -340,7 +387,9 @@ export default function MonthlyOrder() {
   }, [rangeBounds]);
   const rangePadKeys = useMemo(() => {
     if (!rangeBounds) return [];
-    return buildRangePadKeys(rangeBounds.min, rangeBounds.max);
+    const values: number[] = [];
+    for (let n = rangeBounds.min; n <= rangeBounds.max; n++) values.push(n);
+    return values.slice(0, RANGE_NUMBER_SLOTS);
   }, [rangeBounds]);
 
   const commitQtyRange = (which: "min" | "max") => {
@@ -460,6 +509,40 @@ export default function MonthlyOrder() {
     closeNumpad();
   };
 
+  const confirmPinAndShare = async () => {
+    const trimmed = (pin || DEFAULT_MONTHLY_PIN).trim();
+    if (!trimmed) {
+      toast.error("Nhập PIN");
+      return;
+    }
+    setSharing(true);
+    try {
+      const token = shareToken || generateShareToken();
+      const pinHash = await hashPin(trimmed);
+      if (user) {
+        await saveMonthlyOrderRemote(user.id, { ...snapshot, shareToken: token }, { shareToken: token, pinHash });
+      }
+      setShareToken(token);
+      writeMonthlyOrderLocal({ ...snapshot, shareToken: token });
+      setShareStep("qr");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Không tạo được link chia sẻ";
+      toast.error(message);
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const copyShareLink = async () => {
+    if (!shareToken) return;
+    try {
+      await navigator.clipboard.writeText(monthlyShareUrl(shareToken));
+      toast.success("Đã sao chép link");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Không copy được");
+    }
+  };
+
   useEffect(() => {
     if (!editingDate) return;
     const onKey = (e: KeyboardEvent) => {
@@ -566,6 +649,17 @@ export default function MonthlyOrder() {
               {hasInvalidRange ? "Chọn ngày bắt đầu và kết thúc" : `${shortVi(rangeStart)} – ${shortVi(rangeEnd)} · ${dayCount} ngày`}
             </p>
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              setShareStep(shareToken ? "qr" : "pin");
+              setShareOpen(true);
+            }}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label="Chia sẻ đơn tháng"
+          >
+            <Share2 className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
@@ -857,27 +951,35 @@ export default function MonthlyOrder() {
             </div>
 
             {showRangeKeys ? (
-              <div className="grid grid-cols-3 gap-1.5 p-3">
-                {rangePadKeys.map((key, i) =>
-                  key.kind === "extra" ? (
-                    <RangeExtraKey
-                      key={`pad-${i}-${key.value}`}
-                      value={key.value}
-                      picked={pickedRange === key.value}
-                      onPick={pickRange}
-                    />
-                  ) : (
-                    <button
-                      key={`pad-${i}-${key.value}`}
-                      type="button"
-                      onClick={() => pickRange(key.value)}
-                      className={`${RANGE_KEY_CLASS}${pickedRange === key.value ? " pad-range-key--picked" : ""}`}
-                      style={{ minHeight: "2.5rem" }}
-                    >
-                      {key.value}
-                    </button>
-                  ),
-                )}
+              <div className="grid grid-cols-4 gap-1.5 p-3">
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  className={RANGE_NONE_CLASS}
+                  style={{ minHeight: "2.5rem" }}
+                  aria-label="Xóa số ngày này"
+                >
+                  <X className="h-4 w-4" strokeWidth={2.6} />
+                </button>
+                {rangePadKeys.map(value => (
+                  <button
+                    key={`pad-${value}`}
+                    type="button"
+                    onClick={() => pickRange(value)}
+                    className={`${RANGE_KEY_CLASS}${pickedRange === value ? " pad-range-key--picked" : ""}`}
+                    style={{ minHeight: "2.5rem" }}
+                  >
+                    {value}
+                  </button>
+                ))}
+                {Array.from({ length: Math.max(0, RANGE_NUMBER_SLOTS - rangePadKeys.length) }).map((_, i) => (
+                  <span
+                    key={`pad-empty-${i}`}
+                    className={RANGE_GHOST_CLASS}
+                    style={{ minHeight: "2.5rem", opacity: 0.2 }}
+                    aria-hidden
+                  />
+                ))}
               </div>
             ) : (
               <>
@@ -999,6 +1101,63 @@ export default function MonthlyOrder() {
       </Dialog>
 
       {/* Range editor dialog */}
+      <Dialog
+        open={shareOpen}
+        onOpenChange={open => {
+          setShareOpen(open);
+          if (!open) setShareStep(shareToken ? "qr" : "pin");
+        }}
+      >
+        <DialogContent className="max-w-[92vw] rounded-xl sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display">
+              {shareStep === "pin" ? "Đặt PIN chia sẻ" : "Gửi đơn tháng"}
+            </DialogTitle>
+          </DialogHeader>
+          {shareStep === "pin" ? (
+            <div className="space-y-4 py-1">
+              <p className="text-xs text-muted-foreground">
+                Người nhận cần PIN này để mở lưới. Mặc định {DEFAULT_MONTHLY_PIN}.
+              </p>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={pin}
+                onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                placeholder={DEFAULT_MONTHLY_PIN}
+                className="h-11 text-center text-lg tracking-[0.35em]"
+                maxLength={8}
+                autoFocus
+              />
+              <Button type="button" className="w-full" disabled={sharing} onClick={() => void confirmPinAndShare()}>
+                {sharing ? "Đang tạo…" : "Tạo link & QR"}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-4 py-2">
+              {shareToken && (
+                <div className="rounded-xl bg-white p-3 shadow-sm">
+                  <QRCodeSVG value={monthlyShareUrl(shareToken)} size={180} level="M" />
+                </div>
+              )}
+              <p className="w-full break-all rounded-lg bg-muted/50 px-3 py-2 text-center text-[11px] text-muted-foreground">
+                {shareToken ? monthlyShareUrl(shareToken) : ""}
+              </p>
+              <p className="text-center text-xs text-muted-foreground">
+                PIN: <span className="font-semibold text-foreground">{pin || DEFAULT_MONTHLY_PIN}</span>
+              </p>
+              <Button type="button" onClick={() => void copyShareLink()} className="w-full gap-2">
+                <Copy className="h-4 w-4" />
+                Copy link
+              </Button>
+              <Button type="button" variant="outline" className="w-full" onClick={() => setShareStep("pin")}>
+                Đổi PIN
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={rangeEditorOpen} onOpenChange={setRangeEditorOpen}>
         <DialogContent className="max-w-[90vw] rounded-xl sm:max-w-xs">
           <DialogHeader>
@@ -1044,7 +1203,9 @@ export default function MonthlyOrder() {
                 />
               </div>
             </div>
-            <p className="text-[11px] text-muted-foreground">Cách nhau tối đa 12. Luôn 15 ô — số trong dãy nằm giữa, ô ngoài dãy cân hai bên.</p>
+            <p className="text-[11px] text-muted-foreground">
+              Tối đa {RANGE_NUMBER_SLOTS} số trên bàn phím. Ô góc trái là X — xóa số ngày đó.
+            </p>
           </div>
           <div className="mt-4 flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setRangeEditorOpen(false)} className="flex-1">

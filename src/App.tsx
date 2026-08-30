@@ -16,6 +16,7 @@ import Reminders from "./pages/Reminders";
 import Orders from "./pages/Orders";
 import OrderDetail from "./pages/OrderDetail";
 import MonthlyOrder from "./pages/MonthlyOrder";
+import MonthlyOrderShare from "./pages/MonthlyOrderShare";
 import SalaryStaff from "./pages/SalaryStaff";
 import SupplierOrder from "./pages/SupplierOrder";
 import NotFound from "./pages/NotFound";
@@ -53,6 +54,7 @@ const AppRoutes = () => (
   <Routes>
     <Route path="/auth" element={<Auth />} />
     <Route path="/o/:token" element={<SupplierOrder />} />
+    <Route path="/m/:token" element={<MonthlyOrderShare />} />
     <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
     <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
     <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />

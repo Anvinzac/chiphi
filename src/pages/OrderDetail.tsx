@@ -129,12 +129,12 @@ function OrderFilledRow({
               handleRowActivate();
             }
           }}
-          className={`grid w-full cursor-pointer grid-cols-[minmax(0,40%)_auto_1fr] items-center gap-2 px-3 py-1.5 text-left ${
+          className={`grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 px-3 py-1.5 text-left ${
             expanded ? "bg-primary/5" : "hover:bg-muted/30"
           }`}
         >
-          <div className="min-w-0 max-w-[40%]">
-            <p className="truncate text-sm font-medium leading-tight">{row.name}</p>
+          <div className="min-w-0">
+            <p className="text-sm font-medium leading-tight break-words">{row.name}</p>
             {expanded ? (
               <input
                 value={row.notice ?? ""}
@@ -1348,8 +1348,8 @@ export default function OrderDetail() {
               </div>
             )}
             <div className="overflow-hidden rounded-xl border border-border/60 bg-card">
-              <div className="grid grid-cols-[minmax(0,40%)_auto_minmax(0,1fr)] gap-2 border-b border-border/50 px-3 py-1.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                <span className="max-w-[40%] truncate">Nguyên liệu</span>
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2 border-b border-border/50 px-3 py-1.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                <span>Nguyên liệu</span>
                 <span className="w-[3.25rem] text-right">SL</span>
                 <span className="w-[4.5rem] justify-self-end text-right">Đơn giá</span>
               </div>
@@ -1385,7 +1385,7 @@ export default function OrderDetail() {
                   <button
                     type="button"
                     onClick={() => toggleSlot("ph-0")}
-                    className="grid w-full grid-cols-[minmax(0,40%)_auto_1fr] items-center gap-2 bg-primary/5 px-3 py-1.5 text-left"
+                    className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 bg-primary/5 px-3 py-1.5 text-left"
                   >
                     <p className="min-w-0 truncate text-sm text-muted-foreground/35">
                       Tên nguyên liệu
@@ -1420,7 +1420,7 @@ export default function OrderDetail() {
                     <button
                       type="button"
                       onClick={() => toggleSlot(key)}
-                      className={`grid w-full grid-cols-[minmax(0,40%)_auto_1fr] items-center gap-2 px-3 py-1.5 text-left ${
+                      className={`grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 px-3 py-1.5 text-left ${
                         expanded ? "bg-primary/5" : "hover:bg-muted/30"
                       }`}
                     >

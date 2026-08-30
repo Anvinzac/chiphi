@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Calendar, ChevronRight, Plus } from "lucide-react";
 import { endOfWeek, format, isToday, isYesterday, parseISO, startOfWeek } from "date-fns";
 import { vi } from "date-fns/locale";
 import { toast } from "sonner";
@@ -105,6 +105,8 @@ export default function Orders() {
   const [creatingKey, setCreatingKey] = useState<string | null>(null);
   const [ensuring, setEnsuring] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("daily");
+  const [sheetOpen, setSheetOpen] = useState(true);
+  const [sheetClosing, setSheetClosing] = useState(false);
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
 
@@ -227,6 +229,30 @@ export default function Orders() {
     }
   };
 
+  const closeSheet = useCallback(() => {
+    if (!sheetOpen || sheetClosing) return;
+    setSheetClosing(true);
+    window.setTimeout(() => {
+      setSheetOpen(false);
+      setSheetClosing(false);
+    }, 300);
+  }, [sheetOpen, sheetClosing]);
+
+  const openSheet = useCallback(() => {
+    if (sheetOpen) return;
+    setSheetClosing(false);
+    setSheetOpen(true);
+  }, [sheetOpen]);
+
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeSheet();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sheetOpen, closeSheet]);
+
   const hubCats = ORDER_HUB_CATEGORIES.map(h => {
     const live = categories.find(c => c.source_key === h.key);
     return {
@@ -310,7 +336,7 @@ export default function Orders() {
           </Link>
           <div className="min-w-0 flex-1">
             <h1 className="font-display text-xl text-foreground">Đặt hàng</h1>
-            <p className="text-[11px] text-muted-foreground">Chọn danh mục để soạn đơn</p>
+            <p className="text-[11px] text-muted-foreground">{orders.length} đơn đã đặt</p>
           </div>
           <div className="inline-flex shrink-0 rounded-full border border-border/60 bg-muted/40 p-0.5">
             <button
@@ -343,102 +369,115 @@ export default function Orders() {
 
       <SnapshotBanner />
 
-      <div className="mx-auto w-full max-w-lg flex-1 space-y-6 overflow-auto px-4 py-4 pb-10">
-        <section className="space-y-3">
-          <div>
-            <h2 className="text-sm font-semibold">Danh mục</h2>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              Rau · Đậu hũ · Gia vị · Nước tương · Khác
-            </p>
-          </div>
-
-          {loading && categories.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">Đang tải danh mục…</p>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              {hubCats.map(cat => (
-                <button
-                  key={cat.key}
-                  type="button"
-                  disabled={!!creatingKey || ensuring}
-                  onClick={() => startOrderForCategory(cat.key, cat.name)}
-                  className="rounded-2xl border border-border/60 bg-card px-3 py-4 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 active:scale-[0.99] disabled:opacity-60"
-                >
-                  <p className="font-display text-lg text-foreground leading-tight">{cat.name}</p>
-                  <p className="mt-1 text-[10px] text-muted-foreground">{cat.hint}</p>
-                  {creatingKey === cat.key && (
-                    <p className="mt-2 text-[10px] text-primary">Đang mở…</p>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {categories.length === 0 && !loading && (
-            <button
-              type="button"
-              onClick={() => ensureCatalog()}
-              disabled={ensuring}
-              className="w-full rounded-xl border border-dashed border-border px-3 py-3 text-xs text-muted-foreground hover:text-foreground"
-            >
-              {ensuring ? "Đang nhập danh mục…" : "Nhập danh mục từ pantry"}
-            </button>
-          )}
-        </section>
-
-        <section>
-          <Link
-            to="/orders/monthly"
-            className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary/[0.06] px-4 py-3.5 transition-colors hover:border-primary/30 hover:bg-primary/[0.09] active:scale-[0.99]"
-          >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <span className="text-[11px] font-bold tracking-wide">Th</span>
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold leading-tight text-foreground">Đơn tháng · lưới theo ngày</p>
-              <p className="truncate text-[11px] leading-tight text-muted-foreground">
-                Chọn khoảng ngày tùy ý · xem 2 / 3 / 4 cột · mỗi ô 1–3 món · mock layout
-              </p>
-            </div>
-            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-          </Link>
-        </section>
-
-        <section className="space-y-2">
-          <div className="flex items-baseline justify-between gap-2">
-            <h2 className="text-sm font-semibold">Đơn</h2>
-            <span className="text-[11px] text-muted-foreground">{orders.length}</span>
-          </div>
-
-          {loading && orders.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">Đang tải đơn…</p>
-          ) : viewMode === "daily" ? (
-            <OrdersPager
-              pages={dailyPages}
-              emptyLabel="Chưa có đơn ngày này"
-              renderSection={order => <OrderCard key={order.id} order={order} />}
-            />
-          ) : (
-            <OrdersPager
-              pages={weeklyPages}
-              emptyLabel="Chưa có đơn tuần này"
-              renderSection={day => (
-                <DaySection
-                  key={day.date}
-                  title={formatDayHeading(day.date)}
-                  meta={`${day.orders.length} đơn`}
-                >
-                  {day.orders.length === 0 ? (
-                    <p className="py-2 text-[11px] text-muted-foreground">Chưa có đơn</p>
-                  ) : (
-                    day.orders.map(order => <OrderCard key={order.id} order={order} />)
-                  )}
-                </DaySection>
-              )}
-            />
-          )}
-        </section>
+      <div className="mx-auto w-full max-w-lg flex-1 overflow-auto px-4 py-4 pb-28">
+        {loading && orders.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4">Đang tải đơn…</p>
+        ) : viewMode === "daily" ? (
+          <OrdersPager
+            pages={dailyPages}
+            emptyLabel="Chưa có đơn ngày này"
+            renderSection={order => <OrderCard key={order.id} order={order} />}
+          />
+        ) : (
+          <OrdersPager
+            pages={weeklyPages}
+            emptyLabel="Chưa có đơn tuần này"
+            renderSection={day => (
+              <DaySection
+                key={day.date}
+                title={formatDayHeading(day.date)}
+                meta={`${day.orders.length} đơn`}
+              >
+                {day.orders.length === 0 ? (
+                  <p className="py-2 text-[11px] text-muted-foreground">Chưa có đơn</p>
+                ) : (
+                  day.orders.map(order => <OrderCard key={order.id} order={order} />)
+                )}
+              </DaySection>
+            )}
+          />
+        )}
       </div>
+
+      <button
+        type="button"
+        onClick={openSheet}
+        disabled={sheetOpen}
+        tabIndex={sheetOpen ? -1 : 0}
+        aria-hidden={sheetOpen}
+        aria-label="Đơn mới"
+        className={`order-new-fab ${sheetOpen ? "order-new-fab--hidden" : ""}`}
+      >
+        <Plus className="h-6 w-6" strokeWidth={2.4} />
+      </button>
+
+      {sheetOpen && (
+        <>
+          <button
+            type="button"
+            className={`expense-add-scrim fixed inset-0 z-40 ${
+              sheetClosing ? "expense-scrim-exit" : "expense-scrim-enter"
+            }`}
+            aria-label="Đóng đơn mới"
+            onClick={closeSheet}
+          />
+          <div
+            className={`order-new-sheet ${sheetClosing ? "expense-card-exit" : "expense-card-enter"}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="order-new-title"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="order-new-sheet__panel">
+              <div className="order-new-sheet__handle" aria-hidden />
+              <div className="mb-3">
+                <h2 id="order-new-title" className="text-sm font-semibold">
+                  Đơn mới
+                </h2>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Chọn loại đơn để soạn
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {hubCats.map(cat => (
+                  <button
+                    key={cat.key}
+                    type="button"
+                    disabled={!!creatingKey || ensuring}
+                    onClick={() => startOrderForCategory(cat.key, cat.name)}
+                    className="order-hub-tile"
+                  >
+                    <p className="font-display text-lg leading-tight text-foreground">{cat.name}</p>
+                    <p className="mt-1 text-[10px] text-muted-foreground">{cat.hint}</p>
+                    {creatingKey === cat.key && (
+                      <p className="mt-2 text-[10px] text-primary">Đang mở…</p>
+                    )}
+                  </button>
+                ))}
+                <Link
+                  to="/orders/monthly"
+                  className="order-hub-tile order-hub-tile--monthly"
+                  aria-label="Đơn tháng"
+                >
+                  <Calendar className="order-hub-tile__cal" strokeWidth={2.1} aria-hidden />
+                  <p className="font-display text-lg leading-tight">Đơn tháng</p>
+                  <p className="order-hub-tile__hint mt-1 text-[10px]">Lưới theo ngày</p>
+                </Link>
+              </div>
+              {categories.length === 0 && !loading && (
+                <button
+                  type="button"
+                  onClick={() => ensureCatalog()}
+                  disabled={ensuring}
+                  className="mt-3 w-full rounded-xl border border-dashed border-border px-3 py-3 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  {ensuring ? "Đang nhập danh mục…" : "Nhập danh mục từ pantry"}
+                </button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

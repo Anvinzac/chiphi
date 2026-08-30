@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import MoneyLabel from "./MoneyLabel";
 
 interface DaySectionProps {
@@ -34,11 +34,11 @@ export default function DaySection({
           aria-expanded={expanded}
           className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 py-2 text-left transition-colors hover:bg-muted/40"
         >
-          {expanded ? (
-            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          )}
+          <ChevronDown
+            className={`day-section-chevron h-3.5 w-3.5 shrink-0 text-muted-foreground ${
+              expanded ? "" : "day-section-chevron--folded"
+            }`}
+          />
           <h2 className="min-w-0 flex-1 truncate font-display text-base capitalize leading-none text-foreground">
             {title}
           </h2>
@@ -68,20 +68,22 @@ export default function DaySection({
         ) : null}
       </div>
 
-      {expanded && (
-        <div className="ml-5 border-l border-border/50 pl-3 animate-in fade-in slide-in-from-top-1 duration-150">
-          {children}
-          {showDayTotal && (
-            <div className="mt-0.5 flex justify-end border-t border-border/40 px-3 py-2.5">
-              <MoneyLabel
-                amount={total}
-                className="text-sm text-foreground/85"
-                smallClassName="text-[0.7em]"
-              />
-            </div>
-          )}
+      <div className={`day-section-fold ${expanded ? "day-section-fold--open" : ""}`}>
+        <div className="day-section-fold__clip">
+          <div className="day-section-fold__body ml-5 border-l border-border/50 pl-3">
+            {children}
+            {showDayTotal && (
+              <div className="mt-0.5 flex justify-end border-t border-border/40 px-3 py-2.5">
+                <MoneyLabel
+                  amount={total}
+                  className="text-sm text-foreground/85"
+                  smallClassName="text-[0.7em]"
+                />
+              </div>
+            )}
+          </div>
         </div>
-      )}
+      </div>
     </section>
   );
 }

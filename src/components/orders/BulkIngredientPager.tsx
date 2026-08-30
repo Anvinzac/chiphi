@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { Check } from "lucide-react";
 import { getCategoryVisual } from "@/lib/categoryVisuals";
 
 interface BulkIngredient {
@@ -70,24 +71,35 @@ export default function BulkIngredientPager({ pages, selected, alreadyInOrder, o
               {pg.ings.map(ing => {
                 const sel = selected.has(ing.id);
                 const already = alreadyInOrder(ing.name);
+                const locked = already && !sel;
                 return (
-                  <label
+                  <button
                     key={ing.id}
-                    className={`flex items-center gap-1 rounded-lg border px-2 py-1.5 text-xs transition-colors ${
-                      sel ? "border-primary bg-primary/10" : already ? "border-border/50 bg-muted/30 opacity-50" : "border-border/60 bg-card hover:border-primary/30"
+                    type="button"
+                    role="checkbox"
+                    aria-checked={sel}
+                    disabled={locked}
+                    onClick={() => onToggle(ing, !sel)}
+                    className={`flex w-full items-center gap-1 rounded-lg border px-2 py-1.5 text-left text-xs transition-colors ${
+                      sel
+                        ? "border-primary bg-primary/10"
+                        : locked
+                          ? "border-border/50 bg-muted/30 opacity-50"
+                          : "border-border/60 bg-card hover:border-primary/30"
                     }`}
                   >
-                    <input
-                      type="checkbox"
-                      checked={sel}
-                      disabled={already}
-                      onChange={() => onToggle(ing, !sel)}
-                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
-                    />
+                    <span
+                      aria-hidden
+                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                        sel ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"
+                      }`}
+                    >
+                      {sel ? <Check className="h-3 w-3" strokeWidth={2.4} /> : null}
+                    </span>
                     <span className="min-w-0 flex-1 truncate">{ing.name}</span>
                     <span className="shrink-0 text-[11px] text-muted-foreground">{ing.unit}</span>
-                    {already && !sel && <span className="shrink-0 text-[10px] text-muted-foreground">đã có</span>}
-                  </label>
+                    {locked && <span className="shrink-0 text-[10px] text-muted-foreground">đã có</span>}
+                  </button>
                 );
               })}
             </div>

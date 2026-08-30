@@ -1032,10 +1032,6 @@ export type Database = {
           vendor_notice: string
         }[]
       }
-      update_shared_monthly_notice: {
-        Args: { p_notice: string; p_pin: string; p_token: string }
-        Returns: string
-      }
       get_shared_order: {
         Args: { p_token: string }
         Returns: {
@@ -1098,6 +1094,10 @@ export type Database = {
           p_user_agent?: string
         }
         Returns: boolean
+      }
+      update_shared_monthly_notice: {
+        Args: { p_notice: string; p_pin: string; p_token: string }
+        Returns: string
       }
       update_shared_order_alternate: {
         Args: {

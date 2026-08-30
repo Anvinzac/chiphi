@@ -381,6 +381,7 @@ export type Database = {
       }
       monthly_orders: {
         Row: {
+          category_key: string
           cells: Json
           columns: number
           created_at: string
@@ -398,6 +399,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          category_key?: string
           cells?: Json
           columns?: number
           created_at?: string
@@ -415,6 +417,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          category_key?: string
           cells?: Json
           columns?: number
           created_at?: string

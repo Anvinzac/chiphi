@@ -324,7 +324,7 @@ export default function MonthlyOrderShare() {
             </span>
           </div>
           <label
-            className="flex w-1/2 min-w-0 items-center border-l border-border/60 px-2 py-1.5 sm:px-3"
+            className="flex w-[30%] min-w-0 shrink-0 items-center border-l border-border/60 px-2 py-1.5 sm:px-3"
             onClick={e => e.stopPropagation()}
             onKeyDown={e => e.stopPropagation()}
           >

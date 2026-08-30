@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Calendar, ChevronRight, Plus } from "lucide-react";
+import { ArrowLeft, Calendar, CalendarDays, ChevronRight, Plus } from "lucide-react";
 import { endOfWeek, format, isToday, isYesterday, parseISO, startOfWeek } from "date-fns";
 import { vi } from "date-fns/locale";
 import { toast } from "sonner";
@@ -14,8 +14,16 @@ import {
 } from "@/lib/importOrderCatalog";
 import { ensureMockOrders } from "@/lib/mockOrders";
 import { isThrowawayAccount } from "@/lib/throwawayAccount";
-import { formatDayMonth } from "@/lib/formatDateVi";
+import { formatDayMonth, formatDayMonthRange } from "@/lib/formatDateVi";
 import { orderIdentityLine } from "@/lib/orderIdentity";
+import {
+  filledDayCount,
+  listMonthlyOrdersLocal,
+  mergeMonthlyLists,
+  monthlyCategoryName,
+  type MonthlyOrderListItem,
+} from "@/lib/monthlyOrderPersist";
+import { listMonthlyOrdersRemote } from "@/lib/monthlyOrderDb";
 import DaySection from "@/components/daily/DaySection";
 import OrdersPager, { type OrdersPage } from "@/components/orders/OrdersPager";
 
@@ -41,9 +49,15 @@ type OrderCategory = {
 type DayBucket = {
   date: string;
   orders: OrderRow[];
+  monthly: MonthlyOrderListItem[];
 };
 
+type ListEntry =
+  | { kind: "monthly"; row: MonthlyOrderListItem }
+  | { kind: "daily"; row: OrderRow };
+
 type ViewMode = "daily" | "weekly";
+type HubKind = "daily" | "monthly";
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "Nháp",
@@ -95,11 +109,70 @@ function OrderCard({ order }: { order: OrderRow }) {
   );
 }
 
+function monthlyRangeLabel(row: MonthlyOrderListItem): string {
+  try {
+    const start = parseISO(row.startInput);
+    const end = parseISO(row.endInput);
+    if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
+      return formatDayMonthRange(start, end);
+    }
+  } catch {
+    /* keep empty */
+  }
+  return "";
+}
+
+function MonthlyOrderCard({ row }: { row: MonthlyOrderListItem }) {
+  const filled = filledDayCount(row.cells);
+  const range = monthlyRangeLabel(row);
+  return (
+    <Link
+      to={`/orders/monthly?cat=${encodeURIComponent(row.categoryKey)}`}
+      className="order-card-monthly"
+    >
+      <span className="order-card-monthly__icon" aria-hidden>
+        <CalendarDays className="h-4 w-4" strokeWidth={2.1} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="order-card-monthly__mark">{row.shareToken ? "Đã gửi" : "Đang soạn"}</p>
+        <p className="truncate text-sm font-medium">{row.title || `Đơn tháng ${monthlyCategoryName(row.categoryKey)}`}</p>
+        <p className="text-[11px] text-[#5a6b58]">
+          Đơn tháng · {monthlyCategoryName(row.categoryKey)}
+          {range ? (
+            <>
+              <span className="mx-1.5 opacity-40">·</span>
+              {range}
+            </>
+          ) : null}
+          <span className="mx-1.5 opacity-40">·</span>
+          {filled} ngày
+          {row.updatedAt ? (
+            <>
+              <span className="mx-1.5 opacity-40">·</span>
+              {format(parseISO(row.updatedAt), "HH:mm")}
+            </>
+          ) : null}
+        </p>
+      </div>
+      <ChevronRight className="h-4 w-4 shrink-0 opacity-50" />
+    </Link>
+  );
+}
+
+function renderListEntry(entry: ListEntry) {
+  return entry.kind === "monthly" ? (
+    <MonthlyOrderCard key={`m-${entry.row.categoryKey}`} row={entry.row} />
+  ) : (
+    <OrderCard key={entry.row.id} order={entry.row} />
+  );
+}
+
 export default function Orders() {
   const { user } = useAuth();
   const { snapshot } = useLaggedSnapshot();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [monthlyOrders, setMonthlyOrders] = useState<MonthlyOrderListItem[]>(() => listMonthlyOrdersLocal());
   const [categories, setCategories] = useState<OrderCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [creatingKey, setCreatingKey] = useState<string | null>(null);
@@ -107,6 +180,7 @@ export default function Orders() {
   const [viewMode, setViewMode] = useState<ViewMode>("daily");
   const [sheetOpen, setSheetOpen] = useState(true);
   const [sheetClosing, setSheetClosing] = useState(false);
+  const [hubKind, setHubKind] = useState<HubKind>("daily");
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
 
@@ -182,6 +256,14 @@ export default function Orders() {
         toast.error(catsRes.error.message);
       }
     } else setCategories((catsRes.data as OrderCategory[]) || []);
+    try {
+      const remoteMonthly = user ? await listMonthlyOrdersRemote(user.id) : [];
+      setMonthlyOrders(mergeMonthlyLists(listMonthlyOrdersLocal(), remoteMonthly));
+    } catch (err: unknown) {
+      setMonthlyOrders(listMonthlyOrdersLocal());
+      const message = err instanceof Error ? err.message : "Không tải được đơn tháng";
+      toast.error(message);
+    }
     setLoading(false);
   }, [user, snapshot]);
 
@@ -240,6 +322,7 @@ export default function Orders() {
 
   const openSheet = useCallback(() => {
     if (sheetOpen) return;
+    setHubKind("daily");
     setSheetClosing(false);
     setSheetOpen(true);
   }, [sheetOpen]);
@@ -274,21 +357,28 @@ export default function Orders() {
       .map(([date, list]) => ({
         date,
         orders: list.sort((a, b) => b.created_at.localeCompare(a.created_at)),
+        monthly: [] as MonthlyOrderListItem[],
       }))
       .sort((a, b) => b.date.localeCompare(a.date));
     if (!map.has(todayStr)) {
-      days.unshift({ date: todayStr, orders: [] });
+      days.unshift({ date: todayStr, orders: [], monthly: monthlyOrders });
+    } else {
+      const today = days.find(d => d.date === todayStr);
+      if (today) today.monthly = monthlyOrders;
     }
     return days;
-  }, [orders, todayStr]);
+  }, [orders, monthlyOrders, todayStr]);
 
-  const dailyPages = useMemo<OrdersPage<OrderRow>[]>(
+  const dailyPages = useMemo<OrdersPage<ListEntry>[]>(
     () =>
       dayBuckets.map(day => ({
         key: day.date,
         title: formatDayHeading(day.date),
-        count: day.orders.length,
-        sections: day.orders,
+        count: day.monthly.length + day.orders.length,
+        sections: [
+          ...day.monthly.map(row => ({ kind: "monthly" as const, row })),
+          ...day.orders.map(row => ({ kind: "daily" as const, row })),
+        ],
       })),
     [dayBuckets],
   );
@@ -296,7 +386,7 @@ export default function Orders() {
   const weeklyPages = useMemo<OrdersPage<DayBucket>[]>(() => {
     const map = new Map<string, OrdersPage<DayBucket> & { weekStart: Date }>();
     for (const day of dayBuckets) {
-      if (day.orders.length === 0 && day.date !== todayStr) continue;
+      if (day.orders.length === 0 && day.monthly.length === 0 && day.date !== todayStr) continue;
       const d = parseISO(day.date);
       const weekStart = startOfWeek(d, { weekStartsOn: 1 });
       const key = format(weekStart, "yyyy-MM-dd");
@@ -312,7 +402,7 @@ export default function Orders() {
         };
         map.set(key, page);
       }
-      page.count += day.orders.length;
+      page.count += day.orders.length + day.monthly.length;
       page.sections.push(day);
     }
     return Array.from(map.values())
@@ -336,7 +426,11 @@ export default function Orders() {
           </Link>
           <div className="min-w-0 flex-1">
             <h1 className="font-display text-xl text-foreground">Đặt hàng</h1>
-            <p className="text-[11px] text-muted-foreground">{orders.length} đơn đã đặt</p>
+            <p className="text-[11px] text-muted-foreground">
+              {monthlyOrders.length > 0
+                ? `${orders.length} đơn ngày · ${monthlyOrders.length} đơn tháng`
+                : `${orders.length} đơn đã đặt`}
+            </p>
           </div>
           <div className="inline-flex shrink-0 rounded-full border border-border/60 bg-muted/40 p-0.5">
             <button
@@ -376,7 +470,7 @@ export default function Orders() {
           <OrdersPager
             pages={dailyPages}
             emptyLabel="Chưa có đơn ngày này"
-            renderSection={order => <OrderCard key={order.id} order={order} />}
+            renderSection={renderListEntry}
           />
         ) : (
           <OrdersPager
@@ -386,12 +480,19 @@ export default function Orders() {
               <DaySection
                 key={day.date}
                 title={formatDayHeading(day.date)}
-                meta={`${day.orders.length} đơn`}
+                meta={`${day.monthly.length + day.orders.length} đơn`}
               >
-                {day.orders.length === 0 ? (
+                {day.monthly.length === 0 && day.orders.length === 0 ? (
                   <p className="py-2 text-[11px] text-muted-foreground">Chưa có đơn</p>
                 ) : (
-                  day.orders.map(order => <OrderCard key={order.id} order={order} />)
+                  <>
+                    {day.monthly.map(row => (
+                      <MonthlyOrderCard key={`m-${row.categoryKey}`} row={row} />
+                    ))}
+                    {day.orders.map(order => (
+                      <OrderCard key={order.id} order={order} />
+                    ))}
+                  </>
                 )}
               </DaySection>
             )}
@@ -430,39 +531,76 @@ export default function Orders() {
           >
             <div className="order-new-sheet__panel">
               <div className="order-new-sheet__handle" aria-hidden />
-              <div className="mb-3">
-                <h2 id="order-new-title" className="text-sm font-semibold">
-                  Đơn mới
-                </h2>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  Chọn loại đơn để soạn
-                </p>
+              <div className="mb-3 flex items-start gap-2">
+                {hubKind === "monthly" ? (
+                  <button
+                    type="button"
+                    onClick={() => setHubKind("daily")}
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                    aria-label="Về đơn ngày"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </button>
+                ) : null}
+                <div className="min-w-0 flex-1">
+                  <h2 id="order-new-title" className="text-sm font-semibold">
+                    {hubKind === "monthly" ? "Đơn tháng" : "Đơn mới"}
+                  </h2>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {hubKind === "monthly" ? "Chọn loại nguyên liệu cho lưới tháng" : "Chọn loại đơn để soạn"}
+                  </p>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {hubCats.map(cat => (
-                  <button
-                    key={cat.key}
-                    type="button"
-                    disabled={!!creatingKey || ensuring}
-                    onClick={() => startOrderForCategory(cat.key, cat.name)}
-                    className="order-hub-tile"
-                  >
-                    <p className="font-display text-lg leading-tight text-foreground">{cat.name}</p>
-                    <p className="mt-1 text-[10px] text-muted-foreground">{cat.hint}</p>
-                    {creatingKey === cat.key && (
-                      <p className="mt-2 text-[10px] text-primary">Đang mở…</p>
-                    )}
-                  </button>
-                ))}
-                <Link
-                  to="/orders/monthly"
-                  className="order-hub-tile order-hub-tile--monthly"
-                  aria-label="Đơn tháng"
-                >
-                  <Calendar className="order-hub-tile__cal" strokeWidth={2.1} aria-hidden />
-                  <p className="font-display text-lg leading-tight">Đơn tháng</p>
-                  <p className="order-hub-tile__hint mt-1 text-[10px]">Lưới theo ngày</p>
-                </Link>
+                {hubKind === "daily" ? (
+                  <>
+                    {hubCats.map(cat => (
+                      <button
+                        key={cat.key}
+                        type="button"
+                        disabled={!!creatingKey || ensuring}
+                        onClick={() => startOrderForCategory(cat.key, cat.name)}
+                        className="order-hub-tile"
+                      >
+                        <p className="font-display text-lg leading-tight text-foreground">{cat.name}</p>
+                        <p className="mt-1 text-[10px] text-muted-foreground">{cat.hint}</p>
+                        {creatingKey === cat.key && (
+                          <p className="mt-2 text-[10px] text-primary">Đang mở…</p>
+                        )}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setHubKind("monthly")}
+                      className="order-hub-tile order-hub-tile--monthly"
+                      aria-label="Đơn tháng"
+                    >
+                      <Calendar className="order-hub-tile__cal" strokeWidth={2.1} aria-hidden />
+                      <p className="font-display text-lg leading-tight">Đơn tháng</p>
+                      <p className="order-hub-tile__hint mt-1 text-[10px]">Lưới theo ngày · nhiều loại</p>
+                    </button>
+                  </>
+                ) : (
+                  hubCats.map(cat => {
+                    const inProgress = monthlyOrders.find(row => row.categoryKey === cat.key);
+                    const filled = inProgress ? filledDayCount(inProgress.cells) : 0;
+                    return (
+                      <Link
+                        key={cat.key}
+                        to={`/orders/monthly?cat=${encodeURIComponent(cat.key)}`}
+                        className="order-hub-tile order-hub-tile--monthly"
+                      >
+                        <Calendar className="order-hub-tile__cal" strokeWidth={2.1} aria-hidden />
+                        <p className="font-display text-lg leading-tight">{cat.name}</p>
+                        <p className="order-hub-tile__hint mt-1 text-[10px]">
+                          {inProgress
+                            ? `Đang soạn · ${filled} ngày`
+                            : "Lưới theo ngày"}
+                        </p>
+                      </Link>
+                    );
+                  })
+                )}
               </div>
               {categories.length === 0 && !loading && (
                 <button

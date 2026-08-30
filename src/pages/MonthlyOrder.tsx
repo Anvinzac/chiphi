@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, CalendarDays, Check, Copy, Delete, GripHorizontal, Hash, LayoutGrid, Search, Share2, X } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { ArrowLeft, CalendarDays, Check, Copy, Delete, GripHorizontal, Hash, LayoutGrid, Plus, Search, Share2, X } from "lucide-react";
 import { addDays, format, isValid, parseISO } from "date-fns";
 import { toast } from "sonner";
 import MonthlyOrderGrid, { type MonthlyOrderCol } from "@/components/orders/MonthlyOrderGrid";
@@ -14,9 +14,11 @@ import type { MonthlyOrderLine } from "@/lib/mockMonthlyOrderGrid";
 import {
   DEFAULT_MONTHLY_PIN,
   cellsFromOverrides,
+  monthlyOrderDefaultTitle,
   monthlyShareUrl,
   overridesFromCells,
   readMonthlyOrderLocal,
+  resolveMonthlyCategoryKey,
   writeMonthlyOrderLocal,
 } from "@/lib/monthlyOrderPersist";
 import { loadMonthlyOrderRemote, saveMonthlyOrderRemote } from "@/lib/monthlyOrderDb";
@@ -53,10 +55,24 @@ function clampRange(start: Date, end: Date): { start: Date; end: Date } {
   return { start, end };
 }
 
-/** 4×3 pad: top-left is none, remaining 11 slots are the range. */
-const RANGE_PAD_SLOTS = 12;
+/** 5×3 pad (same as 0–9): X + 14 number slots. Core range centered; extras are backups. */
+const RANGE_PAD_SLOTS = 15;
 const RANGE_NUMBER_SLOTS = RANGE_PAD_SLOTS - 1;
-const RANGE_GAP = RANGE_NUMBER_SLOTS - 1;
+const RANGE_GAP = 12;
+
+type RangePadKey = { kind: "none" } | { kind: "extra" | "core"; value: number };
+
+function buildRangePadKeys(min: number, max: number): RangePadKey[] {
+  const coreCount = max - min + 1;
+  const extra = Math.max(0, RANGE_NUMBER_SLOTS - coreCount);
+  const before = Math.floor(extra / 2);
+  const after = extra - before;
+  const keys: RangePadKey[] = [{ kind: "none" }];
+  for (let n = min - before; n < min; n++) keys.push({ kind: "extra", value: n });
+  for (let n = min; n <= max; n++) keys.push({ kind: "core", value: n });
+  for (let n = max + 1; n <= max + after; n++) keys.push({ kind: "extra", value: n });
+  return keys;
+}
 
 function parseQtyBound(raw: string): number | null {
   const n = Number.parseInt(raw, 10);
@@ -67,10 +83,10 @@ function clampQtyRange(min: number, max: number, prefer: "min" | "max"): { min: 
   let a = Math.max(1, Math.floor(min));
   let b = Math.max(1, Math.floor(max));
   if (prefer === "min") {
-    if (b < a) b = a;
+    if (b <= a) b = a + 1;
     if (b - a > RANGE_GAP) b = a + RANGE_GAP;
   } else {
-    if (a > b) a = b;
+    if (a >= b) a = Math.max(1, b - 1);
     if (b - a > RANGE_GAP) a = Math.max(1, b - RANGE_GAP);
     if (b - a > RANGE_GAP) b = a + RANGE_GAP;
   }
@@ -81,8 +97,7 @@ function shortVi(d: Date): string {
   return format(d, "d 'th' M");
 }
 
-const DEFAULT_TITLE = "Đơn tháng";
-const TITLE_STORAGE_KEY = "chiphi:monthly-order-title";
+const TITLE_STORAGE_PREFIX = "chiphi:monthly-order-title";
 const UNIT_PRICE_NUM_CLASS =
   "font-display text-base font-bold leading-none tabular-nums sm:text-lg";
 
@@ -97,15 +112,80 @@ const POPOVER_W = 280;
 const POPOVER_H = 340;
 const GAP = 10;
 const RANGE_KEY_CLASS =
-  "rounded-xl border border-[#b8cddc] bg-[#dce8f0] py-2 text-base font-semibold tabular-nums text-[#3a4f58] shadow-sm active:scale-95";
+  "keypad-key rounded-xl border border-[#b8cddc] bg-[#dce8f0] py-2 text-base font-semibold tabular-nums text-[#3a4f58] shadow-sm active:scale-95";
 const RANGE_NONE_CLASS =
-  "inline-flex items-center justify-center rounded-xl border border-[#e4b8c0] bg-[#ead6d6] text-[#8a4a55] shadow-sm active:scale-95";
+  "keypad-key inline-flex items-center justify-center rounded-xl border border-[#e4b8c0] bg-[#ead6d6] text-[#8a4a55] shadow-sm active:scale-95";
 const RANGE_GHOST_CLASS =
-  "pad-range-ghost relative inline-flex items-center justify-center rounded-xl";
+  "keypad-key pad-range-ghost relative inline-flex items-center justify-center rounded-xl";
 const PAD_KEY_CLASS =
   "keypad-key rounded-xl border border-border/60 bg-card py-2 text-base font-medium shadow-sm active:scale-95";
 const PAD_MUTED_CLASS =
   "keypad-key rounded-xl border border-border/60 bg-muted/40 py-2 text-xs font-medium text-muted-foreground active:scale-95";
+
+function RangeExtraKey({
+  value,
+  picked,
+  onPick,
+}: {
+  value: number;
+  picked: boolean;
+  onPick: (n: number) => void;
+}) {
+  if (value < 1) {
+    return <span className={RANGE_GHOST_CLASS} style={{ minHeight: "2.5rem", opacity: 0.28 }} />;
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => onPick(value)}
+      className={`${RANGE_GHOST_CLASS}${picked ? " pad-range-key--picked" : ""}`}
+      style={{ minHeight: "2.5rem" }}
+      aria-label={String(value)}
+    >
+      <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
+      <span className="pad-range-ghost__val">{value}</span>
+    </button>
+  );
+}
+
+function RangePadKeyButton({
+  keySpec,
+  picked,
+  onNone,
+  onPick,
+}: {
+  keySpec: RangePadKey;
+  picked: boolean;
+  onNone: () => void;
+  onPick: (n: number) => void;
+}) {
+  if (keySpec.kind === "none") {
+    return (
+      <button
+        type="button"
+        onClick={onNone}
+        className={RANGE_NONE_CLASS}
+        style={{ minHeight: "2.5rem" }}
+        aria-label="Xóa số ngày này"
+      >
+        <X className="h-4 w-4" strokeWidth={2.6} />
+      </button>
+    );
+  }
+  if (keySpec.kind === "extra") {
+    return <RangeExtraKey value={keySpec.value} picked={picked} onPick={onPick} />;
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => onPick(keySpec.value)}
+      className={`${RANGE_KEY_CLASS}${picked ? " pad-range-key--picked" : ""}`}
+      style={{ minHeight: "2.5rem" }}
+    >
+      {keySpec.value}
+    </button>
+  );
+}
 
 type AnchorInfo = {
   rect: DOMRect;
@@ -115,8 +195,16 @@ type AnchorInfo = {
 } | null;
 
 export default function MonthlyOrder() {
+  const [params] = useSearchParams();
+  const categoryKey = resolveMonthlyCategoryKey(params.get("cat"));
+  return <MonthlyOrderEditor key={categoryKey} categoryKey={categoryKey} />;
+}
+
+function MonthlyOrderEditor({ categoryKey }: { categoryKey: string }) {
   const { user } = useAuth();
-  const saved = useMemo(() => readMonthlyOrderLocal(), []);
+  const defaultTitle = monthlyOrderDefaultTitle(categoryKey);
+  const titleStorageKey = `${TITLE_STORAGE_PREFIX}:${categoryKey}`;
+  const saved = useMemo(() => readMonthlyOrderLocal(categoryKey), [categoryKey]);
   const today = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => toInputValue(today), [today]);
 
@@ -162,7 +250,7 @@ export default function MonthlyOrder() {
   const [anchor, setAnchor] = useState<AnchorInfo>(null);
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number; arrow: "top" | "left" | "right"; arrowOffset: number } | null>(null);
   const [rangeMin, setRangeMin] = useState(() => saved?.rangeMin || "16");
-  const [rangeMax, setRangeMax] = useState(() => saved?.rangeMax || "26");
+  const [rangeMax, setRangeMax] = useState(() => saved?.rangeMax || "28");
   // State for range editor dialog
   const [rangeEditorOpen, setRangeEditorOpen] = useState(false);
   const [rangeEnabled, setRangeEnabled] = useState(() => saved?.rangeEnabled ?? true);
@@ -180,9 +268,9 @@ export default function MonthlyOrder() {
   const [title, setTitle] = useState(() => {
     if (saved?.title) return saved.title;
     try {
-      return localStorage.getItem(TITLE_STORAGE_KEY) || DEFAULT_TITLE;
+      return localStorage.getItem(titleStorageKey) || defaultTitle;
     } catch {
-      return DEFAULT_TITLE;
+      return defaultTitle;
     }
   });
   const [editingTitle, setEditingTitle] = useState(false);
@@ -197,11 +285,11 @@ export default function MonthlyOrder() {
   }, [editingTitle]);
 
   const commitTitle = () => {
-    const next = title.trim() || DEFAULT_TITLE;
+    const next = title.trim() || defaultTitle;
     setTitle(next);
     setEditingTitle(false);
     try {
-      localStorage.setItem(TITLE_STORAGE_KEY, next);
+      localStorage.setItem(titleStorageKey, next);
     } catch {
       /* private mode */
     }
@@ -209,6 +297,7 @@ export default function MonthlyOrder() {
 
   const snapshot = useMemo(
     () => ({
+      categoryKey,
       title,
       startInput,
       endInput,
@@ -221,7 +310,7 @@ export default function MonthlyOrder() {
       shareToken,
       updatedAt: new Date().toISOString(),
     }),
-    [title, startInput, endInput, columns, rangeMin, rangeMax, rangeEnabled, unitPriceDraft, overrides, shareToken],
+    [categoryKey, title, startInput, endInput, columns, rangeMin, rangeMax, rangeEnabled, unitPriceDraft, overrides, shareToken],
   );
 
   useEffect(() => {
@@ -230,10 +319,10 @@ export default function MonthlyOrder() {
       return;
     }
     let cancelled = false;
-    void loadMonthlyOrderRemote(user.id)
+    void loadMonthlyOrderRemote(user.id, categoryKey)
       .then(remote => {
         if (cancelled || !remote) return;
-        setTitle(remote.title || DEFAULT_TITLE);
+        setTitle(remote.title || defaultTitle);
         setStartInput(remote.startInput);
         setEndInput(remote.endInput);
         setColumns(remote.columns);
@@ -255,7 +344,7 @@ export default function MonthlyOrder() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, categoryKey, defaultTitle]);
 
   useEffect(() => {
     if (!persistReady) return;
@@ -387,9 +476,7 @@ export default function MonthlyOrder() {
   }, [rangeBounds]);
   const rangePadKeys = useMemo(() => {
     if (!rangeBounds) return [];
-    const values: number[] = [];
-    for (let n = rangeBounds.min; n <= rangeBounds.max; n++) values.push(n);
-    return values.slice(0, RANGE_NUMBER_SLOTS);
+    return buildRangePadKeys(rangeBounds.min, rangeBounds.max);
   }, [rangeBounds]);
 
   const commitQtyRange = (which: "min" | "max") => {
@@ -613,9 +700,9 @@ export default function MonthlyOrder() {
                     }
                     if (e.key === "Escape") {
                       try {
-                        setTitle(localStorage.getItem(TITLE_STORAGE_KEY) || DEFAULT_TITLE);
+                        setTitle(localStorage.getItem(titleStorageKey) || defaultTitle);
                       } catch {
-                        setTitle(DEFAULT_TITLE);
+                        setTitle(defaultTitle);
                       }
                       setEditingTitle(false);
                     }
@@ -951,36 +1038,30 @@ export default function MonthlyOrder() {
             </div>
 
             {showRangeKeys ? (
-              <div className="grid grid-cols-4 gap-1.5 p-3">
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  className={RANGE_NONE_CLASS}
-                  style={{ minHeight: "2.5rem" }}
-                  aria-label="Xóa số ngày này"
-                >
-                  <X className="h-4 w-4" strokeWidth={2.6} />
-                </button>
-                {rangePadKeys.map(value => (
-                  <button
-                    key={`pad-${value}`}
-                    type="button"
-                    onClick={() => pickRange(value)}
-                    className={`${RANGE_KEY_CLASS}${pickedRange === value ? " pad-range-key--picked" : ""}`}
-                    style={{ minHeight: "2.5rem" }}
-                  >
-                    {value}
-                  </button>
-                ))}
-                {Array.from({ length: Math.max(0, RANGE_NUMBER_SLOTS - rangePadKeys.length) }).map((_, i) => (
-                  <span
-                    key={`pad-empty-${i}`}
-                    className={RANGE_GHOST_CLASS}
-                    style={{ minHeight: "2.5rem", opacity: 0.2 }}
-                    aria-hidden
-                  />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-3 gap-1.5 p-3 pb-2">
+                  {rangePadKeys.slice(0, 12).map((key, i) => (
+                    <RangePadKeyButton
+                      key={`pad-${i}-${key.kind === "none" ? "none" : key.value}`}
+                      keySpec={key}
+                      picked={key.kind !== "none" && pickedRange === key.value}
+                      onNone={handleDelete}
+                      onPick={pickRange}
+                    />
+                  ))}
+                </div>
+                <div className="grid grid-cols-3 gap-1.5 px-3 pb-3">
+                  {rangePadKeys.slice(12, 15).map((key, i) => (
+                    <RangePadKeyButton
+                      key={`pad-tail-${i}-${key.kind === "none" ? "none" : key.value}`}
+                      keySpec={key}
+                      picked={key.kind !== "none" && pickedRange === key.value}
+                      onNone={handleDelete}
+                      onPick={pickRange}
+                    />
+                  ))}
+                </div>
+              </>
             ) : (
               <>
             <div className="grid grid-cols-3 gap-1.5 p-3 pb-2">
@@ -1204,7 +1285,7 @@ export default function MonthlyOrder() {
               </div>
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Tối đa {RANGE_NUMBER_SLOTS} số trên bàn phím. Ô góc trái là X — xóa số ngày đó.
+              Cách nhau tối đa 12. 15 ô như bàn phím: góc trái là X, dãy chính ở giữa, ô ngoài dãy (n−1, n+1…) viền đứt.
             </p>
           </div>
           <div className="mt-4 flex gap-2">

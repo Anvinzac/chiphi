@@ -21,10 +21,13 @@ type MonthlyOrderRow = {
   unit_price_thousands: string;
   cells: Record<string, string>;
   share_token: string | null;
+  vendor_notice?: string | null;
   updated_at: string;
 };
 
 const SELECT_WITH_CAT =
+  "category_key, title, range_start, range_end, columns, qty_min, qty_max, range_enabled, unit_price_thousands, cells, share_token, vendor_notice, updated_at";
+const SELECT_WITH_CAT_NO_NOTICE =
   "category_key, title, range_start, range_end, columns, qty_min, qty_max, range_enabled, unit_price_thousands, cells, share_token, updated_at";
 const SELECT_LEGACY =
   "title, range_start, range_end, columns, qty_min, qty_max, range_enabled, unit_price_thousands, cells, share_token, updated_at";
@@ -45,6 +48,7 @@ function rowToSnapshot(row: MonthlyOrderRow, fallbackKey = DEFAULT_MONTHLY_CATEG
     unitPriceDraft: row.unit_price_thousands || "",
     cells: row.cells ?? {},
     shareToken: row.share_token,
+    vendorNotice: row.vendor_notice || "",
     updatedAt: row.updated_at,
   };
 }
@@ -67,6 +71,18 @@ export async function loadMonthlyOrderRemote(
   if (isMissingRelation(withCat.error)) return null;
   if (!isMissingColumn(withCat.error)) throw withCat.error;
 
+  const noNotice = await supabase
+    .from("monthly_orders")
+    .select(SELECT_WITH_CAT_NO_NOTICE)
+    .eq("user_id", userId)
+    .eq("category_key", key)
+    .maybeSingle();
+  if (!noNotice.error) {
+    if (!noNotice.data) return null;
+    return rowToSnapshot(noNotice.data as MonthlyOrderRow, key);
+  }
+  if (!isMissingColumn(noNotice.error)) throw noNotice.error;
+
   const legacy = await supabase.from("monthly_orders").select(SELECT_LEGACY).eq("user_id", userId).maybeSingle();
   if (legacy.error) {
     if (isMissingRelation(legacy.error)) return null;
@@ -84,6 +100,12 @@ export async function listMonthlyOrdersRemote(userId: string): Promise<MonthlyOr
   }
   if (isMissingRelation(withCat.error)) return [];
   if (!isMissingColumn(withCat.error)) throw withCat.error;
+
+  const noNotice = await supabase.from("monthly_orders").select(SELECT_WITH_CAT_NO_NOTICE).eq("user_id", userId);
+  if (!noNotice.error) {
+    return ((noNotice.data as MonthlyOrderRow[]) || []).map(row => listItemFromSnapshot(rowToSnapshot(row)));
+  }
+  if (!isMissingColumn(noNotice.error)) throw noNotice.error;
 
   const legacy = await supabase.from("monthly_orders").select(SELECT_LEGACY).eq("user_id", userId);
   if (legacy.error) {
@@ -142,6 +164,7 @@ export type SharedMonthlyOrder = {
   columns: MonthlyOrderSnapshot["columns"];
   cells: Record<string, string>;
   unitPriceDraft: string;
+  vendorNotice: string;
 };
 
 export async function fetchSharedMonthlyOrder(
@@ -167,5 +190,23 @@ export async function fetchSharedMonthlyOrder(
     columns,
     cells: (row.cells ?? {}) as Record<string, string>,
     unitPriceDraft: String(row.unit_price_thousands ?? ""),
+    vendorNotice: String(row.vendor_notice ?? ""),
   };
+}
+
+export async function saveSharedMonthlyNotice(
+  token: string,
+  pin: string,
+  notice: string,
+): Promise<string> {
+  const { data, error } = await supabase.rpc("update_shared_monthly_notice", {
+    p_token: token,
+    p_pin: pin,
+    p_notice: notice,
+  });
+  if (error) {
+    if (isMissingRelation(error) || isMissingColumn(error)) return notice;
+    throw error;
+  }
+  return typeof data === "string" ? data : notice;
 }

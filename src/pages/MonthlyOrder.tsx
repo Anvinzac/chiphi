@@ -260,6 +260,7 @@ function MonthlyOrderEditor({ categoryKey }: { categoryKey: string }) {
   const [pickedRange, setPickedRange] = useState<number | null>(null);
   const [unitPriceDraft, setUnitPriceDraft] = useState(() => saved?.unitPriceDraft || "");
   const [shareToken, setShareToken] = useState<string | null>(() => saved?.shareToken ?? null);
+  const [vendorNotice, setVendorNotice] = useState(() => saved?.vendorNotice || "");
   const [pin, setPin] = useState(DEFAULT_MONTHLY_PIN);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareStep, setShareStep] = useState<"pin" | "qr">("pin");
@@ -308,9 +309,10 @@ function MonthlyOrderEditor({ categoryKey }: { categoryKey: string }) {
       unitPriceDraft,
       cells: cellsFromOverrides(overrides),
       shareToken,
+      vendorNotice,
       updatedAt: new Date().toISOString(),
     }),
-    [categoryKey, title, startInput, endInput, columns, rangeMin, rangeMax, rangeEnabled, unitPriceDraft, overrides, shareToken],
+    [categoryKey, title, startInput, endInput, columns, rangeMin, rangeMax, rangeEnabled, unitPriceDraft, overrides, shareToken, vendorNotice],
   );
 
   useEffect(() => {
@@ -333,6 +335,7 @@ function MonthlyOrderEditor({ categoryKey }: { categoryKey: string }) {
         setUnitPriceDraft(remote.unitPriceDraft);
         setOverrides(overridesFromCells(remote.cells));
         setShareToken(remote.shareToken);
+        setVendorNotice(remote.vendorNotice || "");
       })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : "Không tải được đơn tháng";
@@ -958,7 +961,11 @@ function MonthlyOrderEditor({ categoryKey }: { categoryKey: string }) {
               </>
             ) : null}
           </div>
-          {unitPriceVnd > 0 && !hasInvalidRange ? null : (
+          {vendorNotice.trim() ? (
+            <p className="ml-auto max-w-[42%] truncate text-right text-[11px] text-muted-foreground" title={vendorNotice}>
+              {vendorNotice}
+            </p>
+          ) : unitPriceVnd > 0 && !hasInvalidRange ? null : (
             <span className="ml-auto shrink-0 text-right text-[10px] tabular-nums text-muted-foreground sm:text-[11px]">
               {hasInvalidRange ? "" : `${stats.daysWithItems}/${dayCount} ngày`}
             </span>

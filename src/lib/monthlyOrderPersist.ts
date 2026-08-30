@@ -18,6 +18,7 @@ export type MonthlyOrderSnapshot = {
   unitPriceDraft: string;
   cells: Record<string, string>;
   shareToken: string | null;
+  vendorNotice: string;
   updatedAt: string;
 };
 
@@ -100,6 +101,7 @@ function normalizeSnapshot(
     unitPriceDraft: parsed.unitPriceDraft || "",
     cells: parsed.cells ?? {},
     shareToken: parsed.shareToken ?? null,
+    vendorNotice: parsed.vendorNotice || "",
     updatedAt: parsed.updatedAt || new Date().toISOString(),
   };
 }

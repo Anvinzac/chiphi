@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { CalendarDays, Copy, LayoutGrid, Search } from "lucide-react";
+import { CalendarDays, Copy, HelpCircle, LayoutGrid, Search } from "lucide-react";
 import { format, isValid, parseISO } from "date-fns";
 import { toast } from "sonner";
 import MonthlyOrderGrid, { type MonthlyOrderCol } from "@/components/orders/MonthlyOrderGrid";
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { DEFAULT_MONTHLY_PIN, overridesFromCells } from "@/lib/monthlyOrderPersist";
 import { emptyMonthlyOrderByDate } from "@/lib/mockMonthlyOrderGrid";
-import { fetchSharedMonthlyOrder, type SharedMonthlyOrder } from "@/lib/monthlyOrderDb";
+import { fetchSharedMonthlyOrder, saveSharedMonthlyNotice, type SharedMonthlyOrder } from "@/lib/monthlyOrderDb";
 import { isOrderPinUnlocked, markOrderPinUnlocked } from "@/lib/orderShare";
 import { googleSumExpr } from "@/lib/googleSumExpr";
 import { vndFromThousands } from "@/lib/vndThousands";
@@ -44,6 +44,9 @@ export default function MonthlyOrderShare() {
   const [unlocked, setUnlocked] = useState(() => (token ? isOrderPinUnlocked(`m:${token}`) : false));
   const [columns, setColumns] = useState<MonthlyOrderCol>(4);
   const [totalOpen, setTotalOpen] = useState(false);
+  const [vendorNotice, setVendorNotice] = useState("");
+  const noticeReadyRef = useRef(false);
+  const noticePinRef = useRef(DEFAULT_MONTHLY_PIN);
 
   const todayStr = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
 
@@ -120,15 +123,31 @@ export default function MonthlyOrderShare() {
         return;
       }
       markOrderPinUnlocked(`m:${token}`);
+      noticePinRef.current = pin.trim() || DEFAULT_MONTHLY_PIN;
+      noticeReadyRef.current = false;
+      setVendorNotice(next.vendorNotice || "");
       setOrder(next);
       setColumns(next.columns);
       setUnlocked(true);
+      window.setTimeout(() => {
+        noticeReadyRef.current = true;
+      }, 0);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Không mở được đơn tháng");
     } finally {
       setUnlocking(false);
     }
   };
+
+  useEffect(() => {
+    if (!noticeReadyRef.current || !token || !order) return;
+    const t = window.setTimeout(() => {
+      void saveSharedMonthlyNotice(token, noticePinRef.current, vendorNotice).catch((err: unknown) => {
+        toast.error(err instanceof Error ? err.message : "Không lưu được ghi chú");
+      });
+    }, 450);
+    return () => window.clearTimeout(t);
+  }, [vendorNotice, token, order]);
 
   if (!unlocked || !order) {
     return (
@@ -256,49 +275,68 @@ export default function MonthlyOrderShare() {
           />
         )}
 
-        <div className="relative flex min-h-12 shrink-0 items-center border-t border-border bg-card px-3 py-2 sm:px-4">
-          <span className="shrink-0 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Tổng</span>
-          <div className="pointer-events-none absolute inset-y-0 left-1/2 flex -translate-x-1/2 items-center gap-1 sm:gap-1.5">
-            <button
-              type="button"
-              disabled={!hasValidRange}
-              onClick={() => setTotalOpen(true)}
-              className="total-amount-hit pointer-events-auto shrink-0 hover:bg-muted/50 disabled:pointer-events-none"
-              aria-label="Xem chi tiết tổng"
-            >
+        <div
+          role="button"
+          tabIndex={hasValidRange ? 0 : -1}
+          onClick={() => hasValidRange && setTotalOpen(true)}
+          onKeyDown={e => {
+            if (!hasValidRange) return;
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setTotalOpen(true);
+            }
+          }}
+          className="flex min-h-12 shrink-0 cursor-pointer items-stretch border-t border-border bg-card hover:bg-muted/30"
+          aria-label="Xem chi tiết tổng"
+        >
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 px-3 py-2 sm:px-4">
+            <span className="inline-flex shrink-0 items-center gap-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              Tổng
+              <HelpCircle className="h-3.5 w-3.5" strokeWidth={2.1} aria-hidden />
+            </span>
+            <span className="flex min-w-0 flex-1 items-center justify-center gap-1 sm:gap-1.5">
               <span className={`leading-none ${UNIT_PRICE_NUM_CLASS}`}>
                 {hasValidRange ? stats.totalSum : "—"}
               </span>
-            </button>
-            <span className="shrink-0 text-muted-foreground/45" aria-hidden>
-              ×
-            </span>
-            <span className="monthly-unit-price inline-flex shrink-0 items-baseline rounded-md border border-border/70 bg-background px-1.5 py-0.5">
-              <span className={`${UNIT_PRICE_NUM_CLASS} ${unitPriceDraft ? "" : "font-medium text-muted-foreground/40"}`}>
-                {unitPriceDraft || "giá"}
+              <span className="shrink-0 text-muted-foreground/45" aria-hidden>
+                ×
               </span>
-              {unitPriceDraft ? (
-                <ThousandsMark className="text-[0.7em] font-display font-bold leading-none text-muted-foreground/70" />
+              <span className="monthly-unit-price inline-flex shrink-0 items-baseline rounded-md border border-border/70 bg-background px-1.5 py-0.5">
+                <span className={`${UNIT_PRICE_NUM_CLASS} ${unitPriceDraft ? "" : "font-medium text-muted-foreground/40"}`}>
+                  {unitPriceDraft || "giá"}
+                </span>
+                {unitPriceDraft ? (
+                  <ThousandsMark className="text-[0.7em] font-display font-bold leading-none text-muted-foreground/70" />
+                ) : null}
+              </span>
+              {unitPriceVnd > 0 && hasValidRange ? (
+                <>
+                  <span className="shrink-0 text-muted-foreground/45" aria-hidden>
+                    =
+                  </span>
+                  <MoneyLabel
+                    amount={moneyTotal}
+                    className="min-w-0 truncate text-base font-display font-bold leading-none sm:text-lg"
+                    smallClassName="text-[0.7em]"
+                  />
+                </>
               ) : null}
             </span>
-            {unitPriceVnd > 0 && hasValidRange ? (
-              <>
-                <span className="shrink-0 text-muted-foreground/45" aria-hidden>
-                  =
-                </span>
-                <MoneyLabel
-                  amount={moneyTotal}
-                  className="min-w-0 truncate text-base font-display font-bold leading-none sm:text-lg"
-                  smallClassName="text-[0.7em]"
-                />
-              </>
-            ) : null}
           </div>
-          {unitPriceVnd > 0 && hasValidRange ? null : (
-            <span className="ml-auto shrink-0 text-right text-[10px] tabular-nums text-muted-foreground sm:text-[11px]">
-              {hasValidRange ? `${stats.daysWithItems}/${dayCount} ngày` : ""}
-            </span>
-          )}
+          <label
+            className="flex w-1/2 min-w-0 items-center border-l border-border/60 px-2 py-1.5 sm:px-3"
+            onClick={e => e.stopPropagation()}
+            onKeyDown={e => e.stopPropagation()}
+          >
+            <input
+              value={vendorNotice}
+              onChange={e => setVendorNotice(e.target.value.slice(0, 200))}
+              onClick={e => e.stopPropagation()}
+              placeholder="Ghi chú…"
+              aria-label="Ghi chú cho đơn tháng"
+              className="h-8 w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/45"
+            />
+          </label>
         </div>
       </div>
 

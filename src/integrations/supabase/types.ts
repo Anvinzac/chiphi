@@ -397,6 +397,7 @@ export type Database = {
           unit_price_thousands: string
           updated_at: string
           user_id: string
+          vendor_notice: string
         }
         Insert: {
           category_key?: string
@@ -415,6 +416,7 @@ export type Database = {
           unit_price_thousands?: string
           updated_at?: string
           user_id: string
+          vendor_notice?: string
         }
         Update: {
           category_key?: string
@@ -433,6 +435,7 @@ export type Database = {
           unit_price_thousands?: string
           updated_at?: string
           user_id?: string
+          vendor_notice?: string
         }
         Relationships: []
       }
@@ -1026,7 +1029,12 @@ export type Database = {
           range_start: string
           title: string
           unit_price_thousands: string
+          vendor_notice: string
         }[]
+      }
+      update_shared_monthly_notice: {
+        Args: { p_notice: string; p_pin: string; p_token: string }
+        Returns: string
       }
       get_shared_order: {
         Args: { p_token: string }

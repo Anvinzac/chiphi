@@ -226,9 +226,9 @@ export default function MonthlyOrderShare() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 bg-background border-b border-border/50">
+      <div className="flex justify-center border-b border-border/50 bg-background px-4 py-2.5">
         <div
-          className="inline-flex shrink-0 rounded-full border border-border/60 bg-muted/40 p-0.5"
+          className="flex w-full max-w-sm rounded-full border border-border/60 bg-muted/40 p-1"
           role="tablist"
           aria-label="Số cột"
         >
@@ -241,11 +241,11 @@ export default function MonthlyOrderShare() {
                 role="tab"
                 aria-selected={active}
                 onClick={() => setColumns(opt.value)}
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium leading-none transition-colors sm:px-3 sm:text-xs ${
+                className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-full py-2 text-xs font-medium leading-none transition-colors ${
                   active ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <LayoutGrid className="h-3 w-3 opacity-70" />
+                <LayoutGrid className="h-3.5 w-3.5 opacity-70" />
                 {opt.value}
               </button>
             );

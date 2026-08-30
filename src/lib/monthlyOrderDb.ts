@@ -141,6 +141,7 @@ export type SharedMonthlyOrder = {
   rangeEnd: string;
   columns: MonthlyOrderSnapshot["columns"];
   cells: Record<string, string>;
+  unitPriceDraft: string;
 };
 
 export async function fetchSharedMonthlyOrder(
@@ -165,5 +166,6 @@ export async function fetchSharedMonthlyOrder(
     rangeEnd: row.range_end,
     columns,
     cells: (row.cells ?? {}) as Record<string, string>,
+    unitPriceDraft: String(row.unit_price_thousands ?? ""),
   };
 }

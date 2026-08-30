@@ -1025,6 +1025,7 @@ export type Database = {
           range_end: string
           range_start: string
           title: string
+          unit_price_thousands: string
         }[]
       }
       get_shared_order: {

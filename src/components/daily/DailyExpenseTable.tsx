@@ -1027,7 +1027,7 @@ export default function DailyExpenseTable({
   const applyExpenseJson = useCallback(
     async (raw: string, opts?: { source?: "json" | "receipt" }) => {
       const result = parseSalaryJson(raw);
-      if (!result.ok) {
+      if (result.ok === false) {
         toast.error(result.error);
         return false;
       }
@@ -1242,7 +1242,7 @@ export default function DailyExpenseTable({
           sort_index,
           name: line.name,
           amount: line.amount,
-          attrs: (line.attrs ?? {}) as Record<string, unknown>,
+          attrs: (line.attrs ?? {}) as Json,
         }));
         const lineRes = await supabase.from("sub_payment_lines").insert(lineRows);
         if (lineRes.error && !isMissingRelation(lineRes.error)) {

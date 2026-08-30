@@ -89,6 +89,6 @@ export async function extractReceiptJsonFromImage(file: File): Promise<string> {
 
   const jsonText = extractJsonText(content);
   const parsed = parseSalaryJson(jsonText);
-  if (!parsed.ok) throw new Error(parsed.error);
+  if (parsed.ok === false) throw new Error(parsed.error);
   return jsonText;
 }

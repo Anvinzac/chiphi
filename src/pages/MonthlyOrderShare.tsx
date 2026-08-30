@@ -228,7 +228,7 @@ export default function MonthlyOrderShare() {
 
       <div className="flex justify-center border-b border-border/50 bg-background px-4 py-2.5">
         <div
-          className="flex w-full max-w-sm rounded-full border border-border/60 bg-muted/40 p-1"
+          className="flex w-[80%] max-w-sm rounded-full border border-border/60 bg-muted/40 p-1"
           role="tablist"
           aria-label="Số cột"
         >

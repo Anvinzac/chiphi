@@ -303,11 +303,11 @@ export default function MonthlyOrderShare() {
       </div>
 
       <Dialog open={totalOpen} onOpenChange={setTotalOpen}>
-        <DialogContent className="max-w-[92vw] rounded-xl sm:max-w-sm">
+        <DialogContent className="max-w-[94vw] rounded-xl sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="font-display">Chi tiết tổng</DialogTitle>
           </DialogHeader>
-          <div className="max-h-[50vh] space-y-1 overflow-y-auto pr-0.5">
+          <div className="monthly-total-detail__list space-y-1">
             {stats.dayTotals.length === 0 ? (
               <p className="py-3 text-center text-xs text-muted-foreground">Chưa có số nào trong khoảng này</p>
             ) : (
@@ -320,7 +320,9 @@ export default function MonthlyOrderShare() {
             )}
           </div>
           {googleExpr ? (
-            <p className="break-all font-mono text-[11px] leading-snug text-muted-foreground">{googleExpr}</p>
+            <p className="monthly-total-detail__expr break-all font-mono text-[11px] leading-snug text-muted-foreground">
+              {googleExpr}
+            </p>
           ) : null}
           <div className="flex items-end justify-between gap-2 border-t border-border/50 pt-3">
             <button

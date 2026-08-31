@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { signInAsAdmin, isAdminDemoUser } from "@/hooks/useAdminDemoAuth";
+import { signInAsKitchen } from "@/hooks/useKitchenAuth";
 import { isDemoUser } from "@/hooks/useDemoAuth";
 import { isSandboxUser, signInAsSandbox } from "@/hooks/useSandboxAuth";
 import { ADMIN_PASSWORD, ADMIN_USERNAME, LOCAL_ADMIN_LOGIN_VISIBLE } from "@/lib/adminCredentials";
@@ -138,7 +139,7 @@ export default function Auth() {
               <span className="font-medium text-foreground">{ADMIN_PASSWORD}</span>
             </p>
           )}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <Button
               type="button"
               variant="outline"
@@ -183,6 +184,23 @@ export default function Auth() {
               }}
             >
               Sandbox Login
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full text-xs"
+              onClick={async () => {
+                setSubmitting(true);
+                try {
+                  await signInAsKitchen();
+                } catch (err: any) {
+                  toast.error(err.message);
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+            >
+              Bếp
             </Button>
           </div>
         </form>

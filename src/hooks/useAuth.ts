@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { purgeSeededSampleSpend, seedDataForUser } from "@/lib/seedData";
 import { isThrowawayAccount } from "@/lib/throwawayAccount";
+import { isKitchenAccount } from "@/lib/kitchenAccount";
 import type { Session } from "@supabase/supabase-js";
 
 const seedByUser = new Map<string, Promise<void>>();
@@ -16,6 +17,9 @@ function onSignedIn(userId: string, email?: string | null) {
     }
     return;
   }
+  // Kitchen owns real (pending) orders, so it is never seeded or purge-scrubbed
+  if (isKitchenAccount(email)) return;
+
   if (purgedRealUsers.has(userId)) return;
   purgedRealUsers.add(userId);
   void purgeSeededSampleSpend(userId)

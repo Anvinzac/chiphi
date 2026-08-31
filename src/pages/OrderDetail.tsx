@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Check, ClipboardList, Copy, QrCode, Store } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, ClipboardList, Copy, QrCode, Send, Store } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,6 +35,7 @@ import {
   type OrderMode,
 } from "@/lib/formatOrderQty";
 import { customerNameFromUser, formatOrderDay, orderIdentityLine } from "@/lib/orderIdentity";
+import { isKitchenAccount } from "@/lib/kitchenAccount";
 import BulkIngredientPager from "@/components/orders/BulkIngredientPager";
 import { foldCategoryName } from "@/lib/categoryVisuals";
 import { formatParsedAmount, parseOrderText } from "@/lib/parseOrderText";
@@ -85,6 +86,8 @@ function OrderFilledRow({
   expanded,
   unitPrice,
   chipCloud,
+  autoFocusQty = false,
+  onFocusQtyHandled,
   onExpand,
   onUpdate,
   onCommitNotice,
@@ -94,6 +97,8 @@ function OrderFilledRow({
   expanded: boolean;
   unitPrice: number | null;
   chipCloud: ReactNode;
+  autoFocusQty?: boolean;
+  onFocusQtyHandled?: () => void;
   onExpand: () => void;
   onUpdate: (patch: Partial<OrderItemDraft>) => void;
   onCommitNotice: (notice: string) => void;
@@ -102,6 +107,13 @@ function OrderFilledRow({
   const { confirming, cancelConfirm, consumeClick, rootRef, holdProps } = useHoldToConfirm({
     ignoreSelector: "input, textarea, button",
   });
+  const qtyRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!autoFocusQty) return;
+    qtyRef.current?.focus();
+    onFocusQtyHandled?.();
+  }, [autoFocusQty, onFocusQtyHandled]);
 
   const handleRowActivate = () => {
     if (consumeClick()) return;
@@ -173,8 +185,8 @@ function OrderFilledRow({
               />
             ) : (
               <Input
+                ref={qtyRef}
                 value={row.quantity}
-                onFocus={() => onUpdate({ quantity: "" })}
                 onChange={e => onUpdate({ quantity: e.target.value.replace(/[^\d.]/g, "") })}
                 placeholder="0"
                 inputMode="decimal"
@@ -241,6 +253,7 @@ export default function OrderDetail() {
   const preferredCatKey = searchParams.get("cat") || "";
   const { user } = useAuth();
   const navigate = useNavigate();
+  const kitchen = isKitchenAccount(user?.email);
   const isNewSession = routeId === "new";
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState("draft");
@@ -259,6 +272,10 @@ export default function OrderDetail() {
   const [chipPage, setChipPage] = useState(0);
   /** Which list slot shows the ingredient cloud: item index, or `ph-${n}` for empty slots. */
   const [expandedKey, setExpandedKey] = useState<string>("ph-0");
+  /** Row whose qty input should grab focus right after a chip tap (matched by folded name). */
+  const [focusQtyName, setFocusQtyName] = useState<string | null>(null);
+  /** Sticky across renders so the focus effect in the row fires exactly once. */
+  const clearFocusQty = useCallback(() => setFocusQtyName(null), []);
   const chipPagerRef = useRef<HTMLDivElement>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
@@ -828,9 +845,13 @@ export default function OrderDetail() {
 
   const pickIngredientForExpanded = (ing: CatalogIngredient) => {
     const key = ing.name.trim().toLowerCase();
+    const replacingSame =
+      expandedKey.startsWith("item-") &&
+      items[Number(expandedKey.slice(5))]?.name.trim().toLowerCase() === key;
+    if (!replacingSame) setFocusQtyName(key);
     const entry: OrderItemDraft = {
       name: ing.name,
-      quantity: defaultQty(ing),
+      quantity: "",
       unit: ing.unit || "kg",
       sort_order: 0,
       catalog_id: ing.id,
@@ -1128,6 +1149,40 @@ export default function OrderDetail() {
     }
   };
 
+  const submitForApproval = async () => {
+    const cleaned = items.filter(draftHasAmount);
+    if (cleaned.length === 0) {
+      toast.error("Chọn ít nhất một nguyên liệu");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      let oid = orderIdRef.current;
+      const ok = await save();
+      if (!ok) return;
+      oid = orderIdRef.current;
+      if (!oid) return;
+
+      const { data, error } = await supabase.rpc("submit_order_for_approval", { p_order_id: oid });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      if (!data) {
+        toast.error("Tài khoản bếp chưa được gán cho admin");
+        return;
+      }
+      setStatus("pending");
+      toast.success("Đã gửi duyệt");
+      navigate("/orders");
+    } catch (err: any) {
+      toast.error(err.message || "Gửi duyệt thất bại");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const openShareFlow = () => {
     if (items.filter(draftHasAmount).length === 0) {
       toast.error("Chọn ít nhất một nguyên liệu");
@@ -1363,6 +1418,11 @@ export default function OrderDetail() {
                     expanded={expanded}
                     unitPrice={unitPriceForRow(row)}
                     chipCloud={expanded ? renderChipCloud() : null}
+                    autoFocusQty={
+                      focusQtyName !== null &&
+                      row.name.trim().toLowerCase() === focusQtyName
+                    }
+                    onFocusQtyHandled={clearFocusQty}
                     onExpand={() => toggleSlot(key)}
                     onUpdate={patch => updateRow(index, patch)}
                     onCommitNotice={notice => {
@@ -1458,15 +1518,27 @@ export default function OrderDetail() {
           >
             Lưu nháp
           </Button>
-          <Button
-            type="button"
-            className="flex-1 gap-1.5"
-            disabled={saving}
-            onClick={openShareFlow}
-          >
-            <QrCode className="h-4 w-4" />
-            Link & QR
-          </Button>
+          {kitchen ? (
+            <Button
+              type="button"
+              className="flex-1 gap-1.5"
+              disabled={saving || status === "pending"}
+              onClick={() => void submitForApproval()}
+            >
+              <Send className="h-4 w-4" />
+              {status === "pending" ? "Đang chờ duyệt" : "Gửi duyệt"}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              className="flex-1 gap-1.5"
+              disabled={saving}
+              onClick={openShareFlow}
+            >
+              <QrCode className="h-4 w-4" />
+              Link & QR
+            </Button>
+          )}
         </div>
       </div>
 

@@ -94,6 +94,7 @@ const Index = () => {
         )}
         <Link
           to="/orders"
+          state={{ fromMain: true }}
           className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90"
           aria-label="Đặt hàng"
         >

@@ -1,5 +1,6 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSnapPagerHeight } from "@/hooks/useSnapPagerHeight";
+import { useSnapPagerAxisLock } from "@/hooks/useSnapPagerAxisLock";
 
 export interface OrdersPage<T> {
   key: string;
@@ -20,9 +21,11 @@ export default function OrdersPager<T>({
   renderSection,
   emptyLabel = "Chưa có đơn",
 }: OrdersPagerProps<T>) {
+  const rootRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
   const pagesKey = pages.map(page => page.key).join("|");
   const { scrollerRef, bindPageRef, applyHeight } = useSnapPagerHeight(pages.length, pagesKey);
+  useSnapPagerAxisLock(scrollerRef, rootRef, undefined, pages.length);
 
   useEffect(() => {
     setActive(0);
@@ -51,7 +54,7 @@ export default function OrdersPager<T>({
   if (pages.length === 0) return null;
 
   return (
-    <div data-no-double-tap>
+    <div ref={rootRef} data-no-double-tap className="flex min-h-[55dvh] flex-1 flex-col">
       {pages.length > 1 && (
         <div className="sticky top-0 z-20 -mx-1 mb-1 flex items-center justify-center gap-2 bg-background/95 px-1 py-2 backdrop-blur-sm">
           <div className="flex items-center gap-1.5" role="tablist" aria-label="Trang đơn hàng">
@@ -84,7 +87,7 @@ export default function OrdersPager<T>({
           settleActive();
           applyHeight(true);
         }}
-        className="week-snap-pager -mx-4 items-start"
+        className="week-snap-pager min-h-0 flex-1 -mx-4 items-start"
       >
         {pages.map((page, i) => (
           <div

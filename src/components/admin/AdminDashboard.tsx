@@ -5,16 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Plus, Trash2, ChevronDown, ChevronRight, Users, Tag, BarChart3, CalendarIcon, X, ShoppingBasket } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronRight, Users, Tag, BarChart3, CalendarIcon, X, Check, ShoppingBasket, ClipboardCheck } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO, isWithinInterval } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from "recharts";
 import { toast } from "sonner";
 import type { DateRange } from "react-day-picker";
+import type { Json } from "@/integrations/supabase/types";
 import MoneyLabel from "@/components/daily/MoneyLabel";
 import OrderCatalogAdmin from "@/components/admin/OrderCatalogAdmin";
 import VendorsManager from "@/components/vendors/VendorsManager";
 
-type AdminTab = "summary" | "categories" | "subcategories" | "suppliers" | "items" | "orderCats" | "orderIngs";
+type AdminTab = "summary" | "pending" | "categories" | "subcategories" | "suppliers" | "items" | "orderCats" | "orderIngs";
 type CategoryFrequency = "daily" | "weekly" | "monthly";
 
 const CHART_COLORS = [
@@ -30,6 +31,25 @@ interface DbSubCategory { id: string; name: string; category_id: string; parent_
 interface DbSupplier { id: string; name: string; contact: string | null }
 interface DbItem { id: string; name: string; category_id: string | null; default_supplier_id: string | null; default_unit_price: number | null; unit: string | null }
 interface DbPayment { id: string; date: string; total_amount: number; sub_payments: { item_name: string; amount: number; category_id: string | null }[] }
+
+type PendingLine = {
+  id: string;
+  name: string;
+  quantity: number | null;
+  unit: string;
+  retail_price: number | null;
+  money_amount: number | null;
+  order_mode: string;
+};
+
+type PendingOrder = {
+  order_id: string;
+  title: string;
+  customer_name: string | null;
+  submitted_at: string;
+  item_count: number;
+  items: PendingLine[];
+};
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -55,6 +75,11 @@ export default function AdminDashboard() {
   const [editingSubId, setEditingSubId] = useState<string | null>(null);
   const [editingSubName, setEditingSubName] = useState("");
   const [dataTick, setDataTick] = useState(0);
+  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
+  const [pendingAmounts, setPendingAmounts] = useState<Record<string, string>>({});
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
 
   useEffect(() => {
     const onAccountData = () => setDataTick(n => n + 1);
@@ -81,8 +106,37 @@ export default function AdminDashboard() {
     load();
   }, [user, dataTick]);
 
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    const loadPending = async () => {
+      const { data, error } = await supabase.rpc("list_pending_orders");
+      if (!alive) return;
+      if (error) return; // No kitchen accounts linked yet — stay silent.
+      const rows = (data ?? []) as unknown as PendingOrder[];
+      setPendingOrders(rows);
+      // Seed the editable amount with whatever the order already carries.
+      setPendingAmounts(prev => {
+        const next = { ...prev };
+        for (const row of rows) {
+          for (const item of row.items ?? []) {
+            if (next[item.id] === undefined) {
+              next[item.id] = item.money_amount != null ? String(item.money_amount) : "";
+            }
+          }
+        }
+        return next;
+      });
+    };
+    loadPending();
+    return () => {
+      alive = false;
+    };
+  }, [user, dataTick]);
+
   const tabs: { key: AdminTab; label: string; icon: React.ReactNode }[] = [
     { key: "summary", label: "Summary", icon: <BarChart3 className="h-4 w-4" /> },
+    { key: "pending", label: "Chờ duyệt", icon: <ClipboardCheck className="h-4 w-4" /> },
     { key: "categories", label: "Categories", icon: <Tag className="h-4 w-4" /> },
     { key: "subcategories", label: "Sub-categories", icon: <Tag className="h-4 w-4" /> },
     { key: "suppliers", label: "Vendors", icon: <Users className="h-4 w-4" /> },
@@ -90,6 +144,49 @@ export default function AdminDashboard() {
     { key: "orderCats", label: "Danh mục ĐH", icon: <ShoppingBasket className="h-4 w-4" /> },
     { key: "orderIngs", label: "Nguyên liệu ĐH", icon: <ShoppingBasket className="h-4 w-4" /> },
   ];
+
+  const approvePending = async (order: PendingOrder) => {
+    setReviewingId(order.order_id);
+    try {
+      const amounts: Record<string, number> = {};
+      for (const item of order.items ?? []) {
+        const raw = (pendingAmounts[item.id] ?? "").trim();
+        const parsed = raw ? Number(raw) : NaN;
+        if (Number.isFinite(parsed) && parsed > 0) amounts[item.id] = parsed;
+      }
+      const { error } = await supabase.rpc("approve_order", {
+        p_order_id: order.order_id,
+        p_amounts: amounts as unknown as Json,
+      });
+      if (error) throw error;
+      toast.success("Đã duyệt — đã ghi chi phí");
+      window.dispatchEvent(new Event("mise:account-data"));
+      setPendingOrders(prev => prev.filter(o => o.order_id !== order.order_id));
+    } catch (err: any) {
+      toast.error(err.message || "Duyệt thất bại");
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
+  const rejectPending = async (order: PendingOrder) => {
+    setReviewingId(order.order_id);
+    try {
+      const { error } = await supabase.rpc("reject_order", {
+        p_order_id: order.order_id,
+        p_note: rejectReason.trim() || null,
+      });
+      if (error) throw error;
+      toast.success("Đã từ chối");
+      setPendingOrders(prev => prev.filter(o => o.order_id !== order.order_id));
+      setRejectingId(null);
+      setRejectReason("");
+    } catch (err: any) {
+      toast.error(err.message || "Từ chối thất bại");
+    } finally {
+      setReviewingId(null);
+    }
+  };
 
   const today = new Date();
   const todayStr = format(today, "yyyy-MM-dd");
@@ -303,6 +400,121 @@ export default function AdminDashboard() {
               ) : <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">No data yet</div>}
             </div>
           </div>
+        </div>
+      )}
+
+      {activeTab === "pending" && (
+        <div className="space-y-3">
+          {pendingOrders.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-border px-3 py-8 text-center text-sm text-muted-foreground">
+              Không có đơn chờ duyệt
+            </p>
+          ) : (
+            pendingOrders.map(order => {
+              const lines = order.items ?? [];
+              const busy = reviewingId === order.order_id;
+              return (
+                <div key={order.order_id} className="card-editorial p-4">
+                  <div className="mb-2 flex items-baseline justify-between gap-3">
+                    <p className="min-w-0 truncate text-sm font-medium">{order.title}</p>
+                    <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                      {format(parseISO(order.submitted_at), "HH:mm dd/MM")}
+                    </span>
+                  </div>
+                  <p className="mb-3 text-[11px] text-muted-foreground">
+                    {order.customer_name?.trim() || "bếp"}
+                    <span className="mx-1.5 text-border">·</span>
+                    {order.item_count} món
+                  </p>
+
+                  <div className="mb-3 space-y-1.5">
+                    {lines.map(item => (
+                      <div key={item.id} className="flex items-center gap-2">
+                        <span className="min-w-0 flex-1 truncate text-sm">
+                          {item.name}
+                          {item.quantity != null && (
+                            <span className="ml-1 text-[11px] text-muted-foreground">
+                              {item.quantity}
+                              {item.unit}
+                            </span>
+                          )}
+                        </span>
+                        <Input
+                          value={pendingAmounts[item.id] ?? ""}
+                          onChange={e =>
+                            setPendingAmounts(prev => ({ ...prev, [item.id]: e.target.value }))
+                          }
+                          inputMode="decimal"
+                          placeholder="0"
+                          aria-label={`Số tiền ${item.name}`}
+                          className="h-7 w-28 text-right text-sm tabular-nums"
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {rejectingId === order.order_id ? (
+                    <div className="space-y-2">
+                      <Input
+                        value={rejectReason}
+                        onChange={e => setRejectReason(e.target.value)}
+                        placeholder="Lý do từ chối (tuỳ chọn)"
+                        className="h-8 text-sm"
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          disabled={busy}
+                          onClick={() => {
+                            setRejectingId(null);
+                            setRejectReason("");
+                          }}
+                        >
+                          Huỷ
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="flex-1"
+                          disabled={busy}
+                          onClick={() => void rejectPending(order)}
+                        >
+                          Xác nhận từ chối
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="flex-1 gap-1.5"
+                        disabled={busy}
+                        onClick={() => void approvePending(order)}
+                      >
+                        <Check className="h-4 w-4" />
+                        Duyệt
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 gap-1.5"
+                        disabled={busy}
+                        onClick={() => {
+                          setRejectingId(order.order_id);
+                          setRejectReason("");
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                        Từ chối
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       )}
 

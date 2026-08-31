@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Calendar, CalendarDays, ChevronRight, Plus } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { ArrowLeft, Calendar, CalendarDays, ChevronRight, Plus, Utensils } from "lucide-react";
 import { endOfWeek, format, isToday, isYesterday, parseISO, startOfWeek } from "date-fns";
 import { vi } from "date-fns/locale";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ import {
 } from "@/lib/importOrderCatalog";
 import { ensureMockOrders } from "@/lib/mockOrders";
 import { isThrowawayAccount } from "@/lib/throwawayAccount";
+import { isKitchenAccount, resolveCatalogOwnerId } from "@/lib/kitchenAccount";
 import { formatDayMonth, formatDayMonthRange } from "@/lib/formatDateVi";
 import { orderIdentityLine } from "@/lib/orderIdentity";
 import {
@@ -63,6 +64,8 @@ const STATUS_LABEL: Record<string, string> = {
   draft: "Nháp",
   shared: "Đã gửi",
   closed: "Đóng",
+  pending: "Chờ duyệt",
+  rejected: "Bị từ chối",
 };
 
 const CAT_HINT: Record<string, string> = {
@@ -171,6 +174,12 @@ export default function Orders() {
   const { user } = useAuth();
   const { snapshot } = useLaggedSnapshot();
   const navigate = useNavigate();
+  const location = useLocation() as ReturnType<typeof useLocation> & { state?: { fromMain?: boolean } | null };
+  useEffect(() => {
+    if ((location.state as { fromMain?: boolean } | null)?.fromMain) {
+      navigate(location.pathname + location.search, { replace: true, state: {} });
+    }
+  }, []);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [monthlyOrders, setMonthlyOrders] = useState<MonthlyOrderListItem[]>(() => listMonthlyOrdersLocal());
   const [categories, setCategories] = useState<OrderCategory[]>([]);
@@ -178,9 +187,14 @@ export default function Orders() {
   const [creatingKey, setCreatingKey] = useState<string | null>(null);
   const [ensuring, setEnsuring] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("daily");
-  const [sheetOpen, setSheetOpen] = useState(true);
+  const [sheetOpen, setSheetOpen] = useState(() => {
+    const s = (location.state as { fromMain?: boolean } | null)?.fromMain;
+    return s === true;
+  });
   const [sheetClosing, setSheetClosing] = useState(false);
   const [hubKind, setHubKind] = useState<HubKind>("daily");
+
+  const kitchen = isKitchenAccount(user?.email);
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
 
@@ -192,6 +206,7 @@ export default function Orders() {
     } catch (err: any) {
       if (!snapshot) toast.error(err.message || "Không tạo được đơn mẫu");
     }
+    const catalogOwnerId = await resolveCatalogOwnerId(user.id, user.email);
     const [ordersRes, catsRes] = await Promise.all([
       supabase
         .from("orders")
@@ -201,7 +216,7 @@ export default function Orders() {
       supabase
         .from("order_categories")
         .select("id, name, source_key, sort_order")
-        .eq("user_id", user.id)
+        .eq("user_id", catalogOwnerId)
         .order("sort_order", { ascending: true }),
     ]);
     if (ordersRes.error) {
@@ -229,7 +244,10 @@ export default function Orders() {
       }
     } else {
       const raw = (ordersRes.data as (Omit<OrderRow, "itemCount"> & { order_items?: { id: string }[] })[]) || [];
-      const emptyIds = raw.filter(o => !(o.order_items && o.order_items.length > 0)).map(o => o.id);
+      // Only drafts get swept — a submitted order stays even if it has no lines.
+      const emptyIds = raw
+        .filter(o => o.status === "draft" && !(o.order_items && o.order_items.length > 0))
+        .map(o => o.id);
       if (emptyIds.length > 0) {
         await supabase.from("orders").delete().in("id", emptyIds).eq("user_id", user.id);
       }
@@ -281,6 +299,17 @@ export default function Orders() {
     }
     setEnsuring(true);
     try {
+      // Kitchen reads the admin's catalog and has no write access to seed one.
+      if (isKitchenAccount(user.email)) {
+        const { data } = await supabase
+          .from("order_categories")
+          .select("id, name, source_key, sort_order")
+          .eq("user_id", await resolveCatalogOwnerId(user.id, user.email))
+          .order("sort_order", { ascending: true });
+        const shared = (data as OrderCategory[]) || [];
+        setCategories(shared);
+        return shared;
+      }
       await importOrderCatalogFromSeed(user.id);
       const { data } = await supabase
         .from("order_categories")
@@ -417,13 +446,19 @@ export default function Orders() {
     <div className="flex min-h-screen flex-col bg-background">
       <div className="sticky top-0 z-30 border-b border-border/60 bg-background/95 px-4 py-3 backdrop-blur-sm">
         <div className="mx-auto flex max-w-lg items-center gap-3">
-          <Link
-            to="/"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-            aria-label="Quay lại"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
+          {kitchen ? (
+            <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-muted/60 text-muted-foreground" aria-hidden>
+              <Utensils className="h-4 w-4" />
+            </div>
+          ) : (
+            <Link
+              to="/"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="Quay lại"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          )}
           <div className="min-w-0 flex-1">
             <h1 className="font-display text-xl text-foreground">Đặt hàng</h1>
             <p className="text-[11px] text-muted-foreground">
@@ -463,7 +498,7 @@ export default function Orders() {
 
       <SnapshotBanner />
 
-      <div className="mx-auto w-full max-w-lg flex-1 overflow-auto px-4 py-4 pb-28">
+      <div className="mx-auto flex w-full max-w-lg min-h-0 flex-1 flex-col overflow-auto px-4 py-4 pb-28">
         {loading && orders.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4">Đang tải đơn…</p>
         ) : viewMode === "daily" ? (

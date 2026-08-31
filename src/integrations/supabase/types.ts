@@ -379,6 +379,27 @@ export type Database = {
           },
         ]
       }
+      kitchen_accounts: {
+        Row: {
+          admin_user_id: string
+          created_at: string
+          kitchen_user_id: string
+          label: string | null
+        }
+        Insert: {
+          admin_user_id: string
+          created_at?: string
+          kitchen_user_id: string
+          label?: string | null
+        }
+        Update: {
+          admin_user_id?: string
+          created_at?: string
+          kitchen_user_id?: string
+          label?: string | null
+        }
+        Relationships: []
+      }
       monthly_orders: {
         Row: {
           category_key: string
@@ -597,6 +618,9 @@ export type Database = {
           include_deduction: boolean
           include_shipping: boolean
           mgmt_id: string | null
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
           share_token: string
           shipping_fee: number
           status: string
@@ -614,6 +638,9 @@ export type Database = {
           include_deduction?: boolean
           include_shipping?: boolean
           mgmt_id?: string | null
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           share_token: string
           shipping_fee?: number
           status?: string
@@ -631,6 +658,9 @@ export type Database = {
           include_deduction?: boolean
           include_shipping?: boolean
           mgmt_id?: string | null
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           share_token?: string
           shipping_fee?: number
           status?: string
@@ -1083,8 +1113,44 @@ export type Database = {
         }
         Returns: boolean
       }
+      approve_order: {
+        Args: {
+          p_order_id: string
+          p_supplier_id?: string
+          p_note?: string
+          p_amounts?: Json
+        }
+        Returns: string
+      }
+      admin_for_kitchen: {
+        Args: { p_kitchen: string }
+        Returns: string
+      }
       is_enrolled_admin_device: {
         Args: { p_device_id: string }
+        Returns: boolean
+      }
+      kitchen_ids_for_admin: {
+        Args: { p_admin: string }
+        Returns: string[]
+      }
+      list_pending_orders: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          order_id: string
+          title: string
+          customer_name: string
+          submitted_at: string
+          item_count: number
+          items: Json
+        }[]
+      }
+      reject_order: {
+        Args: { p_order_id: string; p_note?: string }
+        Returns: boolean
+      }
+      submit_order_for_approval: {
+        Args: { p_order_id: string }
         Returns: boolean
       }
       touch_admin_device: {

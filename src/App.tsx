@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { LaggedSnapshotProvider } from "@/hooks/useLaggedSnapshot";
 import { recordAdminDeviceVisit } from "@/lib/adminDevice";
+import KitchenRoute from "@/components/KitchenRoute";
 import Index from "./pages/Index";
 import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
@@ -75,6 +76,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <EnrollAdminDevice />
+        <KitchenRoute />
         <LaggedSnapshotProvider>
           <AppRoutes />
         </LaggedSnapshotProvider>

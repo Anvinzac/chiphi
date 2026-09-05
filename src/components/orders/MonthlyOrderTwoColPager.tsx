@@ -25,6 +25,8 @@ export default function MonthlyOrderTwoColPager({
 }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
+  const rangeStartKey = format(rangeStart, "yyyy-MM-dd");
+  const rangeEndKey = format(rangeEnd, "yyyy-MM-dd");
 
   const weeks = useMemo(() => {
     const ws = startOfWeek(rangeStart, { weekStartsOn: 1 });
@@ -114,7 +116,7 @@ export default function MonthlyOrderTwoColPager({
                   <div className="monthly-two-col-week-body">
                     {eachDayOfInterval({ start: week.start, end: week.end }).map((day, dayIdx) => {
                       const dateStr = format(day, "yyyy-MM-dd");
-                      const outOfRange = day < rangeStart || day > rangeEnd;
+                      const outOfRange = dateStr < rangeStartKey || dateStr > rangeEndKey;
                       const lines = outOfRange ? [] : itemsByDate.get(dateStr) ?? [];
                       const hasNum = lines.length > 0 && !outOfRange;
                       const weekend = getDay(day) === 0 || getDay(day) === 6;

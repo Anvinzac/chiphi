@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { localDateKey } from "@/lib/localDate";
 
 export const SEED_SUPPLIER_NAME = "Metro Wholesale";
 
@@ -377,7 +378,7 @@ export async function seedDataForUser(userId: string) {
   for (const day of pastDays) {
     const d = new Date(today);
     d.setDate(d.getDate() - day.offset);
-    const dateStr = d.toISOString().split("T")[0];
+    const dateStr = localDateKey(d);
     const totalAmount = day.purchases.reduce((s, p) => s + p.amount, 0);
 
     const { data: payment } = await supabase.from("payments").insert({

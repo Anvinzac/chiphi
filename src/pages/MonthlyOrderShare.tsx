@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { CalendarDays, Copy, HelpCircle, LayoutGrid, Search } from "lucide-react";
-import { format, isValid, parseISO } from "date-fns";
+import { isValid } from "date-fns";
 import { toast } from "sonner";
 import MonthlyOrderGrid, { type MonthlyOrderCol } from "@/components/orders/MonthlyOrderGrid";
 import MonthlyOrderTwoColPager from "@/components/orders/MonthlyOrderTwoColPager";
@@ -16,14 +16,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DEFAULT_MONTHLY_PIN, overridesFromCells } from "@/lib/monthlyOrderPersist";
-import { emptyMonthlyOrderByDate } from "@/lib/mockMonthlyOrderGrid";
+import { emptyMonthlyOrderByDate, monthlyLineAmount } from "@/lib/mockMonthlyOrderGrid";
 import { fetchSharedMonthlyOrder, saveSharedMonthlyNotice, type SharedMonthlyOrder } from "@/lib/monthlyOrderDb";
 import { isOrderPinUnlocked, markOrderPinUnlocked } from "@/lib/orderShare";
 import { googleSumExpr } from "@/lib/googleSumExpr";
 import { vndFromThousands } from "@/lib/vndThousands";
+import { parseLocalDateKey } from "@/lib/localDate";
+import { formatDayMonth } from "@/lib/formatDateVi";
+import { useLocalToday } from "@/hooks/useLocalToday";
 
-function shortVi(d: Date): string {
-  return format(d, "d 'th' M");
+function shortVi(dateStr: string): string {
+  const d = parseLocalDateKey(dateStr);
+  return isValid(d) ? formatDayMonth(d) : dateStr;
 }
 
 const UNIT_PRICE_NUM_CLASS =
@@ -51,10 +55,10 @@ export default function MonthlyOrderShare() {
   const [noticeLines, setNoticeLines] = useState(1);
   const [noticeAnimOn, setNoticeAnimOn] = useState(false);
 
-  const todayStr = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
+  const todayStr = useLocalToday();
 
-  const rangeStart = useMemo(() => (order ? parseISO(order.rangeStart) : null), [order]);
-  const rangeEnd = useMemo(() => (order ? parseISO(order.rangeEnd) : null), [order]);
+  const rangeStart = useMemo(() => (order ? parseLocalDateKey(order.rangeStart) : null), [order]);
+  const rangeEnd = useMemo(() => (order ? parseLocalDateKey(order.rangeEnd) : null), [order]);
   const hasValidRange = !!(rangeStart && rangeEnd && isValid(rangeStart) && isValid(rangeEnd));
 
   const dayCount = useMemo(() => {
@@ -79,13 +83,12 @@ export default function MonthlyOrderShare() {
     for (const [dateStr, lines] of itemsByDate) {
       if (lines.length > 0) daysWithItems++;
       for (const l of lines) {
-        const amount = Number(l.num) || 0;
+        const amount = monthlyLineAmount(l.num);
         if (!amount) continue;
         totalSum += amount;
-        const d = parseISO(dateStr);
         dayTotals.push({
           key: `${dateStr}-${l.num}`,
-          name: isValid(d) ? shortVi(d) : dateStr,
+          name: shortVi(dateStr),
           amount,
         });
       }
@@ -382,7 +385,7 @@ export default function MonthlyOrderShare() {
             )}
           </div>
           {googleExpr ? (
-            <p className="monthly-total-detail__expr break-all font-mono text-[11px] leading-snug text-muted-foreground">
+            <p className="monthly-total-detail__expr break-word font-mono text-[11px] leading-snug text-muted-foreground">
               {googleExpr}
             </p>
           ) : null}

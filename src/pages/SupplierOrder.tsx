@@ -1861,7 +1861,7 @@ export default function SupplierOrder() {
             )}
           </div>
           {googleExpr ? (
-            <p className="monthly-total-detail__expr break-all font-mono text-[11px] leading-snug text-muted-foreground">{googleExpr}</p>
+            <p className="monthly-total-detail__expr break-word font-mono text-[11px] leading-snug text-muted-foreground">{googleExpr}</p>
           ) : null}
           <div className="flex items-end justify-between gap-2 border-t border-border/50 pt-3">
             <button

@@ -34,6 +34,8 @@ import { getMockGroupsForRange, isMockPaymentId } from "@/lib/mockRangeData";
 import { ensureMockVendors } from "@/lib/mockVendors";
 import { lockBodyScroll } from "@/lib/focusWithoutScroll";
 import { formatDayMonth, formatDayMonthRange } from "@/lib/formatDateVi";
+import { localDateKey, parseLocalDateKey } from "@/lib/localDate";
+import { useLocalToday } from "@/hooks/useLocalToday";
 import { applyDueExpenseSpans, createExpenseSpan } from "@/lib/applyExpenseSpans";
 import { SPAN_PRESETS, splitAmountAcrossPeriods, type SpanPresetKey } from "@/lib/expenseSpan";
 import { EXTRA_WEEKLY_CATEGORIES, foldCategoryName, getCategoryVisual, type CategoryFrequency } from "@/lib/categoryVisuals";
@@ -181,15 +183,16 @@ export default function DailyExpenseTable({
   const [viewMode, setViewMode] = useState<ViewMode>("range");
   const viewBeforeMonthRef = useRef<Exclude<ViewMode, "month">>("range");
   const [periodOffset, setPeriodOffset] = useState(() => getPeriodOffsetForDate(new Date()));
-  const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [selectedDate, setSelectedDate] = useState(localDateKey);
   const [addForDate, setAddForDate] = useState<string | null>(null);
 
   const period = useMemo(() => getPeriodBounds(periodOffset), [periodOffset]);
   const periodStartStr = format(period.start, "yyyy-MM-dd");
   const periodEndStr = format(period.end, "yyyy-MM-dd");
-  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const todayStr = useLocalToday();
+  const prevTodayRef = useRef(todayStr);
   /** Current kỳ is the newest — don't invent future ranges past today. */
-  const maxPeriodOffset = useMemo(() => getPeriodOffsetForDate(new Date()), [todayStr]);
+  const maxPeriodOffset = useMemo(() => getPeriodOffsetForDate(parseLocalDateKey(todayStr)), [todayStr]);
   const canShiftForward = periodOffset < maxPeriodOffset;
   const periodIsPast = periodEndStr < todayStr;
   const periodIsFuture = periodStartStr > todayStr;
@@ -1423,6 +1426,16 @@ export default function DailyExpenseTable({
     }
     setViewMode(prev => (prev === "month" ? viewBeforeMonthRef.current : prev));
   }, [monthOverview]);
+
+  useEffect(() => {
+    if (prevTodayRef.current === todayStr) return;
+    const prevToday = prevTodayRef.current;
+    prevTodayRef.current = todayStr;
+    const prevCurrent = getPeriodOffsetForDate(parseLocalDateKey(prevToday));
+    const current = getPeriodOffsetForDate(parseLocalDateKey(todayStr));
+    setPeriodOffset(prev => (prev === prevCurrent ? current : Math.min(prev, current)));
+    setSelectedDate(prev => (prev > todayStr ? todayStr : prev));
+  }, [todayStr]);
 
   useEffect(() => {
     if (periodOffset > maxPeriodOffset) setPeriodOffset(maxPeriodOffset);

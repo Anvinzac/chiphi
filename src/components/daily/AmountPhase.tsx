@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, Camera, Check, Pencil, Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Camera, Check, Plus, Store, X } from "lucide-react";
 import type { VerifyData } from "@/types/expense";
 import type { ExpenseLine } from "@/lib/salaryEmployees";
 import { focusWithoutScroll } from "@/lib/focusWithoutScroll";
@@ -309,8 +309,8 @@ export default function AmountPhase({
           showReceiptTable || vendorPickerOpen ? "shrink-0" : "min-h-0 flex-1"
         }`}
       >
-        <div className="mb-2 flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
+        <div className="mb-2 flex items-start gap-2">
+          <div className="min-w-0 w-[60vw] shrink-0">
             <input
               ref={amountRef}
               type="text"
@@ -343,15 +343,11 @@ export default function AmountPhase({
                     }}
                   />
                 ) : null}
-                <div className="flex min-w-0 items-center">
+                <div className="flex min-w-0 w-full items-center gap-1.5">
                   <button
                     ref={amountTrackRef}
                     type="button"
-                    className={`flex w-max min-w-0 cursor-text justify-start overflow-hidden text-left ${
-                      amountStarted
-                        ? "max-w-[calc(100%-8.25rem)]"
-                        : "max-w-[calc(100%-3.25rem)]"
-                    }`}
+                    className="flex min-w-0 flex-1 cursor-text justify-start overflow-hidden text-left"
                     onClick={activateAmount}
                     aria-label="Nhập số tiền"
                     aria-pressed={amountActive}
@@ -374,27 +370,20 @@ export default function AmountPhase({
                     visible={amountStarted}
                     onClear={clearAmount}
                     label="Xóa số tiền"
-                    className="ml-1.5"
                   />
                   {onPickReceiptPhoto ? (
-                    <>
-                      <span
-                        className={`amount-cam-gap${amountStarted ? " amount-cam-gap--open" : ""}`}
-                        aria-hidden="true"
-                      />
-                      <button
-                        type="button"
-                        disabled={receiptAnalyzing}
-                        onClick={() => receiptCameraRef.current?.click()}
-                        className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-primary/40 bg-primary/12 text-primary transition-colors hover:bg-primary/18 disabled:opacity-50 ${
-                          receiptAnalyzing ? "receipt-analyze-busy" : ""
-                        }`}
-                        aria-label="Tải ảnh biên lai để lấy số tiền"
-                        aria-busy={receiptAnalyzing}
-                      >
-                        <Camera className="h-5 w-5" />
-                      </button>
-                    </>
+                    <button
+                      type="button"
+                      disabled={receiptAnalyzing}
+                      onClick={() => receiptCameraRef.current?.click()}
+                      className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-primary/40 bg-primary/12 text-primary transition-colors hover:bg-primary/18 disabled:opacity-50 ${
+                        receiptAnalyzing ? "receipt-analyze-busy" : ""
+                      }`}
+                      aria-label="Tải ảnh biên lai để lấy số tiền"
+                      aria-busy={receiptAnalyzing}
+                    >
+                      <Camera className="h-5 w-5" />
+                    </button>
                   ) : null}
                 </div>
                 <p className="mt-1 text-left text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
@@ -440,19 +429,21 @@ export default function AmountPhase({
             </div>
           </div>
 
-          <div className="flex w-[min(42%,11.5rem)] shrink-0 flex-col items-end gap-1.5">
+          <div className="flex min-w-0 flex-1 flex-col items-end gap-1">
             {hasMeta &&
               fields.map(({ key, label, value }) =>
                 editingField === key ? (
                   <div
                     key={key}
                     data-chip-edit
-                    className="flex max-w-full items-center gap-1 rounded-xl border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs"
+                    className="flex max-w-full items-center gap-1 rounded-xl border border-primary/30 bg-primary/10 px-2 py-1 text-xs"
                   >
-                    <span className="text-[10px] text-muted-foreground">{label}:</span>
+                    {key === "unitPrice" ? (
+                      <span className="text-[10px] text-muted-foreground">{label}</span>
+                    ) : null}
                     <input
                       ref={editInputRef}
-                      className="w-20 bg-transparent text-base font-medium text-foreground caret-primary outline-none"
+                      className="w-16 bg-transparent text-base font-medium text-foreground caret-primary outline-none"
                       value={editValue}
                       onChange={e => setEditValue(e.target.value)}
                       onKeyDown={e => {
@@ -490,12 +481,13 @@ export default function AmountPhase({
                       setVendorPickerOpen(false);
                       openEdit(key);
                     }}
-                    className="group flex max-w-full items-center gap-1 rounded-xl border border-border/60 bg-muted px-2.5 py-1 text-[11px] text-foreground transition-all hover:border-primary/30 active:scale-95"
+                    className="group flex max-w-full items-center gap-1 rounded-xl border border-border/60 bg-muted px-2 py-1 text-[11px] text-foreground transition-all hover:border-primary/30 active:scale-95"
                     aria-label={`Sửa ${label}`}
                   >
-                    <span className="text-[10px] text-muted-foreground">{label}</span>
+                    {key === "unitPrice" ? (
+                      <span className="text-[10px] text-muted-foreground">{label}</span>
+                    ) : null}
                     <span className="truncate font-medium">{value}</span>
-                    <Pencil className="h-2.5 w-2.5 shrink-0 text-muted-foreground/50 group-hover:text-primary/70" />
                   </button>
                 ),
               )}
@@ -503,7 +495,11 @@ export default function AmountPhase({
               type="button"
               onClick={toggleVendorPicker}
               aria-expanded={vendorPickerOpen}
-              className={`group flex max-w-full items-center gap-1 rounded-xl border px-2.5 py-1 text-[11px] transition-all active:scale-95 ${
+              className={`group inline-flex max-w-full items-center justify-center rounded-xl border transition-all active:scale-95 ${
+                supplier
+                  ? "gap-1 px-2 py-1 text-[11px]"
+                  : "h-8 w-8"
+              } ${
                 vendorPickerOpen
                   ? "border-primary/50 bg-primary/15 text-primary"
                   : supplier
@@ -512,11 +508,11 @@ export default function AmountPhase({
               }`}
               aria-label="Chọn nhà cung cấp"
             >
-              <span className="shrink-0 text-[10px] text-muted-foreground">Nhà cung cấp</span>
-              <span className={`truncate font-medium ${supplier && !vendorPickerOpen ? "" : "text-primary/80"}`}>
-                {supplier || "Chọn"}
-              </span>
-              <Pencil className="h-2.5 w-2.5 shrink-0 text-muted-foreground/50 group-hover:text-primary/70" />
+              {supplier ? (
+                <span className="truncate font-medium">{supplier}</span>
+              ) : (
+                <Store className="h-4 w-4" aria-hidden />
+              )}
             </button>
           </div>
         </div>

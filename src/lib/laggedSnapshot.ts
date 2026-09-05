@@ -1,6 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { isMissingRelation } from "@/lib/supabaseMissing";
+import { localDateKey } from "@/lib/localDate";
+
+export { localDateKey };
 
 type PaymentsRow = Database["public"]["Tables"]["payments"]["Row"];
 type SubPaymentsRow = Database["public"]["Tables"]["sub_payments"]["Row"];
@@ -69,13 +72,6 @@ const DB_NAME = "chiphi-lagged-snapshot";
 const DB_VERSION = 1;
 const STORE = "slots";
 const LS_PREFIX = "chiphi:lagged-snapshot:";
-
-export function localDateKey(d = new Date()) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
 
 function payloadWeight(data: SnapshotPayload) {
   return (

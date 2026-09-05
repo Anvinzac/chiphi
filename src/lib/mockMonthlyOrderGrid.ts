@@ -1,21 +1,21 @@
+import { localDateKey, startOfLocalDay } from "@/lib/localDate";
+
 export interface MonthlyOrderLine {
   num: string;
+}
+
+export function monthlyLineAmount(num: string): number {
+  const n = Number.parseInt(String(num).trim(), 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
 /** Empty day map for the monthly grid — no mock quantities. */
 export function emptyMonthlyOrderByDate(rangeStart: Date, rangeEnd: Date): Map<string, MonthlyOrderLine[]> {
   const map = new Map<string, MonthlyOrderLine[]>();
-  const cur = new Date(rangeStart);
-  cur.setHours(0, 0, 0, 0);
-  const end = new Date(rangeEnd);
-  end.setHours(0, 0, 0, 0);
+  const cur = startOfLocalDay(rangeStart);
+  const end = startOfLocalDay(rangeEnd);
   while (cur <= end) {
-    const key = [
-      cur.getFullYear(),
-      String(cur.getMonth() + 1).padStart(2, "0"),
-      String(cur.getDate()).padStart(2, "0"),
-    ].join("-");
-    map.set(key, []);
+    map.set(localDateKey(cur), []);
     cur.setDate(cur.getDate() + 1);
   }
   return map;

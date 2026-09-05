@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, CalendarDays, Check, Copy, Delete, GripHorizontal, Hash, LayoutGrid, Plus, Search, Share2, X } from "lucide-react";
-import { addDays, format, isValid, parseISO } from "date-fns";
+import { addDays, format, isValid } from "date-fns";
 import { toast } from "sonner";
 import MonthlyOrderGrid, { type MonthlyOrderCol } from "@/components/orders/MonthlyOrderGrid";
 import MonthlyOrderTwoColPager from "@/components/orders/MonthlyOrderTwoColPager";
@@ -9,7 +9,7 @@ import MonthBoundCalendar from "@/components/daily/MonthBoundCalendar";
 import MoneyLabel from "@/components/daily/MoneyLabel";
 import ClearFieldButton from "@/components/daily/ClearFieldButton";
 import ThousandsMark from "@/components/daily/ThousandsMark";
-import { emptyMonthlyOrderByDate } from "@/lib/mockMonthlyOrderGrid";
+import { emptyMonthlyOrderByDate, monthlyLineAmount } from "@/lib/mockMonthlyOrderGrid";
 import type { MonthlyOrderLine } from "@/lib/mockMonthlyOrderGrid";
 import {
   DEFAULT_MONTHLY_PIN,
@@ -27,6 +27,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { QRCodeSVG } from "qrcode.react";
 import { googleSumExpr } from "@/lib/googleSumExpr";
 import { vndFromThousands } from "@/lib/vndThousands";
+import { localDateKey, parseLocalDateKey, startOfLocalDay } from "@/lib/localDate";
+import { formatDayMonth } from "@/lib/formatDateVi";
+import { useLocalToday } from "@/hooks/useLocalToday";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -39,20 +42,22 @@ import {
 } from "@/components/ui/dialog";
 
 function toInputValue(d: Date): string {
-  return format(d, "yyyy-MM-dd");
+  return localDateKey(d);
 }
 
 function parseInputValue(v: string): Date | null {
   if (!v) return null;
-  const d = parseISO(v);
+  const d = parseLocalDateKey(v);
   return isValid(d) ? d : null;
 }
 
 function clampRange(start: Date, end: Date): { start: Date; end: Date } {
-  if (start > end) return { start: end, end: start };
-  const diff = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  if (diff > 60) return { start, end: addDays(start, 59) };
-  return { start, end };
+  const a = startOfLocalDay(start);
+  const b = startOfLocalDay(end);
+  if (a > b) return { start: b, end: a };
+  const diff = Math.round((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  if (diff > 60) return { start: a, end: addDays(a, 59) };
+  return { start: a, end: b };
 }
 
 /** 5×3 pad (same as 0–9): X + 14 number slots. Core range centered; extras are backups. */
@@ -93,8 +98,9 @@ function clampQtyRange(min: number, max: number, prefer: "min" | "max"): { min: 
   return { min: a, max: b };
 }
 
-function shortVi(d: Date): string {
-  return format(d, "d 'th' M");
+function shortVi(dateStr: string): string {
+  const d = parseLocalDateKey(dateStr);
+  return isValid(d) ? formatDayMonth(d) : dateStr;
 }
 
 const TITLE_STORAGE_PREFIX = "chiphi:monthly-order-title";
@@ -205,19 +211,14 @@ function MonthlyOrderEditor({ categoryKey }: { categoryKey: string }) {
   const defaultTitle = monthlyOrderDefaultTitle(categoryKey);
   const titleStorageKey = `${TITLE_STORAGE_PREFIX}:${categoryKey}`;
   const saved = useMemo(() => readMonthlyOrderLocal(categoryKey), [categoryKey]);
-  const today = useMemo(() => new Date(), []);
-  const todayStr = useMemo(() => toInputValue(today), [today]);
+  const todayStr = useLocalToday();
 
   const defaultStart = useMemo(() => {
-    const d = new Date();
-    d.setDate(1);
-    return d;
-  }, []);
+    const d = parseLocalDateKey(todayStr);
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  }, [todayStr]);
   const defaultEnd = useMemo(() => {
-    const d = new Date(defaultStart);
-    d.setMonth(d.getMonth() + 1);
-    d.setDate(0);
-    return d;
+    return new Date(defaultStart.getFullYear(), defaultStart.getMonth() + 1, 0);
   }, [defaultStart]);
 
   const [startInput, setStartInput] = useState(() => saved?.startInput || toInputValue(defaultStart));
@@ -379,13 +380,12 @@ function MonthlyOrderEditor({ categoryKey }: { categoryKey: string }) {
       if (lines.length > 0) daysWithItems++;
       totalLines += lines.length;
       for (const l of lines) {
-        const amount = Number(l.num) || 0;
+        const amount = monthlyLineAmount(l.num);
         if (!amount) continue;
         totalSum += amount;
-        const d = parseISO(dateStr);
         dayTotals.push({
           key: `${dateStr}-${l.num}`,
-          name: isValid(d) ? shortVi(d) : dateStr,
+          name: shortVi(dateStr),
           amount,
         });
       }
@@ -415,21 +415,19 @@ function MonthlyOrderEditor({ categoryKey }: { categoryKey: string }) {
   };
 
   const setPreset = (kind: "month" | "30d" | "next30") => {
+    const today = parseLocalDateKey(todayStr);
     if (kind === "month") {
-      const s = new Date();
-      s.setDate(1);
-      const e = new Date(s);
-      e.setMonth(e.getMonth() + 1);
-      e.setDate(0);
+      const s = new Date(today.getFullYear(), today.getMonth(), 1);
+      const e = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       setStartInput(toInputValue(s));
       setEndInput(toInputValue(e));
     } else if (kind === "30d") {
-      const e = new Date();
+      const e = today;
       const s = addDays(e, -29);
       setStartInput(toInputValue(s));
       setEndInput(toInputValue(e));
     } else {
-      const s = new Date();
+      const s = today;
       const e = addDays(s, 29);
       setStartInput(toInputValue(s));
       setEndInput(toInputValue(e));
@@ -998,7 +996,9 @@ function MonthlyOrderEditor({ categoryKey }: { categoryKey: string }) {
             />
             <div className="flex items-center justify-between px-3 pb-1 pt-3">
               <span className="text-xs font-semibold tabular-nums">
-                {editingDate ? format(parseISO(editingDate), "EEEE, d 'th' M") : ""}
+                {editingDate && isValid(parseLocalDateKey(editingDate))
+                  ? format(parseLocalDateKey(editingDate), "EEEE, d 'th' M")
+                  : ""}
               </span>
               <button
                 type="button"
@@ -1158,7 +1158,7 @@ function MonthlyOrderEditor({ categoryKey }: { categoryKey: string }) {
             )}
           </div>
           {googleExpr ? (
-            <p className="monthly-total-detail__expr break-all font-mono text-[11px] leading-snug text-muted-foreground">
+            <p className="monthly-total-detail__expr break-word font-mono text-[11px] leading-snug text-muted-foreground">
               {googleExpr}
             </p>
           ) : null}

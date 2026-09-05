@@ -670,6 +670,8 @@
 
   .monthly-total-detail__expr {
     overflow-y: auto;
+    overflow-wrap: break-word;
+    word-break: normal;
   }
 
   @supports not (scrollbar-gutter: stable) {
@@ -1655,6 +1657,370 @@
     }
   }
 
+  .dat-si-page {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background:
+      radial-gradient(120% 80% at 50% -10%, hsl(32 36% 92%) 0%, transparent 55%),
+      hsl(var(--background));
+  }
+
+  .dat-si-page__head {
+    flex-shrink: 0;
+    padding: 0.65rem 1rem 0.55rem;
+    border-bottom: 1px solid hsl(var(--border) / 0.55);
+    background: var(--gradient-topbar);
+  }
+
+  .dat-si-phieu {
+    flex-shrink: 0;
+    margin: 0.55rem 0.85rem 0;
+    padding: 0.55rem 0.7rem 0.45rem;
+    border-radius: 1rem;
+    background:
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 11px,
+        hsl(20 20% 70% / 0.18) 11px,
+        hsl(20 20% 70% / 0.18) 12px
+      ),
+      hsl(32 38% 96%);
+    border: 1px solid hsl(25 18% 78% / 0.7);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.7),
+      0 1px 3px hsl(25 20% 30% / 0.04);
+  }
+
+  .dat-si-phieu__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .dat-si-phieu__title {
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    font-weight: 650;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: hsl(25 14% 28%);
+  }
+
+  .dat-si-phieu__hint {
+    font-size: 0.68rem;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .dat-si-phieu__sheet {
+    margin-top: 0.4rem;
+    max-height: 16vh;
+    overflow: auto;
+    cursor: text;
+    column-width: 8.6rem;
+    column-gap: 1.1rem;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    word-break: break-word;
+  }
+
+  .dat-si-phieu__line {
+    break-inside: avoid;
+    padding: 0.05rem 0;
+  }
+
+  .dat-si-phieu__wake {
+    display: block;
+    width: 100%;
+    margin-top: 0.35rem;
+    padding: 0.15rem 0 0.05rem;
+    text-align: left;
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground) / 0.75);
+    background: transparent;
+    border: 0;
+  }
+
+  .dat-si-phieu__field {
+    margin-top: 0.35rem;
+    min-height: 4.5rem;
+    max-height: 16vh;
+    width: 100%;
+    resize: none;
+    border: 0;
+    background: transparent;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    outline: none;
+  }
+
+  .dat-si-phieu__apply {
+    margin-top: 0.4rem;
+    width: 100%;
+  }
+
+  .dat-si-stall {
+    min-height: 0;
+  }
+
+  .dat-si-aisles {
+    display: flex;
+    gap: 0.4rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.45rem 0.85rem 0.15rem;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dat-si-aisles::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dat-si-aisle {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    padding: 0.32rem 0.7rem;
+    border-radius: 999px;
+    border: 1px solid hsl(25 16% 78% / 0.7);
+    background: hsl(var(--card) / 0.7);
+    color: hsl(25 12% 28%);
+    font-size: 0.78rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    transition:
+      transform 160ms cubic-bezier(0.22, 1.12, 0.32, 1),
+      background-color 180ms ease,
+      border-color 180ms ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .dat-si-aisle--on {
+    border-color: transparent;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.55),
+      0 1px 2px hsl(25 20% 30% / 0.06);
+  }
+
+  .dat-si-aisle:active {
+    transform: scale(0.96);
+  }
+
+  .dat-si-aisle__pip {
+    min-width: 1.05rem;
+    padding: 0 0.28rem;
+    border-radius: 999px;
+    background: hsl(25 14% 22% / 0.12);
+    font-size: 0.62rem;
+    font-weight: 700;
+    line-height: 1.3;
+    text-align: center;
+  }
+
+  .dat-si-stall__head {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.35rem 0.85rem 0.4rem;
+  }
+
+  .dat-si-stall__sign {
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    min-width: 0;
+    flex: 1;
+    font-family: var(--font-display);
+    font-size: 0.92rem;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+  }
+
+  .dat-si-stall__meta {
+    font-family: var(--font-body);
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: hsl(var(--muted-foreground));
+    white-space: nowrap;
+  }
+
+  .dat-si-call {
+    flex: 0 1 8.5rem;
+  }
+
+  .dat-si-call__input {
+    width: 100%;
+    height: 1.85rem;
+    border: 0;
+    border-bottom: 1px dashed hsl(25 16% 70%);
+    background: transparent;
+    font-size: 0.75rem;
+    color: hsl(var(--foreground));
+    outline: none;
+  }
+
+  .dat-si-call__input::placeholder {
+    color: hsl(var(--muted-foreground) / 0.7);
+  }
+
+  .dat-si-board {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+
+  .dat-si-pager {
+    display: flex;
+    height: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .dat-si-pager::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dat-si-tray {
+    box-sizing: border-box;
+    flex: 0 0 100%;
+    width: 100%;
+    height: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 1fr;
+    gap: 0.5rem;
+    padding: 0.1rem 0.85rem 0.2rem;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    align-content: stretch;
+  }
+
+  @media (min-width: 420px) {
+    .dat-si-tray {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .dat-si-crate {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 0;
+    padding: 0.5rem 0.58rem 0.48rem;
+    border-radius: 1rem;
+    border: 1px solid hsl(25 16% 80% / 0.75);
+    background: hsl(var(--card));
+    text-align: left;
+    color: hsl(25 12% 20%);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.6),
+      0 1px 2px hsl(25 20% 30% / 0.04);
+    transition:
+      transform 160ms cubic-bezier(0.22, 1.12, 0.32, 1),
+      box-shadow 180ms ease,
+      background-color 180ms ease;
+    animation: datSiCrateIn 0.38s cubic-bezier(0.22, 1.12, 0.32, 1) both;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .dat-si-crate:active {
+    transform: scale(0.96);
+  }
+
+  .dat-si-crate--in {
+    border-color: transparent;
+  }
+
+  .dat-si-crate__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem;
+  }
+
+  .dat-si-crate__qty {
+    font-size: 0.72rem;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dat-si-crate__unit {
+    font-size: 0.62rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .dat-si-crate__dot {
+    height: 0.38rem;
+    width: 0.38rem;
+    border-radius: 999px;
+  }
+
+  .dat-si-crate__name {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    margin-top: 0.2rem;
+    font-size: 0.86rem;
+    font-weight: 650;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+
+  .dat-si-dots {
+    display: flex;
+    justify-content: center;
+    gap: 0.28rem;
+    padding: 0.3rem 0 0.15rem;
+  }
+
+  .dat-si-dot {
+    height: 0.28rem;
+    width: 0.28rem;
+    border-radius: 999px;
+    background: hsl(var(--border));
+  }
+
+  .dat-si-dot--on {
+    width: 0.85rem;
+    background: hsl(var(--primary) / 0.7);
+  }
+
+  .dat-si-page__foot {
+    flex-shrink: 0;
+    padding: 0.65rem 1rem calc(0.65rem + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid hsl(var(--border) / 0.7);
+    background: hsl(var(--card) / 0.94);
+    backdrop-filter: blur(8px);
+  }
+
+  @keyframes datSiCrateIn {
+    0% {
+      opacity: 0;
+      transform: translateY(8px) scale(0.96);
+    }
+    70% {
+      opacity: 1;
+      transform: translateY(-2px) scale(1.02);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .category-cell,
     .expense-card-enter,
@@ -1666,7 +2032,8 @@
     .monthly-two-col-page,
     .order-hub-tile,
     .order-card-monthly,
-    .order-new-fab {
+    .order-new-fab,
+    .dat-si-crate {
       animation: none;
     }
 

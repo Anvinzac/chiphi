@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Check, ChevronRight, ClipboardList, Copy, QrCode, Send, Store } from "lucide-react";
+import { ArrowLeft, ClipboardPaste, Copy, QrCode, Send, Store } from "lucide-react";
+import DatSiStall from "@/components/orders/DatSiStall";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,8 +21,6 @@ import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import MoneyLabel from "@/components/daily/MoneyLabel";
-import { useHoldToConfirm } from "@/hooks/useHoldToConfirm";
 import {
   Dialog,
   DialogContent,
@@ -35,10 +34,9 @@ import {
   type OrderMode,
 } from "@/lib/formatOrderQty";
 import { customerNameFromUser, formatOrderDay, orderIdentityLine } from "@/lib/orderIdentity";
-import { isKitchenAccount } from "@/lib/kitchenAccount";
-import BulkIngredientPager from "@/components/orders/BulkIngredientPager";
+import { isKitchenAccount, resolveCatalogOwnerId } from "@/lib/kitchenAccount";
 import { foldCategoryName } from "@/lib/categoryVisuals";
-import { formatParsedAmount, parseOrderText } from "@/lib/parseOrderText";
+import { parseOrderText } from "@/lib/parseOrderText";
 
 type OrderItemDraft = {
   id?: string;
@@ -71,181 +69,12 @@ type CatalogCategory = {
   source_key?: string | null;
 };
 
-const PLACEHOLDER_SLOTS = 4;
-const CHIP_PAGE_SIZE = 12;
-
-function defaultQty(ing: CatalogIngredient): string {
-  if (Array.isArray(ing.quick_quantities) && ing.quick_quantities.length > 0) {
-    return String(ing.quick_quantities[0]);
-  }
-  return "1";
+function draftLine(draft: OrderItemDraft): string {
+  return draft.order_mode === "money"
+    ? `${draft.money_amount}k ${draft.name}`.trim()
+    : `${draft.quantity}${draft.unit} ${draft.name}`.trim();
 }
 
-function OrderFilledRow({
-  row,
-  expanded,
-  unitPrice,
-  chipCloud,
-  autoFocusQty = false,
-  onFocusQtyHandled,
-  onExpand,
-  onUpdate,
-  onCommitNotice,
-  onRemove,
-}: {
-  row: OrderItemDraft;
-  expanded: boolean;
-  unitPrice: number | null;
-  chipCloud: ReactNode;
-  autoFocusQty?: boolean;
-  onFocusQtyHandled?: () => void;
-  onExpand: () => void;
-  onUpdate: (patch: Partial<OrderItemDraft>) => void;
-  onCommitNotice: (notice: string) => void;
-  onRemove: () => void;
-}) {
-  const { confirming, cancelConfirm, consumeClick, rootRef, holdProps } = useHoldToConfirm({
-    ignoreSelector: "input, textarea, button",
-  });
-  const qtyRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!autoFocusQty) return;
-    qtyRef.current?.focus();
-    onFocusQtyHandled?.();
-  }, [autoFocusQty, onFocusQtyHandled]);
-
-  const handleRowActivate = () => {
-    if (consumeClick()) return;
-    if (confirming) {
-      cancelConfirm();
-      return;
-    }
-    onExpand();
-  };
-
-  return (
-    <>
-      <div
-        ref={rootRef}
-        className={`select-none [-webkit-touch-callout:none] ${confirming ? "bg-destructive/5" : ""}`}
-        {...holdProps}
-      >
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={handleRowActivate}
-          onKeyDown={e => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              handleRowActivate();
-            }
-          }}
-          className={`grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 px-3 py-1.5 text-left ${
-            expanded ? "bg-primary/5" : "hover:bg-muted/30"
-          }`}
-        >
-          <div className="min-w-0">
-            <p className="text-sm font-medium leading-tight break-words">{row.name}</p>
-            {expanded ? (
-              <input
-                value={row.notice ?? ""}
-                onChange={e => onUpdate({ notice: e.target.value })}
-                onBlur={e => onCommitNotice(e.target.value)}
-                onClick={e => e.stopPropagation()}
-                onPointerDown={e => e.stopPropagation()}
-                onKeyDown={e => {
-                  e.stopPropagation();
-                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                }}
-                placeholder="Ghi chú cho chợ…"
-                className="mt-0.5 h-5 w-full bg-transparent text-[11px] leading-tight text-muted-foreground outline-none placeholder:text-muted-foreground/35"
-                aria-label={`Ghi chú ${row.name}`}
-              />
-            ) : row.notice?.trim() ? (
-              <p className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">
-                {row.notice}
-              </p>
-            ) : null}
-          </div>
-          <div
-            className="flex shrink-0 items-baseline"
-            onClick={e => e.stopPropagation()}
-            onPointerDown={e => e.stopPropagation()}
-          >
-            {row.order_mode === "money" ? (
-              <Input
-                value={row.money_amount ?? ""}
-                onFocus={() => onUpdate({ money_amount: "" })}
-                onChange={e => onUpdate({ money_amount: e.target.value.replace(/[^\d.]/g, "") })}
-                placeholder="0"
-                inputMode="numeric"
-                className="h-7 w-8 border-0 bg-transparent px-0 text-right text-sm tabular-nums shadow-none focus-visible:ring-1"
-                aria-label={`Số tiền ${row.name}`}
-              />
-            ) : (
-              <Input
-                ref={qtyRef}
-                value={row.quantity}
-                onChange={e => onUpdate({ quantity: e.target.value.replace(/[^\d.]/g, "") })}
-                placeholder="0"
-                inputMode="decimal"
-                className="h-7 w-8 border-0 bg-transparent px-0 text-right text-sm tabular-nums shadow-none focus-visible:ring-1"
-                aria-label={`Số lượng ${row.name}`}
-              />
-            )}
-            <button
-              type="button"
-              className="ml-0.5 text-xs text-muted-foreground/45 hover:text-foreground"
-              title={row.order_mode === "money" ? "Đổi sang đơn vị đo" : "Đặt theo số tiền"}
-              aria-label={row.order_mode === "money" ? "Đơn vị: đồng. Bấm để đổi sang đo lường" : `Đơn vị: ${row.unit}. Bấm để đặt theo tiền`}
-              onClick={() => {
-                if (row.order_mode === "money") {
-                  onUpdate({ order_mode: "measure" });
-                  return;
-                }
-                const qty = Number(row.quantity) || 0;
-                const price = Number(row.reference_price) || 0;
-                const seeded = qty > 0 && price > 0 ? qty * price : draftMoneyVnd(row);
-                onUpdate({
-                  order_mode: "money",
-                  money_amount: seeded ? moneyAmountToDraft(seeded) : row.money_amount || "",
-                });
-              }}
-            >
-              {row.order_mode === "money" ? "₫" : row.unit}
-            </button>
-          </div>
-          <div className="w-[4.5rem] shrink-0 justify-self-end text-right ml-2">
-            {confirming ? (
-              <button
-                type="button"
-                className="text-xs font-semibold px-3 py-1 rounded-full bg-destructive text-destructive-foreground active:brightness-90"
-                aria-label={`Xóa ${row.name}`}
-                onClick={e => {
-                  e.stopPropagation();
-                  onRemove();
-                  cancelConfirm();
-                }}
-              >
-                Xóa
-              </button>
-            ) : unitPrice != null ? (
-              <MoneyLabel
-                amount={unitPrice}
-                className="text-sm font-display text-foreground/90"
-                smallClassName="text-[0.7em]"
-              />
-            ) : (
-              <span className="text-[11px] text-muted-foreground/40">—</span>
-            )}
-          </div>
-        </div>
-      </div>
-      {expanded && chipCloud}
-    </>
-  );
-}
 
 export default function OrderDetail() {
   const { id: routeId } = useParams<{ id: string }>();
@@ -269,21 +98,14 @@ export default function OrderDetail() {
   const [lockedCatId, setLockedCatId] = useState<string>("");
   const [ingSearch, setIngSearch] = useState("");
   const [importing, setImporting] = useState(false);
-  const [chipPage, setChipPage] = useState(0);
-  /** Which list slot shows the ingredient cloud: item index, or `ph-${n}` for empty slots. */
-  const [expandedKey, setExpandedKey] = useState<string>("ph-0");
-  /** Row whose qty input should grab focus right after a chip tap (matched by folded name). */
-  const [focusQtyName, setFocusQtyName] = useState<string | null>(null);
-  /** Sticky across renders so the focus effect in the row fires exactly once. */
-  const clearFocusQty = useCallback(() => setFocusQtyName(null), []);
-  const chipPagerRef = useRef<HTMLDivElement>(null);
-  const [bulkOpen, setBulkOpen] = useState(false);
-  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
-  const [bulkAmounts, setBulkAmounts] = useState<Map<string, string>>(new Map());
-  const [bulkStep, setBulkStep] = useState<"choose" | "amounts">("choose");
-  const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
   const [pasteApplying, setPasteApplying] = useState(false);
+  const pasteFieldRef = useRef<HTMLTextAreaElement>(null);
+  const [numpadIng, setNumpadIng] = useState<CatalogIngredient | null>(null);
+  const [numpadValue, setNumpadValue] = useState("");
+  const [numpadMode, setNumpadMode] = useState<OrderMode>("measure");
+  const [numpadUnit, setNumpadUnit] = useState("kg");
+  const numpadTypingRef = useRef(false);
   /** Real DB id once the first ingredient was saved; null while UI-only draft. */
   const [orderId, setOrderId] = useState<string | null>(isNewSession ? null : routeId || null);
   const orderIdRef = useRef<string | null>(orderId);
@@ -340,10 +162,9 @@ export default function OrderDetail() {
       .select("*")
       .eq("order_id", existingId)
       .order("sort_order", { ascending: true });
-    setItems(
-      (rows || [])
-        .filter(r => !r.is_alternate)
-        .map((r, i) => {
+    const nextItems: OrderItemDraft[] = (rows || [])
+      .filter(r => !r.is_alternate)
+      .map((r, i) => {
         const money = r.order_mode === "money";
         return {
           id: r.id,
@@ -355,8 +176,10 @@ export default function OrderDetail() {
           money_amount: money ? moneyAmountToDraft(Number(r.money_amount) || 0) : "",
           notice: r.notice ?? "",
         };
-      }),
-    );
+      });
+    setItems(nextItems);
+    setPasteText(nextItems.map(draftLine).filter(Boolean).join("\n"));
+    setPasteFromStall(true);
     setLoading(false);
   }, [user, navigate]);
 
@@ -371,7 +194,6 @@ export default function OrderDetail() {
       setStatus("draft");
       setTitle("");
       setIdentity({});
-      setExpandedKey("ph-0");
       setLoading(false);
       return;
     }
@@ -387,18 +209,19 @@ export default function OrderDetail() {
 
   const loadCatalog = useCallback(async () => {
     if (!user) return;
+    const catalogOwnerId = await resolveCatalogOwnerId(user.id, user.email);
     const [cats, ings] = await Promise.all([
       supabase
         .from("order_categories")
         .select("id, name, sort_order, source_key")
-        .eq("user_id", user.id)
+        .eq("user_id", catalogOwnerId)
         .order("sort_order", { ascending: true }),
       supabase
         .from("order_ingredients")
         .select(
           "id, name, unit, category_id, subcategory, reference_price, quick_quantities, order_count",
         )
-        .eq("user_id", user.id)
+        .eq("user_id", catalogOwnerId)
         .order("name", { ascending: true }),
     ]);
     const nextCats = (cats.data as CatalogCategory[]) || [];
@@ -467,133 +290,137 @@ export default function OrderDetail() {
     });
   }, [catalog, lockedCatId, ingSearch]);
 
-  const groupedIngredients = useMemo(() => {
-    const groups = new Map<string, CatalogIngredient[]>();
-    for (const ing of activeIngredients) {
-      const key = ing.subcategory || "";
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(ing);
-    }
-    return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b, "vi"));
-  }, [activeIngredients]);
+  const pickedLabel = useCallback(
+    (name: string) => {
+      const idx = addedByName.get(name.trim().toLowerCase());
+      if (idx == null) return null;
+      const row = items[idx];
+      if (!row) return null;
+      return row.order_mode === "money" ? `${row.money_amount}k` : `${row.quantity}${row.unit}`;
+    },
+    [addedByName, items],
+  );
 
-  const ingredientPages = useMemo(() => {
-    const hasSubs =
-      groupedIngredients.length > 1 ||
-      groupedIngredients.some(([sub]) => Boolean(sub));
-
-    const chunk = (title: string, ings: CatalogIngredient[]) => {
-      const pages: { title: string; ings: CatalogIngredient[] }[] = [];
-      for (let i = 0; i < ings.length; i += CHIP_PAGE_SIZE) {
-        pages.push({ title, ings: ings.slice(i, i + CHIP_PAGE_SIZE) });
+  const openNumpadFor = useCallback((ing: CatalogIngredient) => {
+    const existing = items.find(r => r.name.trim().toLowerCase() === ing.name.trim().toLowerCase());
+    if (existing) {
+      setNumpadIng(ing);
+      setNumpadMode(existing.order_mode || "measure");
+      if (existing.order_mode === "money") {
+        setNumpadUnit("k");
+        setNumpadValue(existing.money_amount ?? "");
+      } else {
+        setNumpadUnit(existing.unit || ing.unit || "kg");
+        setNumpadValue(existing.quantity ?? "");
       }
-      return pages;
+    } else {
+      setNumpadIng(ing);
+      setNumpadMode("measure");
+      setNumpadUnit(ing.unit || "kg");
+      setNumpadValue("");
+    }
+    numpadTypingRef.current = false;
+  }, [items]);
+
+  const closeNumpad = useCallback(() => {
+    setNumpadIng(null);
+    setNumpadValue("");
+    numpadTypingRef.current = false;
+  }, []);
+
+  const numpadDigit = (d: string) => {
+    const fresh = !numpadTypingRef.current;
+    numpadTypingRef.current = true;
+    setNumpadValue(prev => {
+      if (fresh) return d;
+      if (prev.length >= 6) return prev;
+      if (prev === "0") return d;
+      return prev + d;
+    });
+  };
+
+  const numpadBackspace = () => {
+    setNumpadValue(prev => {
+      const next = prev.slice(0, -1);
+      if (next === "") numpadTypingRef.current = false;
+      return next;
+    });
+  };
+
+  const numpadClear = () => {
+    setNumpadValue("");
+    numpadTypingRef.current = false;
+  };
+
+  const numpadUnitChoices = useMemo(() => {
+    if (!numpadIng) return [] as string[];
+    const base = numpadIng.unit || "kg";
+    const extras = base === "kg" ? ["k"] : ["kg", "k"];
+    return [base, ...extras.filter(u => u !== base)];
+  }, [numpadIng]);
+
+  const cycleNumpadUnit = () => {
+    if (numpadUnit === "k") {
+      setNumpadUnit(numpadIng?.unit || "kg");
+      setNumpadMode("measure");
+      return;
+    }
+    const idx = numpadUnitChoices.indexOf(numpadUnit);
+    const next = idx >= 0 && idx + 1 < numpadUnitChoices.length ? numpadUnitChoices[idx + 1] : "k";
+    setNumpadUnit(next);
+    setNumpadMode(next === "k" ? "money" : "measure");
+  };
+
+  const appendPastedLine = (draft: OrderItemDraft) => {
+    const line = draftLine(draft);
+    setPasteFromStall(true);
+    setPasteText(prev => (prev.trim() ? `${prev.trimEnd()}\n${line}` : line));
+  };
+
+  const confirmNumpad = () => {
+    if (!numpadIng) return;
+    const raw = numpadValue.trim();
+    if (!raw || Number(raw) <= 0) {
+      const idx = items.findIndex(r => r.name.trim().toLowerCase() === numpadIng.name.trim().toLowerCase());
+      if (idx >= 0) {
+        setItems(prev => {
+          const next = prev.filter((_, i) => i !== idx).map((r, i) => ({ ...r, sort_order: i }));
+          queueMicrotask(() => syncItemsSideEffects(next));
+          return next;
+        });
+      }
+      closeNumpad();
+      return;
+    }
+    const draft: OrderItemDraft = {
+      name: numpadIng.name,
+      quantity: numpadMode === "measure" ? raw : "",
+      unit: numpadMode === "measure" ? numpadUnit : numpadIng.unit || "kg",
+      sort_order: 0,
+      catalog_id: numpadIng.id,
+      reference_price: numpadIng.reference_price,
+      order_mode: numpadMode,
+      money_amount: numpadMode === "money" ? raw : "",
+      notice: "",
     };
-
-    if (hasSubs) {
-      return groupedIngredients.flatMap(([sub, ings]) => chunk(sub, ings));
-    }
-
-    const pages = chunk("", activeIngredients);
-    return pages.length > 0 ? pages : [{ title: "", ings: [] }];
-  }, [groupedIngredients, activeIngredients]);
-
-  useEffect(() => {
-    setChipPage(0);
-    chipPagerRef.current?.scrollTo({ left: 0, behavior: "auto" });
-  }, [lockedCatId, ingSearch]);
-
-  const settleChipPage = useCallback(() => {
-    const el = chipPagerRef.current;
-    if (!el || el.clientWidth <= 0) return;
-    const next = Math.round(el.scrollLeft / el.clientWidth);
-    setChipPage(Math.max(0, Math.min(next, ingredientPages.length - 1)));
-  }, [ingredientPages.length]);
-
-  const priceByName = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const ing of catalog) {
-      if (ing.reference_price != null && Number(ing.reference_price) > 0) {
-        map.set(ing.name.trim().toLowerCase(), Number(ing.reference_price));
-      }
-    }
-    return map;
-  }, [catalog]);
-
-  const lineEstimate = (row: OrderItemDraft) => {
-    if (row.order_mode === "money") {
-      const vnd = draftMoneyVnd(row);
-      return vnd > 0 ? vnd : null;
-    }
-    const qty = Number(row.quantity) || 0;
-    const price =
-      row.reference_price != null && Number(row.reference_price) > 0
-        ? Number(row.reference_price)
-        : priceByName.get(row.name.trim().toLowerCase());
-    if (!price || qty <= 0) return null;
-    return qty * price;
-  };
-
-  const unitPriceForRow = (row: OrderItemDraft) => {
-    if (row.reference_price != null && Number(row.reference_price) > 0)
-      return Number(row.reference_price);
-    const byName = priceByName.get(row.name.trim().toLowerCase());
-    if (byName != null && byName > 0) return byName;
-    return null;
-  };
-
-  // Keep spare empty rows under the list; always at least one so you can add more
-  const emptyPlaceholderCount = Math.max(1, PLACEHOLDER_SLOTS - items.length);
-  const prevLenRef = useRef(items.length);
-  useEffect(() => {
-    const prev = prevLenRef.current;
-    prevLenRef.current = items.length;
-    // Collapse placeholder after 3 rows to save space — only small "new item" button
-    if (prev < 3 && items.length >= 3 && expandedKey === "ph-0") {
-      setExpandedKey("");
-      return;
-    }
-    if (items.length < 3 && expandedKey === "") {
-      setExpandedKey("ph-0");
-      return;
-    }
-    if (expandedKey === "") return; // collapsed is valid when >=3
-    // Keep expansion on a valid slot after items / placeholder count change
-    if (expandedKey.startsWith("item-")) {
-      const idx = Number(expandedKey.slice(5));
-      if (!Number.isFinite(idx) || idx < 0 || idx >= items.length) {
-        setExpandedKey(items.length === 0 ? "ph-0" : `item-${Math.max(0, items.length - 1)}`);
-      }
-      return;
-    }
-    if (expandedKey.startsWith("ph-")) {
-      const idx = Number(expandedKey.slice(3));
-      if (!Number.isFinite(idx) || idx < 0 || idx >= emptyPlaceholderCount) {
-        setExpandedKey("ph-0");
-      }
-    }
-  }, [items.length, expandedKey, emptyPlaceholderCount]);
-
-  const expandSlot = useCallback((key: string) => {
-    setExpandedKey(key);
-    setIngSearch("");
-    setChipPage(0);
-    requestAnimationFrame(() => {
-      chipPagerRef.current?.scrollTo({ left: 0, behavior: "auto" });
-    });
-  }, []);
-
-  const toggleSlot = useCallback((key: string) => {
-    setExpandedKey(prev => {
-      if (prev === key) return "";
-      setIngSearch("");
-      setChipPage(0);
-      requestAnimationFrame(() => {
-        chipPagerRef.current?.scrollTo({ left: 0, behavior: "auto" });
+    const key = numpadIng.name.trim().toLowerCase();
+    const existsIdx = items.findIndex(r => r.name.trim().toLowerCase() === key);
+    if (existsIdx >= 0) {
+      setItems(prev => {
+        const next = prev.map((r, i) => i === existsIdx ? { ...r, ...draft, id: r.id, sort_order: i } : r);
+        queueMicrotask(() => syncItemsSideEffects(next));
+        return next;
       });
-      return key;
-    });
-  }, []);
+    } else {
+      setItems(prev => {
+        const next = [...prev, { ...draft, sort_order: prev.length }];
+        queueMicrotask(() => syncItemsSideEffects(next));
+        return next;
+      });
+    }
+    appendPastedLine(draft);
+    closeNumpad();
+  };
 
   const persistDraftRows = async (oid: string, rows: OrderItemDraft[]) => {
     const cleaned = rows
@@ -825,10 +652,9 @@ export default function OrderDetail() {
       }
 
       setItems(next);
+      setPasteFromStall(true);
       syncItemsSideEffects(next);
       if (createdCount) await loadCatalog();
-      setPasteText("");
-      setPasteOpen(false);
       toast.success(`Đã thêm ${parsedPaste.length} dòng`, {
         description: createdCount
           ? `${createdCount} nguyên liệu mới vào danh mục`
@@ -843,254 +669,65 @@ export default function OrderDetail() {
     }
   };
 
-  const pickIngredientForExpanded = (ing: CatalogIngredient) => {
-    const key = ing.name.trim().toLowerCase();
-    const replacingSame =
-      expandedKey.startsWith("item-") &&
-      items[Number(expandedKey.slice(5))]?.name.trim().toLowerCase() === key;
-    if (!replacingSame) setFocusQtyName(key);
-    const entry: OrderItemDraft = {
-      name: ing.name,
-      quantity: "",
-      unit: ing.unit || "kg",
-      sort_order: 0,
-      catalog_id: ing.id,
-      reference_price: ing.reference_price,
-      order_mode: "measure",
-      money_amount: "",
-      notice: "",
-    };
-
-    if (expandedKey.startsWith("item-")) {
-      const idx = Number(expandedKey.slice(5));
-      setItems(prev => {
-        if (idx < 0 || idx >= prev.length) return prev;
-        let next: OrderItemDraft[];
-        if (prev[idx].name.trim().toLowerCase() === key) {
-          next = prev.filter((_, i) => i !== idx).map((row, i) => ({ ...row, sort_order: i }));
-        } else {
-          const withoutOtherDup = prev.filter(
-            (row, i) => i === idx || row.name.trim().toLowerCase() !== key,
-          );
-          const at = Math.min(idx, withoutOtherDup.length - 1);
-          next = withoutOtherDup.map((row, i) =>
-            i === at
-              ? { ...entry, id: prev[idx].id, sort_order: i }
-              : { ...row, sort_order: i },
-          );
-        }
-        queueMicrotask(() => syncItemsSideEffects(next));
-        return next;
-      });
-      return;
-    }
-
-    setItems(prev => {
-      const withoutDup = prev.filter(row => row.name.trim().toLowerCase() !== key);
-      const next = [...withoutDup, { ...entry, sort_order: withoutDup.length }];
-      queueMicrotask(() => {
-        syncItemsSideEffects(next);
-        expandSlot("ph-0");
-      });
-      return next;
-    });
-  };
-
-  const toggleBulkSelect = (id: string) => {
-    setBulkSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const handleBulkIngredientToggle = useCallback((
-    ing: CatalogIngredient,
-    willSelect: boolean
-  ) => {
-    toggleBulkSelect(ing.id);
-    if (willSelect) {
-      const entry: OrderItemDraft = {
-        name: ing.name,
-        quantity: defaultQty(ing),
-        unit: ing.unit || "kg",
-        sort_order: items.length,
-        catalog_id: ing.id,
-        reference_price: ing.reference_price,
-        order_mode: "measure",
-        money_amount: "",
-        notice: "",
-      };
-      setItems(prev => {
-        if (prev.some(r => r.name.trim().toLowerCase() === ing.name.trim().toLowerCase())) return prev;
-        const next = [...prev, entry].map((r, i) => ({ ...r, sort_order: i }));
-        queueMicrotask(() => syncItemsSideEffects(next));
-        return next;
-      });
-    } else {
-      setItems(prev => {
-        const next = prev
-          .filter(r => r.name.trim().toLowerCase() !== ing.name.trim().toLowerCase())
-          .map((r, i) => ({ ...r, sort_order: i }));
-        queueMicrotask(() => syncItemsSideEffects(next));
-        return next;
-      });
-    }
-  }, [items.length, toggleBulkSelect, syncItemsSideEffects]);
-
-  const handleBulkContinue = () => {
-    if (bulkSelected.size === 0) {
-      toast.error("Chọn ít nhất một nguyên liệu");
-      return;
-    }
-    const init = new Map<string, string>();
-    for (const id of bulkSelected) {
-      const ing = catalog.find(c => c.id === id);
-      if (ing) init.set(id, defaultQty(ing));
-    }
-    setBulkAmounts(init);
-    setBulkStep("amounts");
-  };
-
-  const handleBulkAdd = () => {
-    const selected = Array.from(bulkSelected)
-      .map(id => catalog.find(c => c.id === id))
-      .filter(Boolean) as CatalogIngredient[];
-    if (selected.length === 0) return;
-    const toAdd: OrderItemDraft[] = selected.map(ing => ({
-      name: ing.name,
-      quantity: bulkAmounts.get(ing.id) || defaultQty(ing),
-      unit: ing.unit || "kg",
-      sort_order: 0,
-      catalog_id: ing.id,
-      reference_price: ing.reference_price,
-      order_mode: "measure" as const,
-      money_amount: "",
-      notice: "",
-    }));
-    setItems(prev => {
-      const existingNames = new Set(prev.map(r => r.name.trim().toLowerCase()));
-      const filtered = toAdd.filter(t => !existingNames.has(t.name.trim().toLowerCase()));
-      const next = [...prev, ...filtered].map((r, i) => ({ ...r, sort_order: i }));
-      queueMicrotask(() => syncItemsSideEffects(next));
-      return next;
-    });
-    setBulkOpen(false);
-    setBulkSelected(new Set());
-    setBulkAmounts(new Map());
-    setBulkStep("choose");
-    toast.success(`Đã thêm ${selected.length} món`);
-  };
-
-  const renderChipCloud = () => (
-    <div className="bg-muted/20 px-3 py-2">
-      <div className="mb-2 flex items-center gap-2">
-        <Input
-          value={ingSearch}
-          onChange={e => setIngSearch(e.target.value)}
-          placeholder="Lọc…"
-          className="h-8 flex-1 text-xs"
-          onClick={e => e.stopPropagation()}
-        />
-      </div>
-      {ingredientPages.every(p => p.ings.length === 0) ? (
-        <p className="py-6 text-center text-xs text-muted-foreground">
-          Không có nguyên liệu trong danh mục này
-        </p>
-      ) : (
-        <>
-          {ingredientPages.length > 1 && (
-            <div className="mb-1.5 flex items-center justify-between gap-2">
-              <p className="min-w-0 truncate text-[10px] text-muted-foreground">
-                {ingredientPages[chipPage]?.title
-                  ? ingredientPages[chipPage].title
-                  : `Trang ${chipPage + 1}/${ingredientPages.length}`}
-              </p>
-              <div className="flex items-center gap-1" aria-hidden="true">
-                {ingredientPages.map((_, i) => (
-                  <span
-                    key={i}
-                    className={`h-1 rounded-full transition-all ${
-                      i === chipPage ? "w-3.5 bg-primary/70" : "w-1 bg-border"
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-          <div
-            ref={chipPagerRef}
-            className="ingredient-chip-pager"
-            onScroll={settleChipPage}
-            onTouchEnd={settleChipPage}
-            aria-label="Danh sách nguyên liệu"
-          >
-            {ingredientPages.map((page, pageIdx) => (
-              <div key={page.title || `page-${pageIdx}`} className="ingredient-chip-page">
-                <div className="ingredient-chip-track">
-                  {page.ings.map(ing => {
-                    const selected = addedByName.has(ing.name.trim().toLowerCase());
-                    const isActiveRow =
-                      expandedKey.startsWith("item-") &&
-                      items[Number(expandedKey.slice(5))]?.name.trim().toLowerCase() ===
-                        ing.name.trim().toLowerCase();
-                    const dotClass = frequentIngredientDotClass(ing.name, topFrequentNames);
-                    return (
-                      <button
-                        key={ing.id}
-                        type="button"
-                        onClick={e => {
-                          e.stopPropagation();
-                          pickIngredientForExpanded(ing);
-                        }}
-                        className={`inline-flex w-full min-w-0 items-center gap-1 rounded-lg border px-2.5 py-1.5 text-left text-xs transition-colors ${
-                          isActiveRow || selected
-                            ? "border-primary bg-primary/10 text-foreground"
-                            : "border-border/70 bg-background text-foreground hover:border-primary/40"
-                        }`}
-                      >
-                        {(isActiveRow || selected) && (
-                          <Check className="h-3 w-3 text-primary shrink-0" />
-                        )}
-                        {dotClass && (
-                          <span
-                            className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`}
-                            aria-hidden="true"
-                          />
-                        )}
-                        <span className="min-w-0 flex-1 truncate">{ing.name}</span>
-                        <span className="shrink-0 text-[10px] text-muted-foreground/55">
-                          {ing.unit}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-          {ingredientPages.length > 1 && (
-            <p className="mt-1.5 text-center text-[10px] text-muted-foreground/70">
-              Vuốt ngang để xem thêm
-            </p>
-          )}
-        </>
-      )}
-    </div>
+  const pastedLines = useMemo(
+    () => pasteText.split("\n").filter(l => l.trim()),
+    [pasteText],
   );
+  const hasPastedLines = pastedLines.length > 0;
+  const [editingPasted, setEditingPasted] = useState(false);
+  const [pasteFromStall, setPasteFromStall] = useState(false);
+  const pastableRef = useRef<HTMLDivElement>(null);
 
-  const updateRow = (index: number, patch: Partial<OrderItemDraft>) => {
-    setItems(prev => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
-  };
-
-  const removeRow = (index: number) => {
-    setItems(prev => {
-      const next = prev.filter((_, i) => i !== index).map((row, i) => ({ ...row, sort_order: i }));
-      queueMicrotask(() => syncItemsSideEffects(next));
-      return next;
+  useEffect(() => {
+    if (editingPasted) return;
+    const el = pastableRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight - el.clientHeight;
+      el.scrollLeft = el.scrollWidth - el.clientWidth;
     });
+  }, [pasteText, editingPasted]);
+
+  useEffect(() => {
+    if (editingPasted) pasteFieldRef.current?.focus();
+  }, [editingPasted]);
+
+  const handleCopyPasted = async () => {
+    const text = pasteText.trim();
+    if (!text) {
+      toast.error("Chưa có gì để copy");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Đã copy đơn");
+    } catch {
+      toast.error("Không copy được");
+    }
   };
+
+  const pasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text.trim()) {
+        toast.error("Clipboard trống");
+        return;
+      }
+      setPasteFromStall(false);
+      setPasteText(prev => (prev.trim() ? `${prev.trimEnd()}\n${text}` : text));
+    } catch (err: unknown) {
+      // Chrome blocks clipboard reads on the insecure contexts used for LAN
+      // testing, so fall back to focusing the field for a manual paste.
+      const message = err instanceof Error ? err.message : "Không đọc được clipboard";
+      toast.error(message, { description: "Nhấn giữ ô dưới và chọn Paste." });
+      pasteFieldRef.current?.focus();
+    }
+  };
+
+  const numpadTitle = useMemo(() => {
+    if (!numpadIng) return "";
+    return numpadIng.name;
+  }, [numpadIng]);
 
   const runImport = async () => {
     if (!user || importing) return;
@@ -1252,9 +889,9 @@ export default function OrderDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-28">
-      <div className="sticky top-0 z-10 border-b border-border/60 bg-background/95 px-4 py-3 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-lg items-center gap-3">
+    <div className="dat-si-page">
+      <header className="dat-si-page__head">
+        <div className="flex items-center gap-3">
           <Link
             to="/orders"
             className="inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -1268,7 +905,7 @@ export default function OrderDetail() {
             </h1>
             <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
               {orderIdentityLine(identity) ||
-                [formatOrderDay(new Date().toISOString()), lockedCatName && `Danh mục: ${lockedCatName}`]
+                [formatOrderDay(new Date().toISOString()), lockedCatName && `Đặt sỉ · ${lockedCatName}`]
                   .filter(Boolean)
                   .join(" · ")}
             </p>
@@ -1284,231 +921,130 @@ export default function OrderDetail() {
             </button>
           )}
         </div>
-      </div>
+      </header>
 
-      <div className="mx-auto max-w-lg px-4 py-4">
-        {catalogCats.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border px-4 py-5 text-center space-y-3">
-            <p className="text-xs text-muted-foreground">
-              Chưa có danh mục / nguyên liệu. Nhập từ pantry để bắt đầu.
-            </p>
-            <Button type="button" size="sm" disabled={importing} onClick={runImport}>
-              {importing ? "Đang nhập…" : "Nhập từ pantry"}
-            </Button>
-          </div>
-        ) : (
-          <>
-            <div className="mb-2 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setPasteOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/15"
-              >
-                <ClipboardList className="h-3.5 w-3.5" />
-                Dán tin
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setBulkOpen(!bulkOpen);
-                  if (!bulkOpen) {
-                    setBulkStep("choose");
-                    setBulkSelected(new Set());
+      {catalogCats.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+          <p className="text-xs text-muted-foreground">
+            Chưa có danh mục / nguyên liệu. Nhập từ pantry để bắt đầu.
+          </p>
+          <Button type="button" size="sm" disabled={importing} onClick={runImport}>
+            {importing ? "Đang nhập…" : "Nhập từ pantry"}
+          </Button>
+        </div>
+      ) : (
+        <>
+          <section className="dat-si-phieu" aria-label="Phiếu đặt sỉ">
+            <div className="dat-si-phieu__bar">
+              <div className="min-w-0">
+                <p className="dat-si-phieu__title">Phiếu {lockedCatName}</p>
+                <p className="dat-si-phieu__hint">
+                  {hasPastedLines
+                    ? `${pastedLines.length} dòng · chạm để sửa`
+                    : "10k = 10.000₫ · 10kg = khối lượng"}
+                </p>
+              </div>
+              {hasPastedLines ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 shrink-0 gap-1.5 text-xs"
+                  onClick={() => void handleCopyPasted()}
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  Copy
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 shrink-0 gap-1.5 text-xs"
+                  onClick={() => void pasteFromClipboard()}
+                >
+                  <ClipboardPaste className="h-3.5 w-3.5" />
+                  Paste
+                </Button>
+              )}
+            </div>
+            {hasPastedLines && !editingPasted ? (
+              <div
+                ref={pastableRef}
+                onClick={() => setEditingPasted(true)}
+                className="dat-si-phieu__sheet"
+                aria-live="polite"
+                role="button"
+                tabIndex={0}
+                aria-label="Chạm để chỉnh sửa phiếu"
+                onKeyDown={e => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setEditingPasted(true);
                   }
                 }}
-                className={`rounded-full border px-3 py-1.5 text-xs font-medium ${bulkOpen ? "border-primary bg-primary text-primary-foreground" : "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15"}`}
               >
-                {bulkOpen ? "Đóng sỉ" : "Đặt sỉ"}
+                {pastedLines.map((line, idx) => (
+                  <div key={idx} className="dat-si-phieu__line">
+                    {line}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {!hasPastedLines && !editingPasted ? (
+              <button
+                type="button"
+                className="dat-si-phieu__wake"
+                onClick={() => setEditingPasted(true)}
+              >
+                Chạm để viết phiếu…
               </button>
-            </div>
-            {bulkOpen && (
-              <div className="mb-3 overflow-hidden rounded-xl border border-primary/20 bg-card">
-                {bulkStep === "choose" ? (
-                  <div className="p-3">
-                    <div className="mb-2 flex items-center gap-2">
-                      <Input
-                        value={ingSearch}
-                        onChange={e => setIngSearch(e.target.value)}
-                        placeholder="Chọn nhiều — lọc…"
-                        className="h-8 flex-1 text-xs"
-                      />
-                      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{bulkSelected.size} chọn</span>
-                    </div>
-                    <BulkIngredientPager
-                      pages={ingredientPages}
-                      selected={bulkSelected}
-                      alreadyInOrder={name => addedByName.has(name.trim().toLowerCase())}
-                      onToggle={handleBulkIngredientToggle}
-                    />
-                    <div className="mt-3 flex justify-end">
-                      <Button type="button" size="sm" disabled={bulkSelected.size === 0} onClick={handleBulkContinue}>
-                        Xong — nhập SL
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-3">
-                    <p className="mb-2 text-xs font-medium">Nhập số lượng cho {bulkSelected.size} món đã chọn (đã hiện trên bảng trên)</p>
-                    <div className="max-h-[40vh] space-y-2 overflow-auto pr-1">
-                      {Array.from(bulkSelected).map(id => {
-                        const ing = catalog.find(c => c.id === id);
-                        if (!ing) return null;
-                        const qty = bulkAmounts.get(id) || "";
-                        // also sync to table row if edited here
-                        return (
-                          <div key={id} className="flex items-center gap-2 rounded-lg border border-border/60 bg-card px-2.5 py-2">
-                            <span className="min-w-0 flex-1 truncate text-sm font-medium">{ing.name}</span>
-                            <span className="shrink-0 text-[11px] text-muted-foreground">{ing.unit}</span>
-                            <Input
-                              value={qty}
-                              onChange={e => {
-                                const v = e.target.value.replace(/[^\d.]/g, "");
-                                setBulkAmounts(prev => { const m = new Map(prev); m.set(id, v); return m; });
-                                // live update table row quantity
-                                setItems(prev => prev.map(r => r.name.trim().toLowerCase() === ing.name.trim().toLowerCase() ? { ...r, quantity: v } : r));
-                              }}
-                              onBlur={() => {
-                                const v = bulkAmounts.get(id) || defaultQty(ing);
-                                setItems(prev => {
-                                  const next = prev.map(r => r.name.trim().toLowerCase() === ing.name.trim().toLowerCase() ? { ...r, quantity: v } : r);
-                                  queueMicrotask(() => syncItemsSideEffects(next));
-                                  return next;
-                                });
-                              }}
-                              placeholder={defaultQty(ing)}
-                              inputMode="decimal"
-                              className="h-8 w-20 border-0 bg-muted/40 px-2 text-right text-sm tabular-nums focus-visible:ring-1"
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="mt-3 flex gap-2">
-                      <Button type="button" variant="outline" className="flex-1" onClick={() => setBulkStep("choose")}>Quay lại</Button>
-                      <Button
-                        type="button"
-                        className="flex-1"
-                        onClick={() => {
-                          // finalize quantities already synced via onBlur, just collapse
-                          setBulkOpen(false);
-                          setBulkStep("choose");
-                          toast.success(`Đã cập nhật ${bulkSelected.size} món`);
-                        }}
-                      >
-                        Xong
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
+            ) : null}
+            {editingPasted && (
+              <Textarea
+                ref={pasteFieldRef}
+                value={pasteText}
+                onChange={e => {
+                  setPasteFromStall(false);
+                  setPasteText(e.target.value);
+                }}
+                onBlur={() => setEditingPasted(false)}
+                placeholder={"Dán tin nhắn…\n10kg cà rốt\n10k lá quế"}
+                className="dat-si-phieu__field focus-visible:ring-0 focus-visible:ring-offset-0"
+                autoFocus
+              />
             )}
-            <div className="overflow-hidden rounded-xl border border-border/60 bg-card">
-              <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2 border-b border-border/50 px-3 py-1.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                <span>Nguyên liệu</span>
-                <span className="w-[3.25rem] text-right">SL</span>
-                <span className="w-[4.5rem] justify-self-end text-right">Đơn giá</span>
-              </div>
-            {items.map((row, index) => {
-              const key = `item-${index}`;
-              const expanded = expandedKey === key;
-              return (
-                <div key={row.id || key} className="border-b border-border/40 last:border-b-0">
-                  <OrderFilledRow
-                    row={row}
-                    expanded={expanded}
-                    unitPrice={unitPriceForRow(row)}
-                    chipCloud={expanded ? renderChipCloud() : null}
-                    autoFocusQty={
-                      focusQtyName !== null &&
-                      row.name.trim().toLowerCase() === focusQtyName
-                    }
-                    onFocusQtyHandled={clearFocusQty}
-                    onExpand={() => toggleSlot(key)}
-                    onUpdate={patch => updateRow(index, patch)}
-                    onCommitNotice={notice => {
-                      setItems(prev => {
-                        const next = prev.map((row, i) =>
-                          i === index ? { ...row, notice } : row,
-                        );
-                        queueMicrotask(() => syncItemsSideEffects(next));
-                        return next;
-                      });
-                    }}
-                    onRemove={() => removeRow(index)}
-                  />
-                </div>
-              );
-            })}
-            {items.length >= 3 ? (
-              expandedKey === "ph-0" ? (
-                <div className="border-b border-border/40">
-                  <button
-                    type="button"
-                    onClick={() => toggleSlot("ph-0")}
-                    className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 bg-primary/5 px-3 py-1.5 text-left"
-                  >
-                    <p className="min-w-0 truncate text-sm text-muted-foreground/35">
-                      Tên nguyên liệu
-                    </p>
-                    <div className="flex shrink-0 items-baseline">
-                      <span className="inline-flex h-7 w-8 items-center justify-end text-sm tabular-nums text-muted-foreground/30">
-                        0
-                      </span>
-                      <span className="ml-0.5 text-xs text-muted-foreground/25">đv</span>
-                    </div>
-                    <span className="w-[4.5rem] shrink-0 justify-self-end text-right ml-2 text-[11px] text-muted-foreground/25">
-                      —
-                    </span>
-                  </button>
-                  {renderChipCloud()}
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => expandSlot("ph-0")}
-                  className="flex w-full items-center justify-center gap-1.5 border-t border-dashed border-border/60 bg-card px-3 py-2.5 text-xs font-medium text-muted-foreground hover:border-primary/30 hover:text-foreground"
-                >
-                  <span className="text-base leading-none">+</span> Thêm món mới
-                </button>
-              )
-            ) : (
-              Array.from({ length: emptyPlaceholderCount }).map((_, i) => {
-                const key = `ph-${i}`;
-                const expanded = expandedKey === key;
-                return (
-                  <div key={key} className="border-b border-border/40 last:border-b-0">
-                    <button
-                      type="button"
-                      onClick={() => toggleSlot(key)}
-                      className={`grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 px-3 py-1.5 text-left ${
-                        expanded ? "bg-primary/5" : "hover:bg-muted/30"
-                      }`}
-                    >
-                      <p className="min-w-0 truncate text-sm text-muted-foreground/35">
-                        Tên nguyên liệu
-                      </p>
-                      <div className="flex shrink-0 items-baseline">
-                        <span className="inline-flex h-7 w-8 items-center justify-end text-sm tabular-nums text-muted-foreground/30">
-                          0
-                        </span>
-                        <span className="ml-0.5 text-xs text-muted-foreground/25">đv</span>
-                      </div>
-                      <span className="w-[4.5rem] shrink-0 justify-self-end text-right ml-2 text-[11px] text-muted-foreground/25">
-                        —
-                      </span>
-                    </button>
-                    {expanded && renderChipCloud()}
-                  </div>
-                );
-              })
+            {parsedPaste.length > 0 && !pasteFromStall && (
+              <Button
+                type="button"
+                size="sm"
+                className="dat-si-phieu__apply"
+                disabled={pasteApplying}
+                onClick={() => void applyPastedLines()}
+              >
+                {pasteApplying
+                  ? "Đang thêm…"
+                  : pasteNewCount
+                    ? `Thêm ${parsedPaste.length} dòng · ${pasteNewCount} mới`
+                    : `Thêm ${parsedPaste.length} dòng`}
+              </Button>
             )}
-          </div>
-            </>
-        )}
-      </div>
+          </section>
 
-      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-card/95 px-4 py-3 backdrop-blur-sm safe-area-bottom">
-        <div className="mx-auto flex max-w-lg gap-2">
+          <DatSiStall
+            ingredients={activeIngredients}
+            searching={Boolean(ingSearch.trim())}
+            search={ingSearch}
+            onSearch={setIngSearch}
+            pickedLabel={pickedLabel}
+            frequentDot={name => frequentIngredientDotClass(name, topFrequentNames)}
+            onPick={openNumpadFor}
+          />
+        </>
+      )}
+
+      <div className="dat-si-page__foot">
+        <div className="flex gap-2">
           <Button
             type="button"
             variant="outline"
@@ -1541,6 +1077,39 @@ export default function OrderDetail() {
           )}
         </div>
       </div>
+
+      <Dialog open={numpadIng != null} onOpenChange={open => { if (!open) closeNumpad(); }}>
+        <DialogContent className="max-w-[92vw] rounded-xl sm:max-w-sm" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle className="font-display">{numpadTitle}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/30 px-3 py-2">
+              <span className="text-sm tabular-nums font-medium">{numpadValue || "—"}</span>
+              <button
+                type="button"
+                onClick={cycleNumpadUnit}
+                className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/15"
+              >
+                {numpadUnit === "k" ? "k · 000₫" : numpadUnit}
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {["1","2","3","4","5","6","7","8","9"].map(d => (
+                <button key={d} type="button" onClick={() => numpadDigit(d)} className="h-12 rounded-xl border border-border/60 bg-card text-lg font-medium shadow-sm active:scale-95">{d}</button>
+              ))}
+              <button type="button" onClick={numpadClear} className="h-12 rounded-xl border border-border/60 bg-muted/40 text-sm font-medium active:scale-95">C</button>
+              <button type="button" onClick={() => numpadDigit("0")} className="h-12 rounded-xl border border-border/60 bg-card text-lg font-medium shadow-sm active:scale-95">0</button>
+              <button type="button" onClick={numpadBackspace} className="h-12 rounded-xl border border-border/60 bg-muted/40 text-sm font-medium active:scale-95">⌫</button>
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={closeNumpad}>Hủy</Button>
+              <Button type="button" variant="outline" className="flex-1" onClick={() => { if (!numpadIng) return; const idx = items.findIndex(r => r.name.trim().toLowerCase() === numpadIng.name.trim().toLowerCase()); if (idx >= 0) { setItems(prev => { const next = prev.filter((_, i) => i !== idx).map((r,i)=>({...r, sort_order:i})); queueMicrotask(()=>syncItemsSideEffects(next)); return next; }); } closeNumpad(); }}>Xóa</Button>
+              <Button type="button" className="flex-1" onClick={confirmNumpad}>Lưu</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={shareOpen}
@@ -1606,85 +1175,6 @@ export default function OrderDetail() {
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={pasteOpen}
-        onOpenChange={open => {
-          setPasteOpen(open);
-          if (!open) setPasteApplying(false);
-        }}
-      >
-        <DialogContent className="flex max-h-[90vh] max-w-[92vw] flex-col overflow-hidden rounded-xl sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="font-display">Dán tin nhắn</DialogTitle>
-          </DialogHeader>
-          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-            <p className="shrink-0 text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">10k</span> là 10.000₫.
-              {" "}
-              <span className="font-medium text-foreground">10kg</span> vẫn là khối lượng. Tên mới sẽ được thêm vào danh mục.
-            </p>
-            <Textarea
-              value={pasteText}
-              onChange={e => setPasteText(e.target.value)}
-              placeholder={"10kg cà rốt\n10k lá quế\n3 bịch bào ngư xám"}
-              className="h-28 shrink-0 resize-y rounded-xl text-sm"
-              autoFocus
-            />
-            {parsedPaste.length > 0 && (
-              <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-border/60">
-                <div className="grid grid-cols-[auto_1fr_auto] gap-px bg-border/60">
-                  <div className="bg-muted/40 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    SL
-                  </div>
-                  <div className="bg-muted/40 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Tên
-                  </div>
-                  <div className="bg-muted/40 px-2 py-1 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Khớp
-                  </div>
-                  {parsedPaste.map((line, idx) => (
-                    <div key={`${line.normalizedName}-${idx}`} className="contents">
-                      <div
-                        className={`bg-card px-2 py-1.5 text-center text-xs tabular-nums ${
-                          line.matched ? "" : "bg-amber-50 text-amber-800"
-                        }`}
-                      >
-                        {formatParsedAmount(line)}
-                      </div>
-                      <div
-                        className={`bg-card px-2 py-1.5 text-xs ${
-                          line.matched ? "text-foreground" : "bg-amber-50 font-medium text-amber-800"
-                        }`}
-                      >
-                        {line.matched?.name ?? line.name}
-                      </div>
-                      <div
-                        className={`bg-card px-2 py-1.5 text-right text-[10px] ${
-                          line.matched ? "text-muted-foreground" : "bg-amber-50 text-amber-700"
-                        }`}
-                      >
-                        {line.matched ? "có sẵn" : "mới"}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            <Button
-              type="button"
-              className="w-full shrink-0"
-              disabled={parsedPaste.length === 0 || pasteApplying}
-              onClick={() => void applyPastedLines()}
-            >
-              {pasteApplying
-                ? "Đang thêm…"
-                : pasteNewCount
-                  ? `Thêm ${parsedPaste.length} dòng · ${pasteNewCount} mới`
-                  : `Thêm ${parsedPaste.length} dòng`}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

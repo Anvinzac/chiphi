@@ -3,6 +3,11 @@
 export const OPENAI_COMPAT_MISSING_KEY =
   "Chưa có OPENAI_API_KEY trong .env.local. Thêm OPENAI_API_KEY (và tuỳ chọn OPENAI_BASE_URL, OPENAI_MODEL) rồi restart bun run dev.";
 
+export function isMissingOpenAiKeyError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err ?? "");
+  return message.includes("OPENAI_API_KEY") || message.includes(OPENAI_COMPAT_MISSING_KEY);
+}
+
 export const OPENAI_COMPAT_DEV_PATH = "/openai-compat/chat/completions";
 
 export function openaiCompatModel() {

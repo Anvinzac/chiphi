@@ -47,6 +47,8 @@ interface AmountPhaseProps {
   nestedLines?: ExpenseLine[];
   onClearNested?: () => void;
   onPickReceiptPhoto?: (file: File) => void;
+  onClearReceipt?: () => void;
+  receiptPreview?: string | null;
   receiptAnalyzing?: boolean;
   vendors?: VendorOption[];
   frequentVendorIds?: string[];
@@ -92,6 +94,8 @@ export default function AmountPhase({
   nestedLines = [],
   onClearNested,
   onPickReceiptPhoto,
+  onClearReceipt,
+  receiptPreview = null,
   receiptAnalyzing = false,
   vendors = [],
   frequentVendorIds = [],
@@ -334,6 +338,7 @@ export default function AmountPhase({
                     ref={receiptCameraRef}
                     type="file"
                     accept="image/*"
+                    capture="environment"
                     className="sr-only"
                     tabIndex={-1}
                     onChange={e => {
@@ -376,13 +381,21 @@ export default function AmountPhase({
                       type="button"
                       disabled={receiptAnalyzing}
                       onClick={() => receiptCameraRef.current?.click()}
-                      className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-primary/40 bg-primary/12 text-primary transition-colors hover:bg-primary/18 disabled:opacity-50 ${
+                      className={`relative inline-flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-primary/40 bg-primary/12 text-primary transition-colors hover:bg-primary/18 disabled:opacity-50 ${
                         receiptAnalyzing ? "receipt-analyze-busy" : ""
                       }`}
-                      aria-label="Tải ảnh biên lai để lấy số tiền"
+                      aria-label={receiptPreview ? "Chụp lại biên lai" : "Tải ảnh biên lai để lấy số tiền"}
                       aria-busy={receiptAnalyzing}
                     >
-                      <Camera className="h-5 w-5" />
+                      {receiptPreview ? (
+                        <img
+                          src={receiptPreview}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <Camera className="h-5 w-5" />
+                      )}
                     </button>
                   ) : null}
                 </div>
@@ -516,6 +529,38 @@ export default function AmountPhase({
             </button>
           </div>
         </div>
+
+        {receiptPreview ? (
+          <div className="amount-receipt" aria-label="Ảnh biên lai">
+            <button
+              type="button"
+              className="amount-receipt__shot"
+              onClick={() => receiptCameraRef.current?.click()}
+              aria-label="Chụp lại biên lai"
+            >
+              <img src={receiptPreview} alt="Biên lai đã chụp" />
+              {receiptAnalyzing ? (
+                <span className="amount-receipt__busy" aria-hidden />
+              ) : null}
+            </button>
+            <div className="amount-receipt__meta">
+              <p className="amount-receipt__title">Biên lai</p>
+              <p className="amount-receipt__hint">
+                {receiptAnalyzing ? "Đang đọc chữ viết tay…" : "Đã gắn ảnh · chạm để chụp lại"}
+              </p>
+            </div>
+            {onClearReceipt ? (
+              <button
+                type="button"
+                onClick={onClearReceipt}
+                className="amount-receipt__clear"
+                aria-label="Xóa ảnh biên lai"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         <div
           className={`note-suggest-strip ${showNoteSuggestions ? "note-suggest-strip--open" : ""}`}

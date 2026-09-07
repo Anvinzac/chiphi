@@ -720,6 +720,95 @@
     animation: receiptAnalyzePulse 0.9s cubic-bezier(0.22, 1.12, 0.32, 1) infinite;
   }
 
+  .amount-receipt {
+    display: grid;
+    grid-template-columns: 7.4rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.65rem;
+    margin-top: 0.7rem;
+    padding: 0.4rem;
+    min-height: 5.6rem;
+    border-radius: 1rem;
+    border: 1px solid hsl(25 16% 78% / 0.7);
+    background:
+      linear-gradient(180deg, hsl(32 40% 97%) 0%, hsl(30 26% 94%) 100%);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.7);
+    animation: amountReceiptIn 0.42s cubic-bezier(0.22, 1.12, 0.32, 1) both;
+  }
+
+  .amount-receipt__shot {
+    position: relative;
+    height: 4.85rem;
+    width: 7.4rem;
+    overflow: hidden;
+    border-radius: 0.75rem;
+    background: hsl(25 14% 22% / 0.06);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .amount-receipt__shot img {
+    height: 100%;
+    width: 100%;
+    object-fit: cover;
+    object-position: center top;
+  }
+
+  .amount-receipt__busy {
+    position: absolute;
+    inset: 0;
+    background: hsl(32 30% 96% / 0.35);
+    animation: receiptAnalyzePulse 0.9s cubic-bezier(0.22, 1.12, 0.32, 1) infinite;
+  }
+
+  .amount-receipt__meta {
+    min-width: 0;
+  }
+
+  .amount-receipt__title {
+    font-size: 0.8rem;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    color: hsl(25 12% 22%);
+  }
+
+  .amount-receipt__hint {
+    margin-top: 0.15rem;
+    font-size: 0.68rem;
+    line-height: 1.35;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .amount-receipt__clear {
+    display: inline-flex;
+    height: 1.85rem;
+    width: 1.85rem;
+    align-items: center;
+    justify-content: center;
+    margin-right: 0.15rem;
+    border-radius: 999px;
+    color: hsl(var(--muted-foreground));
+    background: hsl(var(--background) / 0.7);
+  }
+
+  .amount-receipt__clear:hover {
+    color: hsl(var(--foreground));
+  }
+
+  @keyframes amountReceiptIn {
+    0% {
+      opacity: 0;
+      transform: translateY(8px) scale(0.97);
+    }
+    70% {
+      opacity: 1;
+      transform: translateY(-2px) scale(1.015);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
   .schedule-fold-chevron {
     transition: transform 0.38s cubic-bezier(0.22, 1.12, 0.32, 1);
   }
@@ -755,6 +844,14 @@
     }
 
     .receipt-analyze-busy {
+      animation: none;
+    }
+
+    .amount-receipt {
+      animation: none;
+    }
+
+    .amount-receipt__busy {
       animation: none;
     }
 

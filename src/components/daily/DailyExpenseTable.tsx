@@ -52,6 +52,7 @@ import {
   type ExpenseLine,
 } from "@/lib/salaryEmployees";
 import { extractReceiptJsonFromImage } from "@/lib/receiptVision";
+import { isMissingOpenAiKeyError } from "@/lib/openaiCompatible";
 import type { Json } from "@/integrations/supabase/types";
 import { useLaggedSnapshot } from "@/hooks/useLaggedSnapshot";
 import { useHighValueThresholds } from "@/hooks/useHighValueThresholds";
@@ -1089,6 +1090,7 @@ export default function DailyExpenseTable({
       const ok = await applyExpenseJson(json, { source: "receipt" });
       if (ok) goToAmountPhaseRef.current?.();
     } catch (err: unknown) {
+      if (isMissingOpenAiKeyError(err)) return;
       const message = err instanceof Error ? err.message : "Không đọc được biên lai";
       toast.error(message);
     } finally {
@@ -2603,6 +2605,8 @@ export default function DailyExpenseTable({
                     nestedLines={pendingNestedLines}
                     onClearNested={() => setPendingNestedLines([])}
                     onPickReceiptPhoto={file => void analyzeReceiptPhoto(file)}
+                    onClearReceipt={() => setReceiptFile(null)}
+                    receiptPreview={receiptPreview}
                     receiptAnalyzing={receiptAnalyzing}
                     vendors={suppliers}
                     frequentVendorIds={frequentVendorIds}

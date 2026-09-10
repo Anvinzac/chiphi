@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Plus, Trash2, ChevronDown, ChevronRight, Users, Tag, BarChart3, CalendarIcon, X, Check, ShoppingBasket, ClipboardCheck } from "lucide-react";
-import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO, isWithinInterval } from "date-fns";
+import { Plus, Trash2, ChevronDown, ChevronRight, Users, Tag, BarChart3, CalendarIcon, X, Check, ShoppingBasket, ClipboardCheck, Calculator } from "lucide-react";
+import { addDays, format, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO, isWithinInterval } from "date-fns";
+import { getPeriodBounds, getPeriodOffsetForDate } from "@/lib/expensePeriod";
+import { formatDayMonthRange } from "@/lib/formatDateVi";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from "recharts";
 import { toast } from "sonner";
 import type { DateRange } from "react-day-picker";
@@ -15,7 +17,7 @@ import MoneyLabel from "@/components/daily/MoneyLabel";
 import OrderCatalogAdmin from "@/components/admin/OrderCatalogAdmin";
 import VendorsManager from "@/components/vendors/VendorsManager";
 
-type AdminTab = "summary" | "pending" | "categories" | "subcategories" | "suppliers" | "items" | "orderCats" | "orderIngs";
+type AdminTab = "summary" | "catSum" | "pending" | "categories" | "subcategories" | "suppliers" | "items" | "orderCats" | "orderIngs";
 type CategoryFrequency = "daily" | "weekly" | "monthly";
 
 const CHART_COLORS = [
@@ -80,6 +82,46 @@ export default function AdminDashboard() {
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [sumCatIds, setSumCatIds] = useState<Set<string>>(new Set());
+  type SumPreset = "period" | "month" | "last30" | "custom";
+  const [sumPreset, setSumPreset] = useState<SumPreset>("period");
+  const [sumPeriodOffset, setSumPeriodOffset] = useState(() => getPeriodOffsetForDate(new Date()));
+  const [sumStartInput, setSumStartInput] = useState("");
+  const [sumEndInput, setSumEndInput] = useState("");
+
+  const sumRange = useMemo(() => {
+    if (sumPreset === "custom") {
+      if (!sumStartInput || !sumEndInput) return null;
+      const s = parseISO(sumStartInput);
+      const e = parseISO(sumEndInput);
+      if (isNaN(s.getTime()) || isNaN(e.getTime())) return null;
+      return s <= e ? { start: s, end: e } : { start: e, end: s };
+    }
+    if (sumPreset === "month") {
+      const t = new Date();
+      return { start: startOfMonth(t), end: endOfMonth(t) };
+    }
+    if (sumPreset === "last30") {
+      const t = new Date();
+      return { start: addDays(t, -29), end: t };
+    }
+    return getPeriodBounds(sumPeriodOffset);
+  }, [sumPreset, sumPeriodOffset, sumStartInput, sumEndInput]);
+
+  const sumFilteredPayments = useMemo(() => {
+    if (!sumRange) return [];
+    return payments.filter(p => {
+      try { return isWithinInterval(parseISO(p.date), sumRange); } catch { return false; }
+    });
+  }, [payments, sumRange]);
+  const sumTotal = useMemo(() => sumFilteredPayments.reduce((s, p) => s + Number(p.total_amount), 0), [sumFilteredPayments]);
+
+  const openSumCustom = () => {
+    const r = sumRange ?? getPeriodBounds(getPeriodOffsetForDate(new Date()));
+    setSumStartInput(format(r.start, "yyyy-MM-dd"));
+    setSumEndInput(format(r.end, "yyyy-MM-dd"));
+    setSumPreset("custom");
+  };
 
   useEffect(() => {
     const onAccountData = () => setDataTick(n => n + 1);
@@ -136,6 +178,7 @@ export default function AdminDashboard() {
 
   const tabs: { key: AdminTab; label: string; icon: React.ReactNode }[] = [
     { key: "summary", label: "Summary", icon: <BarChart3 className="h-4 w-4" /> },
+    { key: "catSum", label: "Cat sum", icon: <Calculator className="h-4 w-4" /> },
     { key: "pending", label: "Chờ duyệt", icon: <ClipboardCheck className="h-4 w-4" /> },
     { key: "categories", label: "Categories", icon: <Tag className="h-4 w-4" /> },
     { key: "subcategories", label: "Sub-categories", icon: <Tag className="h-4 w-4" /> },
@@ -219,6 +262,40 @@ export default function AdminDashboard() {
     });
     return Array.from(map, ([name, value]) => ({ name, value }));
   }, [filteredPayments, categories]);
+
+  // Per-category sums over the Cat-sum range (includes uncategorized so totals reconcile)
+  const UNCATEGORIZED_ID = "__uncategorized__";
+  const categorySums = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const c of categories) map.set(c.id, 0);
+    map.set(UNCATEGORIZED_ID, 0);
+    sumFilteredPayments.forEach(p => {
+      (p.sub_payments || []).forEach((sp: any) => {
+        const key = sp.category_id && map.has(sp.category_id) ? sp.category_id : UNCATEGORIZED_ID;
+        map.set(key, (map.get(key) ?? 0) + Number(sp.amount));
+      });
+    });
+    return Array.from(map, ([id, value]) => ({
+      id,
+      name: id === UNCATEGORIZED_ID ? "Chưa phân loại" : (categories.find(c => c.id === id)?.name ?? "Khác"),
+      value,
+    })).sort((a, b) => b.value - a.value);
+  }, [sumFilteredPayments, categories]);
+
+  const selectedCatSum = useMemo(
+    () => categorySums.filter(r => sumCatIds.has(r.id)).reduce((s, r) => s + r.value, 0),
+    [categorySums, sumCatIds],
+  );
+  const selectedCatCount = sumCatIds.size;
+  const selectedCatPct = sumTotal > 0 ? (selectedCatSum / sumTotal) * 100 : 0;
+
+  const toggleSumCat = (id: string) =>
+    setSumCatIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const monthlyTrend = useMemo(() => {
     const months: { month: string; total: number }[] = [];
@@ -399,6 +476,138 @@ export default function AdminDashboard() {
                 </ResponsiveContainer>
               ) : <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">No data yet</div>}
             </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "catSum" && (
+        <div className="space-y-4">
+          {/* Predefined ranges (same 30-day periods as the expense view) + editable dates */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 px-0"
+                aria-label="Kỳ trước"
+                disabled={sumPreset !== "period"}
+                onClick={() => setSumPeriodOffset(o => o - 1)}
+              >
+                <ChevronRight className="h-4 w-4 rotate-180" />
+              </Button>
+              {([
+                ["period", sumPreset === "period" && sumPeriodOffset === getPeriodOffsetForDate(new Date()) ? "Kỳ này" : "Theo kỳ"],
+                ["month", "Tháng này"],
+                ["last30", "30 ngày qua"],
+              ] as [typeof sumPreset, string][]).map(([preset, label]) => (
+                <Button
+                  key={preset}
+                  size="sm"
+                  variant={sumPreset === preset ? "default" : "outline"}
+                  className="text-xs"
+                  onClick={() => {
+                    if (preset === "period") setSumPeriodOffset(getPeriodOffsetForDate(new Date()));
+                    setSumPreset(preset);
+                  }}
+                >
+                  {label}
+                </Button>
+              ))}
+              <Button
+                size="sm"
+                variant={sumPreset === "custom" ? "default" : "outline"}
+                className="text-xs"
+                onClick={openSumCustom}
+              >
+                Tùy chỉnh
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 px-0"
+                aria-label="Kỳ sau"
+                disabled={sumPreset !== "period" || sumPeriodOffset >= getPeriodOffsetForDate(new Date())}
+                onClick={() => setSumPeriodOffset(o => o + 1)}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-xs tabular-nums text-muted-foreground">
+              {sumRange ? formatDayMonthRange(sumRange.start, sumRange.end) : "Chọn ngày bắt đầu và kết thúc"}
+            </p>
+            {sumPreset === "custom" && (
+              <div className="grid grid-cols-2 gap-2">
+                <label className="space-y-1">
+                  <span className="block pl-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Từ ngày</span>
+                  <Input type="date" value={sumStartInput} max={sumEndInput || undefined} onChange={e => setSumStartInput(e.target.value)} className="h-9 text-sm tabular-nums" />
+                </label>
+                <label className="space-y-1">
+                  <span className="block pl-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Đến ngày</span>
+                  <Input type="date" value={sumEndInput} min={sumStartInput || undefined} onChange={e => setSumEndInput(e.target.value)} className="h-9 text-sm tabular-nums" />
+                </label>
+              </div>
+            )}
+          </div>
+
+          {/* Selected sum + % of total expense */}
+          <div className="card-editorial p-4 border-primary/30 bg-primary/5">
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                {selectedCatCount === 0 ? "Chưa chọn danh mục" : `${selectedCatCount} danh mục đã chọn`}
+              </p>
+              <p className="text-xs tabular-nums text-muted-foreground">
+                {selectedCatPct.toFixed(1)}% tổng chi
+              </p>
+            </div>
+            <MoneyLabel amount={selectedCatSum} className="text-2xl font-display mt-1 block" suffix="" smallClassName="text-[0.65em]" />
+            <p className="mt-1 text-[11px] tabular-nums text-muted-foreground">
+              Tổng chi kỳ này: <MoneyLabel amount={sumTotal} className="inline" suffix="" smallClassName="text-[0.8em]" />
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setSumCatIds(new Set(categorySums.map(r => r.id)))}
+              disabled={categorySums.length === 0}
+            >
+              Chọn tất cả
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setSumCatIds(new Set())} disabled={selectedCatCount === 0}>
+              <X className="h-3 w-3 mr-1" />Xóa chọn
+            </Button>
+          </div>
+
+          <div className="card-editorial overflow-hidden">
+            {categorySums.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-muted-foreground">Chưa có danh mục</p>
+            ) : (
+              <div className="divide-y divide-border/40">
+                {categorySums.map(row => {
+                  const on = sumCatIds.has(row.id);
+                  const pct = sumTotal > 0 ? (row.value / sumTotal) * 100 : 0;
+                  return (
+                    <label
+                      key={row.id}
+                      className={`flex cursor-pointer items-center gap-3 px-4 py-2.5 text-sm transition-colors ${on ? "bg-primary/5" : "hover:bg-muted/30"}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={() => toggleSumCat(row.id)}
+                        className="h-4 w-4 shrink-0 rounded border-border text-primary focus:ring-primary/30"
+                      />
+                      <span className="min-w-0 flex-1 truncate font-medium">{row.name}</span>
+                      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{pct.toFixed(1)}%</span>
+                      <span className="w-28 shrink-0 text-right tabular-nums">
+                        <MoneyLabel amount={row.value} suffix="" smallClassName="text-[0.8em]" />
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
